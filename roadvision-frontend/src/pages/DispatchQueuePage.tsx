@@ -187,6 +187,8 @@ export const DispatchQueuePage: React.FC = () => {
               <option value="ROAD_CRACK">Vết nứt mặt đường (Crack)</option>
               <option value="ROAD_FLOODING">Điểm ngập úng (Flooding)</option>
               <option value="ROAD_OBSTACLE">Chướng ngại vật (Obstacle)</option>
+              <option value="COMPLEX_DAMAGE">Hư hại phức hợp (Complex)</option>
+              <option value="OTHER">Hư hại khác (Other)</option>
             </select>
           </div>
 

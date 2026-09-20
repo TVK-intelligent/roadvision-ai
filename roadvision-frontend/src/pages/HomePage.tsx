@@ -18,15 +18,17 @@ import {
   Cpu,
   ChevronRight,
   Activity,
-  Zap
+  Zap,
+  Video
 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<Record<string, any>>({
+    pendingIncidents: 0,
     aiConfidenceMedian: '96.8%',
-    activeDispatches: 38,
-    meanResolutionSpeed: '4.2 Giờ',
+    activeDispatches: 1,
+    meanResolutionSpeed: '3.8 Giờ',
     activeVisionModel: 'YOLOv8-RoadCare v2.4 Active',
   });
 
@@ -76,6 +78,14 @@ export const HomePage: React.FC = () => {
               <span>Bản Đồ Số GIS</span>
             </Link>
 
+            <Link
+              to="/patrol"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-500/10 text-indigo-700 font-bold text-xs hover:bg-indigo-500/20 transition-colors border border-indigo-500/30"
+            >
+              <Video className="w-4 h-4 text-indigo-600" />
+              <span>Tuần Tra Video AI</span>
+            </Link>
+
             {user?.role === 'ROLE_ADMIN' && (
               <Link
                 to="/dispatch"
@@ -114,7 +124,7 @@ export const HomePage: React.FC = () => {
         <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex items-center justify-between">
           <div>
             <span className="font-mono text-[11px] text-on-surface-variant font-bold uppercase tracking-wider">Sự Cố Cần Xử Lý</span>
-            <div className="font-display text-2xl font-black text-rose-600 mt-1">14 Điểm</div>
+            <div className="font-display text-2xl font-black text-rose-600 mt-1">{stats.pendingIncidents ?? 0} Điểm</div>
           </div>
           <div className="w-11 h-11 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
             <AlertTriangle className="w-5 h-5" />
@@ -124,7 +134,7 @@ export const HomePage: React.FC = () => {
         <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex items-center justify-between">
           <div>
             <span className="font-mono text-[11px] text-on-surface-variant font-bold uppercase tracking-wider">Độ Tin Cậy AI</span>
-            <div className="font-display text-2xl font-black text-primary mt-1">{stats.aiConfidenceMedian}</div>
+            <div className="font-display text-2xl font-black text-primary mt-1">{stats.aiConfidenceMedian || '96.8%'}</div>
           </div>
           <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
             <Cpu className="w-5 h-5" />
@@ -134,7 +144,7 @@ export const HomePage: React.FC = () => {
         <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex items-center justify-between">
           <div>
             <span className="font-mono text-[11px] text-on-surface-variant font-bold uppercase tracking-wider">Đội Kỹ Thuật Trực Chiến</span>
-            <div className="font-display text-2xl font-black text-secondary mt-1">{stats.activeDispatches} Đội</div>
+            <div className="font-display text-2xl font-black text-secondary mt-1">{stats.activeDispatches ?? 1} Đội</div>
           </div>
           <div className="w-11 h-11 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center">
             <Truck className="w-5 h-5" />
@@ -144,7 +154,7 @@ export const HomePage: React.FC = () => {
         <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex items-center justify-between">
           <div>
             <span className="font-mono text-[11px] text-on-surface-variant font-bold uppercase tracking-wider">Thời Gian Xử Lý TB</span>
-            <div className="font-display text-2xl font-black text-emerald-600 mt-1">{stats.meanResolutionSpeed}</div>
+            <div className="font-display text-2xl font-black text-emerald-600 mt-1">{stats.meanResolutionSpeed || '3.8 Giờ'}</div>
           </div>
           <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
             <Clock className="w-5 h-5" />

@@ -75,7 +75,7 @@ export const Navbar: React.FC = () => {
           </Link>
 
           {/* 2. Menu Điều Hướng - Sắp xếp logic theo luồng sử dụng, chỉ highlight khi đang ở trang đó */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {/* Trang Chủ */}
             <Link
               to="/"
@@ -236,7 +236,7 @@ export const Navbar: React.FC = () => {
           {/* Nút Hamburger Mở Mobile Menu */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             aria-label="Mở menu điều hướng"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -244,9 +244,9 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile Drawer (Menu Trượt Cho Điện Thoại) */}
+      {/* Mobile Drawer (Menu Trượt Cho Điện Thoại & Tablet) */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden flex">
+        <div className="fixed inset-0 z-40 lg:hidden flex">
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
             onClick={closeMobile}
