@@ -1,0 +1,97 @@
+sequenceDiagram
+    autonumber
+    actor Citizen as Người dân (Citizen)
+    participant React as React Client
+    participant Spring as Spring Boot API
+    participant ONNX as ONNX Runtime (YOLO)
+    participant MySQL as MySQL Database
+    actor Admin as Quản trị viên (Admin)
+    actor Staff as Nhân viên kỹ thuật (Staff)
+
+    %% GIAI ĐOẠN 1
+    rect rgb(240, 245, 255)
+    Note over Citizen, MySQL: Giai đoạn 1: Tiếp nhận phản ánh & Phân tích AI
+    Citizen->>React: Gửi phản ánh (Ảnh, Tọa độ GPS, Ghi chú)
+    React->>Spring: POST /api/v1/incidents (Multipart + JWT)
+    activate Spring
+    Spring->>Spring: Validate file (<=10MB, JPG/PNG), GPS Geofence, JWT
+    Spring->>ONNX: Gửi ảnh (buffered image byte array)
+    activate ONNX
+    ONNX->>ONNX: Tiền xử lý: Resize 640x640, RGB FloatBuffer [1,3,640,640]
+    ONNX->>ONNX: Chạy YOLO Inference + NMS (IoU >= 0.45)
+    ONNX-->>Spring: Trả về BBoxes, Class (POTHOLE), Confidence (94.7%), Latency (42ms)
+    deactivate ONNX
+
+    alt Confidence >= 70%
+        Spring->>MySQL: Lưu Incident (Status: AI_ANALYZED, Category: POTHOLE) & AI_Detection
+        MySQL-->>Spring: Ghi nhận thành công
+    else Confidence < 70% hoặc không nhận diện được
+        Spring->>MySQL: Lưu Incident (Status: SUBMITTED, Flag: NEEDS_MANUAL_REVIEW)
+        MySQL-->>Spring: Ghi nhận thành công
+    end
+    Spring-->>React: 201 Created (Incident ID #RC-8942, AI Detection Summary)
+    deactivate Spring
+    React-->>Citizen: Hiển thị giao diện nộp thành công & theo dõi tiến độ
+    end
+
+    %% GIAI ĐOẠN 2
+    rect rgb(255, 250, 240)
+    Note over Admin, MySQL: Giai đoạn 2: Thẩm định hồ sơ & Phân công điều phối
+    Admin->>React: Xem danh sách sự cố chờ duyệt
+    React->>Spring: GET /api/v1/incidents?status=AI_ANALYZED
+    activate Spring
+    Spring->>MySQL: Truy vấn danh sách sự cố cần phân công
+    MySQL-->>Spring: Dữ liệu sự cố & AI telemetry
+    Spring-->>React: 200 OK (Danh sách sự cố)
+    deactivate Spring
+
+    React-->>Admin: Hiển thị bảng đối chiếu: Ảnh AI BBox + Bản đồ vị trí
+    Admin->>React: Xác nhận loại hư hại & chọn Staff
+    React->>Spring: PATCH /api/v1/incidents/{id}/assign (staffId, verifiedCategory, priority)
+    activate Spring
+    Spring->>MySQL: Update status = ASSIGNED, tạo record Assignments
+    MySQL-->>Spring: Ghi nhận thành công
+    Spring-->>React: 200 OK
+    deactivate Spring
+    end
+
+    %% GIAI ĐOẠN 3
+    rect rgb(240, 255, 245)
+    Note over Staff, MySQL: Giai đoạn 3: Khắc phục sự cố tại hiện trường
+    Staff->>React: Xem danh sách nhiệm vụ được giao, đến hiện trường
+    React->>Spring: PATCH /api/v1/incidents/{id}/status (IN_PROGRESS)
+    activate Spring
+    Spring->>MySQL: Update status = IN_PROGRESS
+    Spring-->>React: 200 OK
+    deactivate Spring
+
+    Staff->>Staff: Thi công vá đường, rào chắn, hoàn tất xử lý
+    Staff->>React: Chụp ảnh hiện trường hoàn thiện (Proof of Work)
+    React->>Spring: POST /api/v1/incidents/{id}/resolve (Proof Image, Notes)
+    activate Spring
+    Spring->>Spring: Lưu trữ ảnh nghiệm thu
+    Spring->>MySQL: Update status = RESOLVED, cập nhật resolved_at
+    Spring-->>React: 200 OK
+    deactivate Spring
+    React-->>Staff: Báo hoàn tất công việc
+    end
+
+    %% GIAI ĐOẠN 4
+    rect rgb(250, 240, 255)
+    Note over Citizen, MySQL: Giai đoạn 4: Nghiệm thu, Đánh giá & Đóng luồng
+    Citizen->>React: Mở mục My Reports xem chi tiết hồ sơ sự cố
+    React->>Spring: GET /api/v1/incidents/{id}
+    activate Spring
+    Spring->>MySQL: Truy vấn chi tiết, ảnh Trước vs Sau (Before/After)
+    MySQL-->>Spring: Kết quả
+    Spring-->>React: 200 OK
+    deactivate Spring
+    React-->>Citizen: Hiển thị giao diện đối chiếu ảnh Before / After
+    Citizen->>React: Xác nhận hài lòng, chấm điểm (5 sao) & nhận xét
+    React->>Spring: POST /api/v1/incidents/{id}/close (rating, feedback)
+    activate Spring
+    Spring->>MySQL: Update status = CLOSED, lưu Feedbacks
+    Spring-->>React: 200 OK
+    deactivate Spring
+    React-->>Citizen: Cảm ơn và hiển thị trạng thái đã hoàn thành (CLOSED)
+    end

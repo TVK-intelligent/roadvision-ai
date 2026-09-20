@@ -1,0 +1,18 @@
+stateDiagram-v2
+    [*] --> SUBMITTED : Citizen nộp phản ánh [POST /api/v1/incidents]
+
+    SUBMITTED --> AI_ANALYZED : ONNX YOLO thành công (Confidence >= 70%)
+    SUBMITTED --> REJECTED : Admin từ chối (Ảnh mờ, spam, ngoài phạm vi)
+    AI_ANALYZED --> REJECTED : Admin từ chối duyệt
+
+    AI_ANALYZED --> ASSIGNED : Admin thẩm định & phân công Staff [PATCH /assign]
+    SUBMITTED --> ASSIGNED : Admin thẩm định thủ công khi cờ NEEDS_MANUAL_REVIEW
+
+    ASSIGNED --> IN_PROGRESS : Staff nhận task tại hiện trường [PATCH /status = IN_PROGRESS]
+    IN_PROGRESS --> RESOLVED : Staff tải ảnh Proof of Work [POST /resolve]
+
+    RESOLVED --> IN_PROGRESS : Yêu cầu xử lý lại (Chưa đạt nghiệm thu)
+    RESOLVED --> CLOSED : Citizen đánh giá sao & xác nhận đóng [POST /close]
+
+    REJECTED --> [*]
+    CLOSED --> [*]

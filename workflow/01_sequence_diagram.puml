@@ -1,0 +1,123 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam roundcorner 8
+skinparam defaultFontName "Inter", "Arial", sans-serif
+skinparam defaultFontSize 12
+
+skinparam sequence {
+    ArrowColor #004ac6
+    ActorBorderColor #004ac6
+    ActorBackgroundColor #E5EEFF
+    LifeLineBorderColor #737686
+    LifeLineBackgroundColor #F8F9FF
+    ParticipantBorderColor #004ac6
+    ParticipantBackgroundColor #E5EEFF
+    ParticipantFontStyle bold
+    BoxBorderColor #C3C6D7
+    BoxBackgroundColor #F8F9FF
+}
+
+autonumber "<b>[00]</b>"
+actor Citizen as "Người dân\n(Citizen)" #E5EEFF
+participant React as "React Client\n(Frontend)" #DBE1FF
+participant Spring as "Spring Boot API\n(Backend)" #CCE5FF
+participant ONNX as "ONNX Runtime\n(YOLOv8 Engine)" #D5E3FC
+database MySQL as "MySQL Database\n(Storage)" #E9F0FF
+actor Admin as "Quản trị viên\n(Admin/Dispatcher)" #FFEFEF
+actor Staff as "Nhân viên xử lý\n(Field Staff)" #EFFFF0
+
+== Giai đoạn 1: Tiếp nhận & Phân tích AI Tự động ==
+Citizen -> React: 1. Đăng nhập & chụp ảnh sự cố\n(Tự động trích xuất GPS, nhập mô tả)
+React -> Spring: 2. POST /api/v1/incidents\n(Multipart: file ảnh, latitude, longitude, note, Bearer JWT)
+activate Spring
+
+Spring -> Spring: 3. Kiểm tra tính hợp lệ:\n- File size <= 10MB, định dạng .jpg/.png\n- Tọa độ GPS nằm trong ranh giới địa bàn quản lý\n- Xác thực JWT Token của Citizen
+
+Spring -> ONNX: 4. Gửi byte array/buffered image để tiền xử lý
+activate ONNX
+ONNX -> ONNX: 5. Tiền xử lý Tensor:\n- Resize 640x640, RGB normalization [0, 1]\n- Chuyển sang NCHW float tensor [1, 3, 640, 640]
+ONNX -> ONNX: 6. Thực thi mô hình YOLO (Inference):\n- Forward pass trên CPU/JVM\n- Non-Maximum Suppression (NMS, IoU >= 0.45)
+ONNX --> Spring: 7. Trả về kết quả: Bounding Boxes, Class ("POTHOLE"), Confidence (vd: 94.7%), Latency (42ms)
+deactivate ONNX
+
+alt Độ tin cậy (Confidence) >= 70%
+    Spring -> MySQL: 8a. INSERT incidents (status='AI_ANALYZED', category='POTHOLE')\nINSERT ai_detections (bbox, confidence=0.947, latency=42)
+    MySQL --> Spring: Ghi nhận thành công
+else Độ tin cậy < 70% hoặc không phát hiện vật thể hư hỏng
+    Spring -> MySQL: 8b. INSERT incidents (status='SUBMITTED', flag='NEEDS_MANUAL_REVIEW')\nINSERT ai_detections (class='UNKNOWN', confidence=low)
+    MySQL --> Spring: Ghi nhận thành công
+end
+
+Spring --> React: 9. Trả về HTTP 201 Created\n{ incidentId: 8942, status: 'AI_ANALYZED', aiSummary: { class: 'POTHOLE', conf: 0.947, bbox: [...] } }
+deactivate Spring
+React --> Citizen: 10. Hiển thị thông báo gửi thành công & chuyển hướng sang trang theo dõi tiến độ (#RC-8942)
+
+== Giai đoạn 2: Thẩm định Hồ sơ & Điều phối Phân công ==
+Admin -> React: 11. Mở Admin Control Center / Dispatch Queue
+React -> Spring: 12. GET /api/v1/incidents?status=AI_ANALYZED&page=0&size=20
+activate Spring
+Spring -> MySQL: 13. SELECT * FROM incidents JOIN ai_detections WHERE status IN ('AI_ANALYZED', 'SUBMITTED')
+MySQL --> Spring: 14. Trả về danh sách sự cố chờ xử lý
+Spring --> React: 15. HTTP 200 OK (Danh sách hồ sơ sự cố)
+deactivate Spring
+
+React --> Admin: 16. Hiển thị giao diện đối chiếu:\n- Ảnh gốc kèm Bounding Box AI\n- Tọa độ bản đồ vệ tinh OpenStreetMap\n- Đề xuất loại sự cố & độ tin cậy
+
+Admin -> React: 17. Thẩm định, xác nhận loại hư hại (hoặc ghi đè) & chọn Staff từ danh mục
+React -> Spring: 18. PATCH /api/v1/incidents/{id}/assign\n{ staffId: 104, verifiedCategory: 'POTHOLE', priority: 'HIGH', note: 'Khu vực đông phương tiện' }
+activate Spring
+Spring -> MySQL: 19. UPDATE incidents SET status='ASSIGNED', category='POTHOLE', updated_at=NOW()\nINSERT INTO assignments (incident_id, assigned_by, assigned_to, ...)
+MySQL --> Spring: Ghi nhận thành công
+Spring --> React: 20. HTTP 200 OK (Phân công thành công)
+deactivate Spring
+React --> Admin: 21. Cập nhật trạng thái phiếu trên hàng đợi điều phối
+
+== Giai đoạn 3: Khắc phục Sự cố tại Hiện trường ==
+Staff -> React: 22. Đăng nhập ứng dụng Staff, xem danh sách nhiệm vụ được giao
+React -> Spring: 23. GET /api/v1/incidents/assigned-to-me
+activate Spring
+Spring -> MySQL: 24. SELECT * FROM incidents WHERE status='ASSIGNED' AND assigned_to=staffId
+MySQL --> Spring: Danh sách nhiệm vụ
+Spring --> React: 25. HTTP 200 OK
+deactivate Spring
+
+Staff -> React: 26. Di chuyển đến hiện trường & bấm "Bắt đầu xử lý"
+React -> Spring: 27. PATCH /api/v1/incidents/{id}/status\n{ status: 'IN_PROGRESS' }
+activate Spring
+Spring -> MySQL: 28. UPDATE incidents SET status='IN_PROGRESS', updated_at=NOW()
+MySQL --> Spring: Ghi nhận thành công
+Spring --> React: 29. HTTP 200 OK
+deactivate Spring
+
+Staff -> Staff: 30. Thực hiện rào chắn, trám trét asphalt, lu phẳng ổ gà mặt đường
+Staff -> React: 31. Chụp ảnh hiện trường hoàn thiện (Proof of Work) & bấm "Hoàn tất"
+React -> Spring: 32. POST /api/v1/incidents/{id}/resolve\n(Multipart: proofImage, repairNotes, completedAt)
+activate Spring
+Spring -> Spring: 33. Validate & lưu trữ ảnh bằng chứng thi công vào thư mục storage
+Spring -> MySQL: 34. UPDATE incidents SET status='RESOLVED', updated_at=NOW()\nINSERT INTO resolutions (incident_id, staff_id, proof_image_url, notes)
+MySQL --> Spring: Ghi nhận thành công
+Spring --> React: 35. HTTP 200 OK (Đã ghi nhận hoàn tất)
+deactivate Spring
+React --> Staff: 36. Hiển thị thông báo hoàn thành nhiệm vụ
+
+== Giai đoạn 4: Nghiệm thu, Đánh giá & Đóng Sự cố ==
+Citizen -> React: 37. Nhận thông báo tiến độ, vào mục "My Reports" xem hồ sơ sự cố
+React -> Spring: 38. GET /api/v1/incidents/{id}
+activate Spring
+Spring -> MySQL: 39. Truy vấn chi tiết sự cố, kèm ảnh ban đầu & ảnh sau khắc phục (Before / After)
+MySQL --> Spring: Chi tiết hồ sơ sự cố
+Spring --> React: 40. HTTP 200 OK
+deactivate Spring
+
+React --> Citizen: 41. Hiển thị giao diện đối chiếu tương tác Before / After
+Citizen -> React: 42. Xác nhận hài lòng, chấm điểm (vd: 5 sao) & gửi phản hồi
+React -> Spring: 43. POST /api/v1/incidents/{id}/close\n{ rating: 5, feedback: 'Đường đã phẳng đẹp, xử lý rất nhanh!', closedBy: citizenId }
+activate Spring
+Spring -> MySQL: 44. UPDATE incidents SET status='CLOSED', updated_at=NOW()\nINSERT INTO feedbacks (incident_id, citizen_id, rating, comments)
+MySQL --> Spring: Ghi nhận thành công
+Spring --> React: 45. HTTP 200 OK (Sự cố kết thúc trọn vẹn)
+deactivate Spring
+React --> Citizen: 46. Hiển thị huy hiệu "COMPLETED / CLOSED" & cảm ơn đóng góp cộng đồng
+@enduml

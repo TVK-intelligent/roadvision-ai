@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><title>RoadCare - Control Center</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-primary-fixed": "#00174b", "surface-container-highest": "#d3e4fe", "outline": "#737686", "error-container": "#ffdad6", "surface-container-lowest": "#ffffff", "secondary-fixed": "#cce5ff", "outline-variant": "#c3c6d7", "on-secondary-fixed": "#001d31", "tertiary": "#48566a", "on-tertiary-fixed-variant": "#3a485b", "surface-dim": "#cbdbf5", "on-tertiary-fixed": "#0d1c2e", "surface-container": "#e5eeff", "secondary": "#006398", "primary-fixed-dim": "#b4c5ff", "on-secondary-fixed-variant": "#004b73", "surface-tint": "#0053db", "on-primary": "#ffffff", "surface-container-high": "#dce9ff", "on-tertiary": "#ffffff", "surface": "#f8f9ff", "tertiary-fixed": "#d5e3fc", "on-secondary-container": "#00476e", "surface-variant": "#d3e4fe", "error": "#ba1a1a", "on-tertiary-container": "#e9f0ff", "tertiary-container": "#606e83", "on-surface": "#0b1c30", "inverse-primary": "#b4c5ff", "on-error-container": "#93000a", "on-background": "#0b1c30", "primary": "#004ac6", "on-surface-variant": "#434655", "on-primary-container": "#eeefff", "surface-bright": "#f8f9ff", "on-primary-fixed-variant": "#003ea8", "surface-container-low": "#eff4ff", "inverse-surface": "#213145", "secondary-fixed-dim": "#93ccff", "tertiary-fixed-dim": "#b9c7df", "secondary-container": "#5bb8fe", "on-error": "#ffffff", "background": "#f8f9ff", "inverse-on-surface": "#eaf1ff", "on-secondary": "#ffffff", "primary-container": "#2563eb", "primary-fixed": "#dbe1ff" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-xs": "0.5rem", "space-sm": "0.75rem", "space-md": "1rem", "space-2xl": "3rem", "space-xl": "2rem", "space-lg": "1.5rem", "space-2xs": "0.25rem", "gutter-desktop": "1.5rem", "gutter-mobile": "1rem", "sidebar-width": "17.5rem", "inspector-width": "22.5rem" }, "fontFamily": { "headline-md": [ "Plus Jakarta Sans" ], "display-lg": [ "Plus Jakarta Sans" ], "mono-metric": [ "JetBrains Mono" ], "body-md": [ "Inter" ], "body-lg": [ "Inter" ], "body-sm": [ "Inter" ], "display-lg-mobile": [ "Plus Jakarta Sans" ], "mono-code": [ "JetBrains Mono" ], "headline-lg": [ "Plus Jakarta Sans" ], "headline-sm": [ "Plus Jakarta Sans" ], "label-sm": [ "Inter" ], "label-md": [ "Inter" ], "label-lg": [ "Inter" ] }, "fontSize": { "headline-md": [ "22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "display-lg": [ "40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "mono-metric": [ "13px", { "lineHeight": "16px", "letterSpacing": "-0.01em", "fontWeight": "500" } ], "body-md": [ "14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" } ], "body-lg": [ "16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" } ], "body-sm": [ "12px", { "lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "400" } ], "display-lg-mobile": [ "30px", { "lineHeight": "38px", "letterSpacing": "-0.015em", "fontWeight": "700" } ], "mono-code": [ "11px", { "lineHeight": "14px", "letterSpacing": "0em", "fontWeight": "400" } ], "headline-lg": [ "28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "headline-sm": [ "18px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600" } ], "label-sm": [ "11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "600" } ], "label-md": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" } ], "label-lg": [ "14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "500" } ] } } } };</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-sidebar-width bg-surface-container-lowest border-r border-outline-variant/40 z-50 flex flex-col justify-between py-space-md"><div class="flex flex-col gap-space-lg"><div class="px-space-md flex items-center gap-space-xs"><img alt="RoadCare Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U2EVl8jeIKxIrXwvtLpfVKX5J8P6D4UIip24EokILDIiDganLxP-eWLGo-LCKKjSnDfVwbbtb7JG-bCbb4-w8kCTcg7NjynbzQF7xbAPe1zpERyLgwAaNYUrTf6Czr6r_ZruyjW9XxpXbuj3YJfuf7cR7vyBPrBFMpRLYmz2L6G4WlEEkJ38kNZlJ0kiNtwrYwVr8eTKQrlbiUTpMPSZ26FThu0DzgQ45HC2--KloXvzGhtDQSqIZH6Ws"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">RoadCare</span><span class="font-mono-code text-mono-code text-on-surface-variant">MISSION DISPATCH</span></div></div><nav class="flex flex-col gap-space-2xs px-space-xs" data-active-classes="bg-primary-container text-on-primary font-semibold shadow-sm"><a aria-current="page" class="flex items-center gap-space-xs px-space-sm py-space-xs rounded-lg transition-colors bg-primary-container text-on-primary font-semibold shadow-sm" data-path="admin-dashboard" href="#"><span class="material-symbols-outlined text-[20px]">grid_view</span><span class="font-label-lg text-label-lg">Overview</span></a><a class="flex items-center gap-space-xs px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="incident-map" href="#"><span class="material-symbols-outlined text-[20px]">map</span><span class="font-label-lg text-label-lg">Spatial Map</span></a><a class="flex items-center gap-space-xs px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="report-incident" href="#"><span class="material-symbols-outlined text-[20px]">emergency</span><span class="font-label-lg text-label-lg">Dispatch New</span></a><a class="flex items-center gap-space-xs px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="my-reports" href="#"><span class="material-symbols-outlined text-[20px]">fact_check</span><span class="font-label-lg text-label-lg">Triage Queue</span></a><a class="flex items-center gap-space-xs px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="home" href="#"><span class="material-symbols-outlined text-[20px]">public</span><span class="font-label-lg text-label-lg">Public Portal</span></a></nav></div><div class="px-space-md flex flex-col gap-space-sm"><div class="p-space-sm rounded-xl bg-surface-container border border-outline-variant/50 flex flex-col gap-space-2xs"><div class="flex items-center justify-between"><span class="font-mono-code text-mono-code text-on-surface-variant uppercase font-medium">Vision Pipeline</span><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span></span></div><span class="font-mono-metric text-mono-metric text-on-surface font-semibold">YOLOv8 98.4% conf</span><div class="w-full bg-outline-variant/40 h-1.5 rounded-full overflow-hidden"><div class="bg-secondary h-full rounded-full w-[98.4%]"></div></div></div><div class="flex items-center gap-space-xs pt-space-xs border-t border-outline-variant/40"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoMYlHmnw3chbDBLqWLCJv4T7ak05o6kAzQHVIYqoE33Ol9bU3P-Vk8xl6h1u5NccesCLcytulBXvu_mXsWyvpr7KKCHJWrOLoX0QW1uyYvu2bgbwzQb6WbbFnNryMObbF4RKBKYcXQw8-lwgi1AKYo7YalikkoTcRihIVUnfIMf4tiWlHs10r_iw7XUtEHxMFIZ2OJ19yNJNjrlLeG9bk5QpuasK4goQ0p-RezIXCu31OLyCvhY-n"/><div class="flex flex-col truncate"><span class="font-label-md text-label-md text-on-surface font-semibold truncate">Eng. Elena Rostova</span><span class="font-body-sm text-body-sm text-on-surface-variant truncate">Transport Ops</span></div></div></div></aside><div class="pl-sidebar-width"><header class="fixed top-0 left-sidebar-width right-0 h-16 bg-surface-container-lowest border-b border-outline-variant/40 shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-gutter-desktop"><nav class="hidden md:flex items-center gap-space-xs" data-active-classes="bg-surface-container-low text-primary font-bold rounded-lg shadow-sm"><a class="px-space-sm py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="home" href="#">Home</a><a class="px-space-sm py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="report-incident" href="#">Report Incident</a><a class="px-space-sm py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="my-reports" href="#">My Reports</a><a class="px-space-sm py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="incident-map" href="#">Incident Map</a><a aria-current="page" class="px-space-sm py-space-xs transition-colors bg-surface-container-low text-primary font-bold rounded-lg shadow-sm" data-path="admin-dashboard" href="#">Admin Dashboard</a></nav><div class="flex items-center gap-space-sm ml-auto"><div class="hidden lg:flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-surface-container-low border border-outline-variant/60"><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span></span><span class="font-label-sm text-label-sm text-on-surface-variant">Live Grid: <strong class="text-on-surface font-semibold">Operational</strong></span></div><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-primary-fixed/40 border border-primary/20"><span class="material-symbols-outlined text-primary text-[16px]">smart_toy</span><span class="font-mono-metric text-mono-metric text-on-primary-fixed font-medium">YOLOv8-RoadCare v2.4 Active</span></div><button class="relative p-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-full transition-colors" type="button"><span class="material-symbols-outlined">notifications</span><span class="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error font-mono-code text-[9px] font-bold">3</span></button><div class="flex items-center gap-space-xs pl-space-xs border-l border-outline-variant/60"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoMYlHmnw3chbDBLqWLCJv4T7ak05o6kAzQHVIYqoE33Ol9bU3P-Vk8xl6h1u5NccesCLcytulBXvu_mXsWyvpr7KKCHJWrOLoX0QW1uyYvu2bgbwzQb6WbbFnNryMObbF4RKBKYcXQw8-lwgi1AKYo7YalikkoTcRihIVUnfIMf4tiWlHs10r_iw7XUtEHxMFIZ2OJ19yNJNjrlLeG9bk5QpuasK4goQ0p-RezIXCu31OLyCvhY-n"/><div class="hidden sm:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface leading-snug font-semibold">Eng. Elena Rostova</span><span class="font-body-sm text-body-sm text-on-surface-variant leading-none">Transport Operations</span></div></div></div></header><main class="relative pt-16 bg-surface min-h-screen px-gutter-desktop py-gutter-desktop"><div class="flex flex-col w-full">
+<div class="flex flex-col gap-space-lg w-full">
+<!-- Top Header Banner & Fast Stats -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md bg-surface-container-lowest p-space-lg rounded-xl shadow-sm">
+<div class="flex flex-col gap-space-2xs">
+<div class="flex items-center gap-space-xs">
+<span class="px-space-xs py-space-2xs rounded-full bg-primary-fixed text-on-primary-fixed font-mono-code text-mono-code uppercase font-semibold">Triage Ops V4.2</span>
+<span class="text-on-surface-variant font-mono-code text-mono-code">QUEUE #892-ALPHA</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Incident Management &amp; Dispatch Queue</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Review, verify, assign work orders, and audit AI-detected roadway impediments in real time.</p>
+</div>
+<!-- Quick Action CTA Group -->
+<div class="flex flex-wrap items-center gap-space-xs">
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors font-label-md text-label-md shadow-sm" id="btn-export">
+<span class="material-symbols-outlined text-[18px] text-tertiary">download</span>
+<span>Export CSV / GeoJSON</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors font-label-md text-label-md shadow-sm" id="btn-bulk-assign">
+<span class="material-symbols-outlined text-[18px] text-secondary">group_add</span>
+<span>Bulk Assign (<span id="selected-count-label">0</span>)</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-lg bg-primary text-on-primary hover:bg-primary-container transition-colors font-label-md text-label-md shadow-sm" onclick="document.getElementById('manual-order-modal').classList.remove('hidden')">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>+ Create Manual Work Order</span>
+</button>
+</div>
+</div>
+<!-- Telemetry Metric Strip -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-space-md">
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-mono-code text-mono-code text-on-surface-variant uppercase">Critical SLA At Risk</span>
+<span class="font-headline-md text-headline-md text-error mt-space-2xs">14 Incidents</span>
+</div>
+<div class="h-10 w-10 rounded-full bg-error-container text-on-error-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">warning</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-mono-code text-mono-code text-on-surface-variant uppercase">AI Confidence Median</span>
+<span class="font-headline-md text-headline-md text-primary mt-space-2xs">96.8%</span>
+</div>
+<div class="h-10 w-10 rounded-full bg-surface-container-high text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">neurology</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-mono-code text-mono-code text-on-surface-variant uppercase">Active Crew Dispatches</span>
+<span class="font-headline-md text-headline-md text-secondary mt-space-2xs">38 Units</span>
+</div>
+<div class="h-10 w-10 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">local_shipping</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-mono-code text-mono-code text-on-surface-variant uppercase">Mean Resolution Speed</span>
+<span class="font-headline-md text-headline-md text-on-surface mt-space-2xs">4.2 Hours</span>
+</div>
+<div class="h-10 w-10 rounded-full bg-surface-container-low text-tertiary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">timer</span>
+</div>
+</div>
+</div>
+<!-- Filter Console & Search Command Ribbon -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-md">
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm items-center">
+<!-- Search Bar -->
+<div class="md:col-span-4 relative">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full pl-9 pr-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface placeholder:text-on-surface-variant font-body-md text-body-md outline-none focus:bg-surface-container-lowest shadow-inner transition-all" id="table-search" placeholder="Search by ID (#RC-...), Road, Reporter, or Crew..." type="text"/>
+</div>
+<!-- Category Dropdown -->
+<div class="md:col-span-2">
+<select class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md outline-none focus:bg-surface-container-lowest shadow-sm transition-all cursor-pointer" id="filter-category">
+<option value="ALL">All Categories</option>
+<option value="POTHOLE">Pothole (Surface Void)</option>
+<option value="CRACK">Road Crack (Fatigue)</option>
+<option value="OBSTACLE">Road Obstacle / Debris</option>
+<option value="FLOODING">Road Flooding (Ponding)</option>
+</select>
+</div>
+<!-- Status Filter -->
+<div class="md:col-span-2">
+<select class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md outline-none focus:bg-surface-container-lowest shadow-sm transition-all cursor-pointer" id="filter-status">
+<option value="ALL">All Statuses</option>
+<option value="SUBMITTED">Submitted</option>
+<option value="AI_ANALYZED">AI Analyzed</option>
+<option value="VERIFIED">Verified</option>
+<option value="ASSIGNED">Assigned</option>
+<option value="IN_PROGRESS">In Progress</option>
+<option value="RESOLVED">Resolved</option>
+<option value="CLOSED">Closed</option>
+</select>
+</div>
+<!-- Severity Filter -->
+<div class="md:col-span-2">
+<select class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md outline-none focus:bg-surface-container-lowest shadow-sm transition-all cursor-pointer" id="filter-severity">
+<option value="ALL">Severity: All</option>
+<option value="CRITICAL">Critical</option>
+<option value="HIGH">High</option>
+<option value="MEDIUM">Medium</option>
+<option value="LOW">Low</option>
+</select>
+</div>
+<!-- District Filter -->
+<div class="md:col-span-2">
+<select class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md outline-none focus:bg-surface-container-lowest shadow-sm transition-all cursor-pointer" id="filter-district">
+<option value="ALL">All Wards / Districts</option>
+<option value="D1">District 1 (Downtown Core)</option>
+<option value="D2">District 2 (Harbor / Industrial)</option>
+<option value="D3">District 3 (Highland Ridgeway)</option>
+<option value="D4">District 4 (Metro West Bypass)</option>
+<option value="D5">District 5 (South Valley)</option>
+<option value="D6">District 6 (Eastgate Terminal)</option>
+</select>
+</div>
+</div>
+<!-- Secondary Sub-Filter Row -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs">
+<div class="flex flex-wrap items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="uppercase font-mono-code text-mono-code tracking-wider">Quick Filter:</span>
+<button class="px-space-xs py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">Pending Crew Assignment (19)</button>
+<button class="px-space-xs py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">High Confidence &gt;95% (84)</button>
+<button class="px-space-xs py-1 rounded bg-error-container text-on-error-container hover:bg-error/20 transition-colors">Breached SLA (3)</button>
+<button class="px-space-xs py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">Automated Sensor Ingest (412)</button>
+</div>
+<div class="flex items-center gap-space-xs">
+<div class="flex items-center gap-space-2xs bg-surface-container-low px-space-sm py-1.5 rounded-lg text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px] text-tertiary">calendar_today</span>
+<span>Past 30 Days: Sep 25 - Oct 25</span>
+</div>
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" id="btn-reset-filters" title="Reset Filters">
+<span class="material-symbols-outlined text-[18px]">restart_alt</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Incident Data Table Container -->
+<div class="w-full bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[1100px]">
+<thead>
+<tr class="bg-surface-container-low h-10 text-on-surface-variant font-mono-code text-mono-code uppercase tracking-wider select-none">
+<th class="w-12 px-space-md text-center">
+<input class="rounded border-outline text-primary focus:ring-0 cursor-pointer" id="select-all-checkbox" type="checkbox"/>
+</th>
+<th class="py-space-xs px-space-sm">Incident ID</th>
+<th class="py-space-xs px-space-sm">Visual Evidence</th>
+<th class="py-space-xs px-space-sm">Category</th>
+<th class="py-space-xs px-space-sm">Geospatial Coordinates</th>
+<th class="py-space-xs px-space-sm">AI Conf. Meter</th>
+<th class="py-space-xs px-space-sm">Timestamp</th>
+<th class="py-space-xs px-space-sm">Status</th>
+<th class="py-space-xs px-space-sm">Assigned Crew</th>
+<th class="py-space-xs px-space-sm">SLA Horizon</th>
+<th class="py-space-xs px-space-sm text-right pr-space-md">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low font-body-md text-body-md text-on-surface" id="incident-table-body">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openSlideOver('RC-9402')">
+<td class="px-space-md text-center" onclick="event.stopPropagation()">
+<input class="row-checkbox rounded border-outline text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-mono-metric text-mono-metric font-semibold text-primary">#RC-9402</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">FleetDash #08</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="relative w-14 h-10 rounded-lg overflow-hidden bg-surface-container group/thumb shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Close-up asphalt view of a deep cavernous street pothole with sharp cracked edges on wet dark tarmac under daylight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMGoORbcOMTocUmUL3oaa06Eoe7s6ecfY-35R_FDrPPHTWVMI3epip3b_iUPTopw2sdYaIoqjoL8OSnkKPWK4QnBDVdtEji-UM0LhgJeeU0Z6db-qEg3Cles8-mEDrz3idnKTymrVgVf7yOV-y6JKWCo6BtrmtKhqjXLL8sHIBRzs4QbgZHDym6Yp597M0ZNWDRfZ74VBTKabcSmTYpefk297CiozQHhITcMFV2qdaG45YmdToxnQ2"/>
+<span class="absolute bottom-0.5 right-0.5 bg-primary/90 text-on-primary font-mono-code text-[8px] px-1 rounded">AI BOX</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-amber-600"></span>
+                  Pothole
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col max-w-[190px]">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">842 Rainier Ave S</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">47.5921° N, 122.3105° W</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm min-w-[120px]">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-mono-metric text-mono-metric font-semibold text-on-surface">98.4%</span>
+<span class="font-mono-code text-[10px] text-on-surface-variant">YOLOv8x</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full w-[98.4%]"></div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Oct 24, 11:20 AM</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">District 1 (Downtown)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 font-label-sm text-label-sm font-semibold">
+<span class="relative flex h-1.5 w-1.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-600 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-600"></span>
+</span>
+                  In Progress
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex items-center gap-space-2xs">
+<div class="w-6 h-6 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-mono-code text-[10px] font-bold">MV</div>
+<span class="font-label-md text-label-md text-on-surface font-medium">M. Vance (Sq-4)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1 font-mono-metric text-mono-metric text-error font-medium">
+<span class="material-symbols-outlined text-[14px]">alarm</span>
+                  1h 42m remaining
+                </span>
+</td>
+<td class="py-space-sm px-space-sm text-right pr-space-md" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" onclick="openSlideOver('RC-9402')" title="View Inspection Dossier">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Reclassify AI Detection">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-error transition-colors" title="Archive Work Order">
+<span class="material-symbols-outlined text-[18px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openSlideOver('RC-9399')">
+<td class="px-space-md text-center" onclick="event.stopPropagation()">
+<input class="row-checkbox rounded border-outline text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-mono-metric text-mono-metric font-semibold text-primary">#RC-9399</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">Citizen App #91</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="relative w-14 h-10 rounded-lg overflow-hidden bg-surface-container group/thumb shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Extensive spiderweb transverse cracking stretching across multiple lanes of concrete roadway under overcast lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMbR9sH07r-9Rkc89B5p_kdKTHxRpZUX2sCcJB4jay7bsW48a0XeQkp6fWDmBVo9JGZOsA18-9iaSl0bVnV7KhNXYDS2g1fJquT5dYgA6_zjDzuQv0p_sjvh_aVBevRPhxUDq1VLwbWT5vh60E5XmfCI1fgAA7orP72s6ll5cxxxRWRJ1pasCGqobODc-iqmYexefxGThuMPCwQu7EKP9R5cobwoN3FI4YUmrwVP8OR-1eqwWAyAVG"/>
+<span class="absolute bottom-0.5 right-0.5 bg-purple-600 text-on-primary font-mono-code text-[8px] px-1 rounded">AI BOX</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-purple-600"></span>
+                  Road Crack
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col max-w-[190px]">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">NW Market St &amp; 15th</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">47.6687° N, 122.3764° W</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm min-w-[120px]">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-mono-metric text-mono-metric font-semibold text-on-surface">94.7%</span>
+<span class="font-mono-code text-[10px] text-on-surface-variant">YOLOv8x</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full w-[94.7%]"></div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Oct 24, 10:45 AM</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">District 4 (Metro West)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-outline"></span>
+                  Verified
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<button class="px-space-xs py-1 rounded bg-primary-fixed/60 text-on-primary-fixed font-label-sm text-label-sm font-semibold hover:bg-primary hover:text-on-primary transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">person_add</span>
+                  Assign Crew
+                </button>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1 font-mono-metric text-mono-metric text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-[14px] text-tertiary">check_circle</span>
+                  On Schedule (6h)
+                </span>
+</td>
+<td class="py-space-sm px-space-sm text-right pr-space-md" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" onclick="openSlideOver('RC-9399')" title="View Inspection Dossier">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Reclassify AI Detection">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-error transition-colors" title="Archive Work Order">
+<span class="material-symbols-outlined text-[18px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openSlideOver('RC-9388')">
+<td class="px-space-md text-center" onclick="event.stopPropagation()">
+<input class="row-checkbox rounded border-outline text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-mono-metric text-mono-metric font-semibold text-primary">#RC-9388</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">LIDAR Sensor 04</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="relative w-14 h-10 rounded-lg overflow-hidden bg-surface-container group/thumb shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Fallen tree trunk and heavy construction debris blocking the left lane of a wet suburban highway at dawn." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHx7Bs1vbf-HobZ6M79zuFNYFRadMNv7AcCm8CLDYQDSfw0kg6v8ZhGMB269YtbxjRaa0C7iBPmGFkWANnJhspGZBLW8Wc3TjJBQ5K-IoXOeTMmSehInuFaWgP-e63xHQmgMVQpFI7SX9uMA75G_WdZUeek8tEiG3Ow-VDw1S8FRZksnQgJWCW3D-LUqIOpBC3vGL9_h5vR1EsjfsM3f8ccxpcL0dOkJVENd1KN3UDDIysGxdhPIJ7"/>
+<span class="absolute bottom-0.5 right-0.5 bg-error text-on-error font-mono-code text-[8px] px-1 rounded">AI CRIT</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-error"></span>
+                  Road Obstacle
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col max-w-[190px]">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">Boren Ave &amp; Pine St</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">47.6139° N, 122.3308° W</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm min-w-[120px]">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-mono-metric text-mono-metric font-semibold text-error">99.1%</span>
+<span class="font-mono-code text-[10px] text-error font-bold">HIGH RISK</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-error h-full rounded-full w-[99.1%]"></div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Oct 24, 09:12 AM</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">District 1 (Downtown)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-amber-600"></span>
+                  Assigned
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex items-center gap-space-2xs">
+<div class="w-6 h-6 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-mono-code text-[10px] font-bold">HR</div>
+<span class="font-label-md text-label-md text-on-surface font-medium">Heavy Rescue 2</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error-container text-error font-mono-code text-mono-code font-bold animate-pulse">
+<span class="material-symbols-outlined text-[14px]">error</span>
+                  SLA BREACHED
+                </span>
+</td>
+<td class="py-space-sm px-space-sm text-right pr-space-md" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" onclick="openSlideOver('RC-9388')" title="View Inspection Dossier">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Reclassify AI Detection">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-error transition-colors" title="Archive Work Order">
+<span class="material-symbols-outlined text-[18px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openSlideOver('RC-9375')">
+<td class="px-space-md text-center" onclick="event.stopPropagation()">
+<input class="row-checkbox rounded border-outline text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-mono-metric text-mono-metric font-semibold text-primary">#RC-9375</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">Drone Patrol B</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="relative w-14 h-10 rounded-lg overflow-hidden bg-surface-container group/thumb shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Major water accumulation and deep roadway flooding submerging the curb and sidewalk along an asphalt street." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbZG16HeuC9NvCdGkmPMC3dpGWXwMuERJbmS58tVCga7QpPL0Y843PQ9Qxua6l6OE5-RcfEcVz4bpiKoB0CSYdWZtsSX5AUi8Niz7LWZyo0pjpQSvrCg4G0SQpl2aEY67gnrTXoO7urcrzoRVZwL5lYQNd0C7yOsZKXf4wuMzvviZ7VYXKDIz2AtItdP7twdDHxs-CFDfAqaWOqZX335VtY5qb8jD-C-ww-N5S_GRan_VbwpO4xfyQ"/>
+<span class="absolute bottom-0.5 right-0.5 bg-secondary-container text-on-secondary-container font-mono-code text-[8px] px-1 rounded">AI BOX</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-100 text-cyan-900 font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-cyan-600"></span>
+                  Road Flooding
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col max-w-[190px]">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">Harbor Island Way #12</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">47.5794° N, 122.3512° W</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm min-w-[120px]">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-mono-metric text-mono-metric font-semibold text-on-surface">97.6%</span>
+<span class="font-mono-code text-[10px] text-on-surface-variant">YOLOv8-Hydro</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full w-[97.6%]"></div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Oct 24, 08:30 AM</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">District 2 (Harbor)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 font-label-sm text-label-sm font-semibold">
+<span class="relative flex h-1.5 w-1.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-600 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-600"></span>
+</span>
+                  In Progress
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex items-center gap-space-2xs">
+<div class="w-6 h-6 rounded-full bg-surface-container-high text-secondary flex items-center justify-center font-mono-code text-[10px] font-bold">SD</div>
+<span class="font-label-md text-label-md text-on-surface font-medium">Drainage Unit 01</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1 font-mono-metric text-mono-metric text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-[14px] text-tertiary">schedule</span>
+                  3h 15m remaining
+                </span>
+</td>
+<td class="py-space-sm px-space-sm text-right pr-space-md" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" onclick="openSlideOver('RC-9375')" title="View Inspection Dossier">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Reclassify AI Detection">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-error transition-colors" title="Archive Work Order">
+<span class="material-symbols-outlined text-[18px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openSlideOver('RC-9360')">
+<td class="px-space-md text-center" onclick="event.stopPropagation()">
+<input class="row-checkbox rounded border-outline text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-mono-metric text-mono-metric font-semibold text-primary">#RC-9360</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">Metro Bus #402</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="relative w-14 h-10 rounded-lg overflow-hidden bg-surface-container group/thumb shadow-sm">
+<img class="w-full h-full object-cover" data-alt="A freshly patched asphalt pothole level with the roadway surface during early morning municipal maintenance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMQmKZ0rDp1gRRXAeUk6Xxoe2Mg8t4WG5mkTGFW4I0PBApNzow2QOCq_mhjjpfEpheGVgj7gzBpBUwT8p-EhH2-znSwN0qMCLE-2vjhJLgCE-KJ1XR55-IDl0VthNSIEsVqBnGZiJQuSWuxHSiVIYmY5rgaT5ImNzABhDPSXK2bkR5b0KGG69r_rqsOEQ5yvteBXK7PYxuVvFC6mqRKEaCnYcAJv5L6AUrOD0Bf2T1Zh9rPuV1MITd"/>
+<span class="absolute bottom-0.5 right-0.5 bg-emerald-600 text-on-primary font-mono-code text-[8px] px-1 rounded">CLEARED</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-amber-600"></span>
+                  Pothole
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col max-w-[190px]">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">1st Ave &amp; Pike St</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">47.6089° N, 122.3400° W</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm min-w-[120px]">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-mono-metric text-mono-metric font-semibold text-on-surface">99.5%</span>
+<span class="font-mono-code text-[10px] text-on-surface-variant">Audit Passed</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-emerald-600 h-full rounded-full w-[99.5%]"></div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Oct 23, 04:15 PM</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">District 1 (Downtown)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+                  Resolved
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex items-center gap-space-2xs">
+<div class="w-6 h-6 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center font-mono-code text-[10px] font-bold">DK</div>
+<span class="font-label-md text-label-md text-on-surface font-medium">D. Kim (Rapid Pave)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1 font-mono-metric text-mono-metric text-emerald-700 font-medium">
+<span class="material-symbols-outlined text-[14px]">task_alt</span>
+                  Completed early
+                </span>
+</td>
+<td class="py-space-sm px-space-sm text-right pr-space-md" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" onclick="openSlideOver('RC-9360')" title="View Inspection Dossier">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Audit QA Record">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-error transition-colors" title="Archive Work Order">
+<span class="material-symbols-outlined text-[18px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openSlideOver('RC-9355')">
+<td class="px-space-md text-center" onclick="event.stopPropagation()">
+<input class="row-checkbox rounded border-outline text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-mono-metric text-mono-metric font-semibold text-primary">#RC-9355</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">Public Portal #104</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="relative w-14 h-10 rounded-lg overflow-hidden bg-surface-container group/thumb shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Deep roadway pothole filled with rainwater reflecting gloomy storm clouds on a suburban avenue." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEA-KWPhBWt42b2XEENAnYUsMK_u5TXz0iHGQnfjeGL3QNM20m3gl8lHW_v3fgMRnRzM3BfsveB_ulTLUsbK6htRYhwaYjcJWLYQiPwT7T2EYO1GeQRVL5aPxkIg6_CVXHFCBh2g6q3fIMIQC2N1K4Szvbx70Ykj-oWpD6dvp2Q2A5EdKIxZgeoFhfpOBsKMBaNtmAtuPlrsZ0wArm5x-VNwbY-jaavBrsWMaNqnWfqUHUoAg2oxfO"/>
+<span class="absolute bottom-0.5 right-0.5 bg-amber-600 text-on-primary font-mono-code text-[8px] px-1 rounded">AI BOX</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-amber-600"></span>
+                  Pothole
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col max-w-[190px]">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">Martin Luther King Jr Way</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">47.5381° N, 122.2851° W</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm min-w-[120px]">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-mono-metric text-mono-metric font-semibold text-on-surface">91.3%</span>
+<span class="font-mono-code text-[10px] text-on-surface-variant">YOLOv8x</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full w-[91.3%]"></div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Oct 23, 02:08 PM</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">District 5 (South Valley)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                  AI Analyzed
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<button class="px-space-xs py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm font-medium flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-[14px]">person_search</span>
+                  Dispatch Pending
+                </button>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1 font-mono-metric text-mono-metric text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-[14px] text-tertiary">timelapse</span>
+                  18h remaining
+                </span>
+</td>
+<td class="py-space-sm px-space-sm text-right pr-space-md" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" onclick="openSlideOver('RC-9355')" title="View Inspection Dossier">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Reclassify AI Detection">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-error transition-colors" title="Archive Work Order">
+<span class="material-symbols-outlined text-[18px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 7 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openSlideOver('RC-9348')">
+<td class="px-space-md text-center" onclick="event.stopPropagation()">
+<input class="row-checkbox rounded border-outline text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-mono-metric text-mono-metric font-semibold text-primary">#RC-9348</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">LIDAR Sensor 01</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="relative w-14 h-10 rounded-lg overflow-hidden bg-surface-container group/thumb shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Severe longitudinal fissure splitting along the asphalt center dividing line of an expressway." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIvTNyba0VlaurKfuGT7H-n6ZUssgcOuHh933u1nLdkD1ySyhLMj0AMmwpvheGYIiAKWQ3plCF5fob9I_dZDl30U-WuOd2uayXRuojjq3gm0uIRhA8UTfVOvB8v5GHlvYXGp_Fh760bl9zHqdMbFuXBEWYmp_t8Re7ERHbtiAuZEPHZuX3Y1cH-Csy0hKznh-5JfYf3AEy03Y-81CVyfrhb40epF_CfjPqKt7La70jk-cy1ldEga8A"/>
+<span class="absolute bottom-0.5 right-0.5 bg-purple-600 text-on-primary font-mono-code text-[8px] px-1 rounded">AI BOX</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-purple-600"></span>
+                  Road Crack
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col max-w-[190px]">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">Airport Way S &amp; S Bailey</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">47.5510° N, 122.3190° W</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm min-w-[120px]">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-mono-metric text-mono-metric font-semibold text-on-surface">96.3%</span>
+<span class="font-mono-code text-[10px] text-on-surface-variant">YOLOv8x</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full w-[96.3%]"></div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Oct 23, 11:50 AM</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">District 2 (Harbor)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-tertiary"></span>
+                  Closed
+                </span>
+</td>
+<td class="py-space-sm px-space-sm">
+<div class="flex items-center gap-space-2xs">
+<div class="w-6 h-6 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center font-mono-code text-[10px] font-bold">RS</div>
+<span class="font-label-md text-label-md text-on-surface font-medium">Road Seal Unit B</span>
+</div>
+</td>
+<td class="py-space-sm px-space-sm">
+<span class="inline-flex items-center gap-1 font-mono-metric text-mono-metric text-tertiary font-medium">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+                  Archived
+                </span>
+</td>
+<td class="py-space-sm px-space-sm text-right pr-space-md" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" onclick="openSlideOver('RC-9348')" title="View Inspection Dossier">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Audit QA Record">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-error transition-colors" title="Archive Work Order">
+<span class="material-symbols-outlined text-[18px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- High-Density Data Table Pagination Footer -->
+<div class="flex flex-col sm:flex-row items-center justify-between gap-space-sm px-space-lg py-space-sm bg-surface-container-lowest">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-md text-label-md">
+<span>Rows per page:</span>
+<select class="bg-surface-container-low px-space-xs py-1 rounded-lg text-on-surface font-mono-metric text-mono-metric outline-none cursor-pointer">
+<option>10</option>
+<option selected="">25</option>
+<option>50</option>
+<option>100</option>
+</select>
+</div>
+<span class="font-mono-metric text-mono-metric text-on-surface-variant">
+            Showing <strong class="text-on-surface">1 - 7</strong> of <strong class="text-on-surface">4,821</strong> incidents
+          </span>
+</div>
+<div class="flex items-center gap-space-2xs">
+<button class="p-1.5 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface disabled:opacity-40 transition-colors" disabled="">
+<span class="material-symbols-outlined text-[18px]">first_page</span>
+</button>
+<button class="p-1.5 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface disabled:opacity-40 transition-colors" disabled="">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="h-8 w-8 rounded-lg bg-primary text-on-primary font-mono-metric text-mono-metric font-semibold shadow-sm">1</button>
+<button class="h-8 w-8 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-mono-metric text-mono-metric transition-colors">2</button>
+<button class="h-8 w-8 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-mono-metric text-mono-metric transition-colors">3</button>
+<span class="px-1 text-on-surface-variant font-mono-metric">...</span>
+<button class="h-8 w-8 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-mono-metric text-mono-metric transition-colors">483</button>
+<button class="p-1.5 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+<button class="p-1.5 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]">last_page</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Quick Incident Dispatch Slide-over / Inspector Drawer -->
+<div class="fixed right-0 top-16 bottom-0 w-inspector-width bg-surface-container-lowest shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between overflow-y-auto" id="slide-over-inspector">
+<div class="flex flex-col">
+<!-- Inspector Header -->
+<div class="flex items-center justify-between p-space-md bg-surface-container-low sticky top-0 z-10">
+<div class="flex flex-col">
+<span class="font-mono-code text-mono-code text-on-surface-variant uppercase font-semibold">Incident Dossier</span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold" id="slide-over-id">#RC-9402</span>
+</div>
+<button class="p-1.5 rounded-full hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" onclick="closeSlideOver()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Inspector Content Body -->
+<div class="p-space-md flex flex-col gap-space-md">
+<!-- Machine Vision Detection Canvas -->
+<div class="flex flex-col gap-space-2xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase font-mono-code text-on-surface-variant">Optical AI Telemetry</span>
+<span class="font-mono-metric text-mono-metric text-secondary font-semibold">YOLOv8 Conf: 98.4%</span>
+</div>
+<div class="relative w-full h-48 rounded-xl overflow-hidden bg-surface-container-high group">
+<img class="w-full h-full object-cover" data-alt="High resolution roadway inspection camera captures asphalt degradation showing bounding markers and pixel coordinate telemetry overlays." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCuh4gtzX5xhpieSa1xVN9nktDUyiV_ecFXfg7FJ52tlky0bM9AqgWwggclnJvPPIQAtldDXTi7ySwtOao31z-G6QrhT_dp3flJFAu8zM4VGkfNenbyeN3w8TdS4y1QYuudzaSf8Z7uydf5OqEV90adzAHD7XtRnHeqqD_gLnoKxQwXAAkM57m7VotxMZr4ww9VxeB2HCZoItSPWdHwTFabQJtyNRP67ULmAQbMGIRmVDZnSa28M_nP"/>
+<!-- Bounding Box Annotation Mock -->
+<div class="absolute inset-x-8 inset-y-6 border-2 border-dashed border-secondary bg-secondary/10 rounded pointer-events-none flex items-start justify-between p-1">
+<span class="font-mono-code text-[9px] bg-secondary text-on-secondary px-1 py-0.5 rounded font-bold">CLASS: POTHOLE (SEV: HIGH)</span>
+<span class="font-mono-code text-[9px] bg-secondary text-on-secondary px-1 py-0.5 rounded font-bold">AREA: 0.42m²</span>
+</div>
+</div>
+</div>
+<!-- Geospatial Map View -->
+<div class="flex flex-col gap-space-2xs">
+<span class="font-label-sm text-label-sm uppercase font-mono-code text-on-surface-variant">Geospatial Fix</span>
+<div class="w-full h-28 rounded-xl bg-surface-container flex items-center justify-center relative overflow-hidden shadow-inner" data-alt="Satellite GIS topographical road map of urban arterial network with GPS pinpoint markers and traffic flows." data-location="Seattle Downtown 842 Rainier Ave" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBELfVukOG9ODzGzMrvDvBADXWFA73O4Ta731fZtNwxEcEC8uBK6QGLLA6T62InFhP9J3x21lZsG3f3x5aAtj4c_FWpVwMrK2x4Abxf_SlinoYQsX4gD7j0mY1a4jqqMvI1AKEA6GYQvrN6B2p5A4epjitog9K-lOT14032mZK-LKl-xJc840LkHNyJaVDL2iBrvflwt1BQt104ii0-Sz04gloNSc8v0-YQyEFsINsQ0Xe3WH-dj3_2')">
+<div class="absolute px-space-xs py-1 rounded bg-surface/90 backdrop-blur-sm shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-error text-[16px]">location_on</span>
+<span class="font-mono-code text-mono-code text-on-surface font-semibold">47.5921° N, 122.3105° W</span>
+</div>
+</div>
+</div>
+<!-- Triage Form Controls -->
+<div class="flex flex-col gap-space-sm pt-space-xs">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Assign Maintenance Unit</label>
+<select class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md outline-none">
+<option>Squad 4 - Asphalt Rapid Response</option>
+<option>Squad 2 - Structural Pavement Unit</option>
+<option>Stormwater Drainage Ops Unit</option>
+<option>Heavy Vehicle Clearing Fleet</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Dispatch Priority &amp; SLA</label>
+<select class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md outline-none">
+<option>Priority 1 - Immediate Hazard (2h SLA)</option>
+<option>Priority 2 - Arterial Road Repair (6h SLA)</option>
+<option>Priority 3 - Scheduled Pavement Maintenance</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm font-semibold text-on-surface">Inspector Verification Notes</label>
+<textarea class="w-full p-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md outline-none placeholder:text-on-surface-variant" placeholder="Add verified field instructions for incoming municipal crew..." rows="3"></textarea>
+</div>
+</div>
+</div>
+</div>
+<!-- Slide-over Action Buttons -->
+<div class="p-space-md bg-surface-container-low flex items-center gap-space-xs sticky bottom-0">
+<button class="w-1/2 py-2.5 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors font-semibold" onclick="closeSlideOver()">
+          Dismiss
+        </button>
+<button class="w-1/2 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors font-semibold shadow-sm" onclick="closeSlideOver()">
+          Dispatch Work Order
+        </button>
+</div>
+</div>
+<!-- Manual Work Order Creation Modal (Hidden by Default) -->
+<div class="fixed inset-0 bg-inverse-surface/40 backdrop-blur-sm z-50 flex items-center justify-center p-space-md hidden" id="manual-order-modal">
+<div class="bg-surface-container-lowest w-full max-w-xl rounded-xl shadow-2xl p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Create Manual Work Order</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Inject an offline road hazard report into the automated dispatch triage queue.</p>
+</div>
+<button class="p-1 rounded-full hover:bg-surface-container text-on-surface-variant" onclick="document.getElementById('manual-order-modal').classList.add('hidden')">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold">Hazard Category</label>
+<select class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md outline-none">
+<option>Pothole</option>
+<option>Road Crack</option>
+<option>Road Obstacle</option>
+<option>Road Flooding</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold">Severity Rating</label>
+<select class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md outline-none">
+<option>Low</option>
+<option>Medium</option>
+<option>High</option>
+<option>Critical</option>
+</select>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold">Location / Address</label>
+<input class="w-full px-space-sm py-2 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md outline-none" placeholder="e.g. 1420 4th Ave, Seattle WA" type="text"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold">Evidence Upload (Optional)</label>
+<div class="p-space-md border-2 border-dashed border-outline-variant/60 rounded-lg flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:bg-surface-container-low cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-[28px] text-tertiary">cloud_upload</span>
+<span class="font-label-md text-label-md text-on-surface font-medium">Drop road photo or inspection scan here</span>
+<span class="font-body-sm text-body-sm">Supports PNG, JPG, GeoTIFF up to 25MB</span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-end gap-space-xs pt-space-xs">
+<button class="px-space-md py-2 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors font-medium" onclick="document.getElementById('manual-order-modal').classList.add('hidden')">
+            Cancel
+          </button>
+<button class="px-space-md py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors font-semibold shadow-sm" onclick="document.getElementById('manual-order-modal').classList.add('hidden')">
+            Save &amp; Queue Work Order
+          </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  function openSlideOver(incidentId) {
+    const slideOver = document.getElementById('slide-over-inspector');
+    const idLabel = document.getElementById('slide-over-id');
+    if (slideOver && idLabel) {
+      idLabel.textContent = incidentId;
+      slideOver.classList.remove('translate-x-full');
+    }
+  }
+
+  function closeSlideOver() {
+    const slideOver = document.getElementById('slide-over-inspector');
+    if (slideOver) {
+      slideOver.classList.add('translate-x-full');
+    }
+  }
+
+  // Row Selection logic
+  const selectAll = document.getElementById('select-all-checkbox');
+  const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+  const countLabel = document.getElementById('selected-count-label');
+
+  function updateCount() {
+    let count = 0;
+    rowCheckboxes.forEach(cb => {
+      if (cb.checked) count++;
+    });
+    if (countLabel) countLabel.textContent = count;
+  }
+
+  if (selectAll) {
+    selectAll.addEventListener('change', (e) => {
+      rowCheckboxes.forEach(cb => {
+        cb.checked = e.target.checked;
+      });
+      updateCount();
+    });
+  }
+
+  rowCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateCount);
+  });
+
+  // Simple live search simulation
+  const searchInput = document.getElementById('table-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const val = e.target.value.toLowerCase();
+      const rows = document.querySelectorAll('#incident-table-body tr');
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(val) ? '' : 'none';
+      });
+    });
+  }
+
+  // Reset filters
+  const resetBtn = document.getElementById('btn-reset-filters');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      document.getElementById('filter-category').value = 'ALL';
+      document.getElementById('filter-status').value = 'ALL';
+      document.getElementById('filter-severity').value = 'ALL';
+      document.getElementById('filter-district').value = 'ALL';
+      if (searchInput) searchInput.value = '';
+      const rows = document.querySelectorAll('#incident-table-body tr');
+      rows.forEach(r => r.style.display = '');
+    });
+  }
+</script></main></div></body></html>

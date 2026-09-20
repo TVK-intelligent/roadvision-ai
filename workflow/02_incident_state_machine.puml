@@ -1,0 +1,69 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam roundcorner 8
+skinparam defaultFontName "Inter", "Arial", sans-serif
+skinparam defaultFontSize 12
+
+skinparam state {
+    BorderColor #004ac6
+    BackgroundColor #F8F9FF
+    FontColor #0b1c30
+    ArrowColor #004ac6
+    StartColor #004ac6
+    EndColor #ba1a1a
+}
+
+title Sơ Đồ Chuyển Trạng Thái Sự Cố (Incident State Machine) - RoadCare
+
+[*] --> SUBMITTED : Citizen nộp phản ánh\n[POST /api/v1/incidents]
+
+state SUBMITTED {
+    description: Sự cố vừa được tạo, chờ kết quả AI hoặc đang gắn cờ thẩm định thủ công
+}
+
+SUBMITTED --> AI_ANALYZED : ONNX YOLO Inference thành công\n[Confidence >= 70%]
+
+state AI_ANALYZED {
+    description: Đã tự động gán nhãn loại hư hại (POTHOLE, CRACK, OBSTACLE, FLOODING)
+}
+
+SUBMITTED --> REJECTED : Admin kiểm duyệt từ chối\n(Ảnh mờ, spam, ngoài phạm vi)
+AI_ANALYZED --> REJECTED : Admin từ chối\n(Thông tin không hợp lệ)
+
+state REJECTED #FFDAD6 {
+    description: Sự cố bị bác bỏ, hệ thống gửi lý do giải trình cho Người dân
+}
+
+AI_ANALYZED --> ASSIGNED : Admin phê duyệt & phân công Staff\n[PATCH /api/v1/incidents/{id}/assign]
+SUBMITTED --> ASSIGNED : Admin thẩm định thủ công & phân công Staff\n[Trường hợp Confidence < 70%]
+
+state ASSIGNED {
+    description: Đã chỉ định kỹ thuật viên phụ trách & mức độ ưu tiên xử lý
+}
+
+ASSIGNED --> IN_PROGRESS : Staff tiếp nhận nhiệm vụ tại hiện trường\n[PATCH /api/v1/incidents/{id}/status]
+
+state IN_PROGRESS #E5EEFF {
+    description: Đang thi công sửa chữa mặt đường, rào chắn an toàn
+}
+
+IN_PROGRESS --> RESOLVED : Staff hoàn tất & tải ảnh nghiệm thu\n[POST /api/v1/incidents/{id}/resolve]
+
+state RESOLVED #D5E3FC {
+    description: Đã khắc phục xong, có ảnh bằng chứng thi công Proof of Work
+}
+
+RESOLVED --> IN_PROGRESS : Citizen hoặc Admin khiếu nại chưa đạt\n(Yêu cầu xử lý lại)
+
+RESOLVED --> CLOSED : Citizen xác nhận hài lòng & chấm điểm\n[POST /api/v1/incidents/{id}/close]\n(Hoặc tự động đóng sau 7 ngày nếu không phản hồi)
+
+state CLOSED #CCE5FF {
+    description: Sự cố hoàn tất trọn vẹn vòng đời, lưu trữ vào kho dữ liệu phân tích
+}
+
+REJECTED --> [*]
+CLOSED --> [*]
+
+@enduml

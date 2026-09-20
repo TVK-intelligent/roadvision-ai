@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9ff;
+    color: #0b1c30;
+  }
+}
+
+/* Tùy chỉnh thanh cuộn thanh lịch */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #eff4ff;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c3c6d7;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #004ac6;
+}

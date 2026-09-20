@@ -1,0 +1,15 @@
+# Cấu hình dữ liệu huấn luyện YOLOv8 cho hệ thống RoadVision
+# Tham khảo: SamaIsmail91/Road-Damage-Detection (RDD2022) + jaygala24/pothole-detection
+
+path: /content/dataset
+train: images/train
+val: images/val
+test: images/test
+
+nc: 4
+
+names:
+  0: POTHOLE        # Ổ gà / Hố sụt mặt đường
+  1: ROAD_CRACK     # Vết nứt mặt đường
+  2: ROAD_OBSTACLE  # Chướng ngại vật / Rác thải cản trở
+  3: ROAD_FLOODING  # Điểm ngập úng cục bộ

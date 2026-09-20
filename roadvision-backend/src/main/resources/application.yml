@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: roadvision-backend
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/roadcare_db?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: 12345678
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 15MB
+
+# Cấu hình bảo mật JWT
+roadvision:
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    expiration-ms: 86400000 # 24 giờ
+  storage:
+    upload-dir: uploads
+  ai:
+    model-path: classpath:models/yolov8_multiclass_roadcare.onnx
+    confidence-threshold: 0.20
+    iou-threshold: 0.45
+
+logging:
+  charset:
+    console: UTF-8
+
+# Cấu hình tài liệu Swagger / OpenAPI v3
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs

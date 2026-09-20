@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><title>RoadCare - Road Traffic Incident Management</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-primary-fixed": "#00174b", "surface-container-highest": "#d3e4fe", "outline": "#737686", "error-container": "#ffdad6", "surface-container-lowest": "#ffffff", "secondary-fixed": "#cce5ff", "outline-variant": "#c3c6d7", "on-secondary-fixed": "#001d31", "tertiary": "#48566a", "on-tertiary-fixed-variant": "#3a485b", "surface-dim": "#cbdbf5", "on-tertiary-fixed": "#0d1c2e", "surface-container": "#e5eeff", "secondary": "#006398", "primary-fixed-dim": "#b4c5ff", "on-secondary-fixed-variant": "#004b73", "surface-tint": "#0053db", "on-primary": "#ffffff", "surface-container-high": "#dce9ff", "on-tertiary": "#ffffff", "surface": "#f8f9ff", "tertiary-fixed": "#d5e3fc", "on-secondary-container": "#00476e", "surface-variant": "#d3e4fe", "error": "#ba1a1a", "on-tertiary-container": "#e9f0ff", "tertiary-container": "#606e83", "on-surface": "#0b1c30", "inverse-primary": "#b4c5ff", "on-error-container": "#93000a", "on-background": "#0b1c30", "primary": "#004ac6", "on-surface-variant": "#434655", "on-primary-container": "#eeefff", "surface-bright": "#f8f9ff", "on-primary-fixed-variant": "#003ea8", "surface-container-low": "#eff4ff", "inverse-surface": "#213145", "secondary-fixed-dim": "#93ccff", "tertiary-fixed-dim": "#b9c7df", "secondary-container": "#5bb8fe", "on-error": "#ffffff", "background": "#f8f9ff", "inverse-on-surface": "#eaf1ff", "on-secondary": "#ffffff", "primary-container": "#2563eb", "primary-fixed": "#dbe1ff" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-xs": "0.5rem", "space-sm": "0.75rem", "space-md": "1rem", "space-2xl": "3rem", "space-xl": "2rem", "space-lg": "1.5rem", "space-2xs": "0.25rem", "gutter-desktop": "1.5rem", "gutter-mobile": "1rem", "sidebar-width": "17.5rem", "inspector-width": "22.5rem" }, "fontFamily": { "headline-md": [ "Plus Jakarta Sans" ], "display-lg": [ "Plus Jakarta Sans" ], "mono-metric": [ "JetBrains Mono" ], "body-md": [ "Inter" ], "body-lg": [ "Inter" ], "body-sm": [ "Inter" ], "display-lg-mobile": [ "Plus Jakarta Sans" ], "mono-code": [ "JetBrains Mono" ], "headline-lg": [ "Plus Jakarta Sans" ], "headline-sm": [ "Plus Jakarta Sans" ], "label-sm": [ "Inter" ], "label-md": [ "Inter" ], "label-lg": [ "Inter" ] }, "fontSize": { "headline-md": [ "22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "display-lg": [ "40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "mono-metric": [ "13px", { "lineHeight": "16px", "letterSpacing": "-0.01em", "fontWeight": "500" } ], "body-md": [ "14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" } ], "body-lg": [ "16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" } ], "body-sm": [ "12px", { "lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "400" } ], "display-lg-mobile": [ "30px", { "lineHeight": "38px", "letterSpacing": "-0.015em", "fontWeight": "700" } ], "mono-code": [ "11px", { "lineHeight": "14px", "letterSpacing": "0em", "fontWeight": "400" } ], "headline-lg": [ "28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "headline-sm": [ "18px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600" } ], "label-sm": [ "11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "600" } ], "label-md": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" } ], "label-lg": [ "14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "500" } ] } } } };</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest border-b border-outline-variant/40 shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 w-full px-gutter-desktop flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg shrink-0"><div class="flex items-center gap-space-xs"><img alt="RoadCare Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U2EVl8jeIKxIrXwvtLpfVKX5J8P6D4UIip24EokILDIiDganLxP-eWLGo-LCKKjSnDfVwbbtb7JG-bCbb4-w8kCTcg7NjynbzQF7xbAPe1zpERyLgwAaNYUrTf6Czr6r_ZruyjW9XxpXbuj3YJfuf7cR7vyBPrBFMpRLYmz2L6G4WlEEkJ38kNZlJ0kiNtwrYwVr8eTKQrlbiUTpMPSZ26FThu0DzgQ45HC2--KloXvzGhtDQSqIZH6Ws"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">RoadCare</span><span class="font-mono-code text-mono-code text-on-surface-variant">MUNICIPAL VISION INFRASTRUCTURE</span></div></div><nav class="hidden xl:flex items-center gap-space-xs" data-active-classes="bg-surface-container-low text-primary font-bold rounded-lg shadow-sm"><a aria-current="page" class="px-space-sm py-space-xs transition-colors bg-surface-container-low text-primary font-bold rounded-lg shadow-sm" data-path="home" href="#">Home</a><a class="px-space-sm py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="report-incident" href="#">Report Incident</a><a class="px-space-sm py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="my-reports" href="#">My Reports</a><a class="px-space-sm py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="incident-map" href="#">Incident Map</a><a class="px-space-sm py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="admin-dashboard" href="#">Admin Dashboard</a></nav></div><div class="flex items-center gap-space-sm shrink-0"><div class="hidden 2xl:flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-surface-container-low border border-outline-variant/60"><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span></span><span class="font-label-sm text-label-sm text-on-surface-variant">Live Grid: <strong class="text-on-surface font-semibold">Operational</strong></span></div><div class="hidden lg:flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-primary-fixed/40 border border-primary/20"><span class="material-symbols-outlined text-primary text-[16px]">smart_toy</span><span class="font-mono-metric text-mono-metric text-on-primary-fixed font-medium">YOLOv8-RoadCare v2.4 Active</span></div><button class="relative p-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-full transition-colors" type="button"><span class="material-symbols-outlined">notifications</span><span class="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error font-mono-code text-[9px] font-bold">3</span></button><div class="flex items-center gap-space-xs pl-space-xs border-l border-outline-variant/60"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoMYlHmnw3chbDBLqWLCJv4T7ak05o6kAzQHVIYqoE33Ol9bU3P-Vk8xl6h1u5NccesCLcytulBXvu_mXsWyvpr7KKCHJWrOLoX0QW1uyYvu2bgbwzQb6WbbFnNryMObbF4RKBKYcXQw8-lwgi1AKYo7YalikkoTcRihIVUnfIMf4tiWlHs10r_iw7XUtEHxMFIZ2OJ19yNJNjrlLeG9bk5QpuasK4goQ0p-RezIXCu31OLyCvhY-n"/><div class="hidden sm:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface leading-snug font-semibold">Eng. Elena Rostova</span><span class="font-body-sm text-body-sm text-on-surface-variant leading-none">Transport Operations</span></div></div></div></div></header><main class="w-full pt-16 bg-surface min-h-screen"><div class="flex flex-col w-full">
+<!-- HERO SECTION -->
+<section class="relative w-full overflow-hidden bg-surface-container-low px-gutter-desktop py-space-2xl">
+<!-- Ambient Backdrop Light Glows -->
+<div class="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
+<div class="absolute top-1/2 -right-32 w-80 h-80 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none"></div>
+<div class="relative max-w-7xl mx-auto flex flex-col items-center text-center">
+<!-- Live Status Ticker Pills -->
+<div class="flex flex-wrap items-center justify-center gap-space-xs mb-space-lg">
+<div class="inline-flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-surface-container-lowest shadow-sm">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+<span class="font-mono-code text-mono-code text-primary uppercase tracking-wider font-semibold">AI Model: 96.4% Precision</span>
+<span class="text-outline-variant font-mono-code text-mono-code">/</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">4 Hazard Classes</span>
+</div>
+<div class="inline-flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-surface-container-lowest shadow-sm">
+<span class="material-symbols-outlined text-secondary text-[14px]">timer</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">Avg Resolution: <strong class="text-on-surface font-semibold">4.2 Hours</strong></span>
+</div>
+<div class="inline-flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-surface-container-lowest shadow-sm">
+<span class="material-symbols-outlined text-primary text-[14px]">task_alt</span>
+<span class="font-mono-code text-mono-code text-on-surface">3,480+ Hazards Resolved</span>
+</div>
+</div>
+<!-- High-Impact Main Headline -->
+<h1 class="font-display-lg text-display-lg text-on-surface max-w-4xl tracking-tight leading-tight">
+        Smarter Roads, Safer Cities Powered by Autonomous AI Vision
+      </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mt-space-md leading-relaxed">
+        Empowering citizens and municipal departments to report, classify, and resolve road hazards in real-time using next-gen deep learning computer vision.
+      </p>
+<!-- Action CTAs -->
+<div class="flex flex-wrap items-center justify-center gap-space-md mt-space-xl">
+<a class="inline-flex items-center gap-space-xs px-space-lg py-space-sm bg-primary text-on-primary font-label-lg text-label-lg rounded-lg shadow-md hover:bg-on-primary-fixed-variant transition-all hover:scale-[1.02] active:scale-[0.98]" data-path="report-incident" href="#">
+<span class="material-symbols-outlined text-[20px]">add_a_photo</span>
+<span>Report an Incident</span>
+</a>
+<a class="inline-flex items-center gap-space-xs px-space-lg py-space-sm bg-surface-container-lowest text-on-surface font-label-lg text-label-lg rounded-lg shadow-sm hover:bg-surface-container transition-all" data-path="incident-map" href="#">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+</span>
+<span>Explore Live Incident Map</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</a>
+</div>
+<!-- Visual Telemetry Anchor Preview (Bento Peek) -->
+<div class="relative w-full max-w-5xl mt-space-2xl rounded-xl overflow-hidden shadow-xl bg-surface-container-lowest">
+<div class="relative w-full h-64 sm:h-80 md:h-96">
+<img class="w-full h-full object-cover" data-alt="Photorealistic street view through a modern connected vehicle dashcam overlooking a metropolitan intersection with high-definition digital HUD telemetry overlays, holographic bounding boxes framing asphalt defects in neon cyan and precision cobalt, clean morning light, urban architecture, crisp perspective view" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASOeoxKGQVz2km_DOMIVb7x8hU3Q3f0zsVlKOGVmq319ggLCllNmrln2QVAufqiLgKEmO81d9qGZdrvmiTYRqiOhv2J6W6vKpybbx8D2l-b93aUqbk27upZkTgtC-93ATQB57vPJEbKgSALs6IZeqT_HPMLfbU5YEA1eI6YfUqUMbneoZ35r61gY7iecs71V58st9TVSc-qvApWnbuEYd0cRy7IYIiBLhDcANupyOZ_t3_KoDlicam"/>
+<!-- Scanning Frame & Neural HUD Overlay -->
+<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/90 via-inverse-surface/30 to-transparent p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-sm">
+<span class="material-symbols-outlined text-primary text-[16px]">videocam</span>
+<span class="font-mono-code text-mono-code text-on-surface font-semibold">FEED: METRO-NORTH-402</span>
+<span class="font-mono-code text-mono-code text-secondary font-medium">30.0 FPS</span>
+</div>
+<div class="flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-sm">
+<span class="font-mono-code text-mono-code text-on-surface-variant font-medium">GPS: 41.8781° N, 87.6298° W</span>
+</div>
+</div>
+<!-- Simulated Neural Detection Box in Overlay -->
+<div class="relative max-w-md self-start p-space-md rounded-xl bg-surface-container-lowest/95 backdrop-blur-md shadow-lg">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">smart_toy</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Neural Target Identified</span>
+</div>
+<span class="px-space-xs py-space-2xs rounded-full bg-primary-fixed text-on-primary-fixed font-mono-metric text-mono-metric font-semibold">97.8% CONF</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-2xs">Class 01: Cavity Pothole • Impact Severity Level 4 • Auto-dispatched to District 3 Rapid Team</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- METRICS & KPI SECTION -->
+<section class="w-full bg-surface px-gutter-desktop py-space-xl">
+<div class="max-w-7xl mx-auto">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- KPI 1 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Total Reported</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">report_problem</span>
+</div>
+</div>
+<div class="mt-space-md">
+<div class="flex items-baseline gap-space-xs">
+<span class="font-display-lg text-display-lg text-on-surface font-bold">4,821</span>
+<span class="font-mono-code text-mono-code text-primary font-semibold flex items-center">
+<span class="material-symbols-outlined text-[14px]">arrow_upward</span>+12%
+              </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-2xs">Logged incidents this month</p>
+</div>
+<!-- Sparkline Mini Chart SVG -->
+<div class="w-full h-8 mt-space-md pt-space-xs">
+<svg class="w-full h-full text-primary" fill="none" preserveaspectratio="none" viewbox="0 0 100 24">
+<path d="M0 18 L15 15 L30 19 L45 10 L60 12 L75 6 L90 8 L100 2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+<!-- KPI 2 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">AI Classification</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+</div>
+</div>
+<div class="mt-space-md">
+<div class="flex items-baseline gap-space-xs">
+<span class="font-display-lg text-display-lg text-on-surface font-bold">98.2%</span>
+<span class="font-mono-code text-mono-code text-secondary font-semibold">YOLOv8</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-2xs">Automated triage accuracy</p>
+</div>
+<!-- Sparkline Mini Chart SVG -->
+<div class="w-full h-8 mt-space-md pt-space-xs">
+<svg class="w-full h-full text-secondary" fill="none" preserveaspectratio="none" viewbox="0 0 100 24">
+<path d="M0 12 L20 10 L40 14 L60 6 L80 8 L100 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+<!-- KPI 3 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">In Progress</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">engineering</span>
+</div>
+</div>
+<div class="mt-space-md">
+<div class="flex items-baseline gap-space-xs">
+<span class="font-display-lg text-display-lg text-on-surface font-bold">142</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">Squads</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-2xs">Active civil work crews</p>
+</div>
+<!-- Sparkline Mini Chart SVG -->
+<div class="w-full h-8 mt-space-md pt-space-xs">
+<svg class="w-full h-full text-primary" fill="none" preserveaspectratio="none" viewbox="0 0 100 24">
+<path d="M0 14 L25 18 L50 9 L75 12 L100 7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+<!-- KPI 4 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Repairs Completed</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+</div>
+</div>
+<div class="mt-space-md">
+<div class="flex items-baseline gap-space-xs">
+<span class="font-display-lg text-display-lg text-on-surface font-bold">4,395</span>
+<span class="font-mono-code text-mono-code text-secondary font-semibold">91.1% Rate</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-2xs">Verified road repairs completed</p>
+</div>
+<!-- Sparkline Mini Chart SVG -->
+<div class="w-full h-8 mt-space-md pt-space-xs">
+<svg class="w-full h-full text-secondary" fill="none" preserveaspectratio="none" viewbox="0 0 100 24">
+<path d="M0 20 L20 16 L40 14 L60 8 L80 5 L100 2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 4 INCIDENT CATEGORIES EXPLORER -->
+<section class="w-full bg-surface-container-low px-gutter-desktop py-space-2xl">
+<div class="max-w-7xl mx-auto">
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-space-xl gap-space-md">
+<div>
+<span class="font-mono-code text-mono-code text-primary uppercase tracking-widest font-semibold">AI Detection Taxonomy</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mt-space-2xs">Autonomous Road Hazard Classification</h2>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md">
+          Our deep vision system splits street-level anomalies into four specialized structural models, ensuring proper work crew dispatch within minutes.
+        </p>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Category 1: Potholes -->
+<div class="flex flex-col rounded-xl bg-surface-container-lowest p-space-lg shadow-sm hover:shadow-md transition-all group">
+<div class="relative w-full h-40 rounded-lg overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="High-resolution close-up photo of a deep asphalt pothole on an urban road showing structural aggregate breakdown and crisp edge fractures under bright daylight, inspected by digital vision markers" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkXa3x7lLaTSALORLoDgxf0jOmeTi_4d8338oDtnCzcn5e6V7lC04_pZ7sohX2dwFoSp65LskgAvoUuSB73iEACfIMfX36jzHyZ3XiYTteVIZA8zby6Co9544JiTaweki1Z0xN0md-5iIzry3Q7n224fiRjVlRXK7IgcN0Tiw2KbOtXLd2gegJz0zaa9_YkShYnSr47HN96ohmlKey7HxcbVsQy3XJ32LKrTN4duqOZoXHnR0ubvKV"/>
+<span class="absolute top-2 left-2 px-space-xs py-space-2xs rounded-full bg-surface-container-lowest/90 font-mono-code text-mono-code text-on-surface font-semibold shadow-sm">
+              CLASS 01
+            </span>
+</div>
+<div class="mt-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[22px]">disc_full</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Potholes</h3>
+</div>
+<span class="font-mono-metric text-mono-metric text-primary font-bold">98.4% Acc</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">
+            Deep surface cavity identification, rim depth analysis, and vehicle tire impact risk scoring.
+          </p>
+<div class="mt-space-md pt-space-sm bg-surface-container-low/50 rounded-lg p-space-sm flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<span class="font-mono-code text-mono-code text-on-surface-variant">Trained Samples:</span>
+<span class="font-mono-metric text-mono-metric text-on-surface font-semibold">24,500+</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-mono-code text-mono-code text-on-surface-variant">Dispatch SLA:</span>
+<span class="font-mono-metric text-mono-metric text-primary font-semibold">&lt; 3.5 Hours</span>
+</div>
+</div>
+</div>
+<!-- Category 2: Road Cracks -->
+<div class="flex flex-col rounded-xl bg-surface-container-lowest p-space-lg shadow-sm hover:shadow-md transition-all group">
+<div class="relative w-full h-40 rounded-lg overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Detailed macro view of extensive alligator cracking and longitudinal fissures in highway tarmac pavement with AI vector segmentation lines mapping fracture density in cool morning light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkacwvF8c2eqsGTi9xNDRXCQIWcVzvcCg2nWwHoT9IH4lyQKpjL84TWY6VqaLM5cWneiBRgmW-wMPDAqy_DMpliz_QZbJrWUK1cVELYbbA5yQ2gsQbuCh9PEIaZ7AYkUydklPSbuvvrWhCiGozlx4FVKt4Lc9fJonJCgRswuUSWvjKJ34vetaDVzrcL9hYB46oFNhCcfFIxgsiseEq9wj9XpDhsNUsHQjMMQeHWVHDNAhDGhWEyeKc"/>
+<span class="absolute top-2 left-2 px-space-xs py-space-2xs rounded-full bg-surface-container-lowest/90 font-mono-code text-mono-code text-on-surface font-semibold shadow-sm">
+              CLASS 02
+            </span>
+</div>
+<div class="mt-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[22px]">broken_image</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Road Cracks</h3>
+</div>
+<span class="font-mono-metric text-mono-metric text-secondary font-bold">95.8% Acc</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">
+            Longitudinal and alligator structural fatigue detection preventing water seeping and foundation failure.
+          </p>
+<div class="mt-space-md pt-space-sm bg-surface-container-low/50 rounded-lg p-space-sm flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<span class="font-mono-code text-mono-code text-on-surface-variant">Trained Samples:</span>
+<span class="font-mono-metric text-mono-metric text-on-surface font-semibold">18,200+</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-mono-code text-mono-code text-on-surface-variant">Dispatch SLA:</span>
+<span class="font-mono-metric text-mono-metric text-secondary font-semibold">&lt; 24 Hours</span>
+</div>
+</div>
+</div>
+<!-- Category 3: Road Obstacles -->
+<div class="flex flex-col rounded-xl bg-surface-container-lowest p-space-lg shadow-sm hover:shadow-md transition-all group">
+<div class="relative w-full h-40 rounded-lg overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Urban city road with a fallen tree branch and highway safety debris blocking an active driving lane, surrounded by digital danger bounding zones captured from traffic surveillance perspective" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjJCCjxnamjNjn306FhhYWlJMF7lFCsLbEdGvDD6Xtsqp9110hIanmJr2WJxYxb_BaiaE-w2lyi6XUOINWSh-C-8t5wN1GK8hjoA2bpLAuQ0hjCj27VwRAVS7Q-9IsoJoGKmobV9zDrLZin7yUz2B0I2rd2RyVkoYPT5sKhWgmo7k4IQDJrkC5bD9sGeO6zIzOIeGUrID3YY1DtosjWspqcWSxqSmLEsZIVdhU_1jEppYgQIhywnKb"/>
+<span class="absolute top-2 left-2 px-space-xs py-space-2xs rounded-full bg-surface-container-lowest/90 font-mono-code text-mono-code text-error font-semibold shadow-sm">
+              CLASS 03
+            </span>
+</div>
+<div class="mt-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-error text-[22px]">warning</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Road Obstacles</h3>
+</div>
+<span class="font-mono-metric text-mono-metric text-error font-bold">99.1% Acc</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">
+            Fallen branches, construction debris, tire treads, and stationary road hazards in driving lanes.
+          </p>
+<div class="mt-space-md pt-space-sm bg-surface-container-low/50 rounded-lg p-space-sm flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<span class="font-mono-code text-mono-code text-on-surface-variant">Trained Samples:</span>
+<span class="font-mono-metric text-mono-metric text-on-surface font-semibold">14,900+</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-mono-code text-mono-code text-on-surface-variant">Dispatch SLA:</span>
+<span class="font-mono-metric text-mono-metric text-error font-semibold">&lt; 45 Mins</span>
+</div>
+</div>
+</div>
+<!-- Category 4: Road Flooding -->
+<div class="flex flex-col rounded-xl bg-surface-container-lowest p-space-lg shadow-sm hover:shadow-md transition-all group">
+<div class="relative w-full h-40 rounded-lg overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Suburban arterial boulevard with deep rainwater pooling over curbstones and storm drain backed up, street reflections and emergency hydroplane risk indicators shown under overcast sky" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCswb4k8DIuJIyNTBpTOZ4u84SM6tub0bVFf_KzySjr2gVtlCSH9acsV6jiHU_nF5h7iAkB8-QUZj6uHg9VuCET1TtqId0GsJjXxZTJsXOoxWZYKOPOjZ1Z0IBnu2EsOLDxaJNwKpidMNvJY4_jhJh9FXOtYohoHEjyInB9LT103kDbZSrmfsHvHmCNzwDGZt1n-77qhuHd08UvAyds7wjr2ULwF20FIvhbRea_unkij0Ir9t4CPJAU"/>
+<span class="absolute top-2 left-2 px-space-xs py-space-2xs rounded-full bg-surface-container-lowest/90 font-mono-code text-mono-code text-secondary font-semibold shadow-sm">
+              CLASS 04
+            </span>
+</div>
+<div class="mt-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[22px]">flood</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Road Flooding</h3>
+</div>
+<span class="font-mono-metric text-mono-metric text-secondary font-bold">97.0% Acc</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">
+            Water pooling, drain obstruction, hydroplaning danger zones, and flash flood surface inundation.
+          </p>
+<div class="mt-space-md pt-space-sm bg-surface-container-low/50 rounded-lg p-space-sm flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<span class="font-mono-code text-mono-code text-on-surface-variant">Trained Samples:</span>
+<span class="font-mono-metric text-mono-metric text-on-surface font-semibold">11,800+</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-mono-code text-mono-code text-on-surface-variant">Dispatch SLA:</span>
+<span class="font-mono-metric text-mono-metric text-secondary font-semibold">&lt; 1.5 Hours</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- INTERACTIVE LIVE MAP PREVIEW -->
+<section class="w-full bg-surface px-gutter-desktop py-space-2xl">
+<div class="max-w-7xl mx-auto">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md mb-space-lg">
+<div>
+<span class="font-mono-code text-mono-code text-secondary uppercase tracking-wider font-semibold">Spatial GIS Telemetry</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mt-space-2xs">Real-Time Municipal Grid Monitoring</h2>
+</div>
+<!-- Filter Buttons Bar -->
+<div class="flex flex-wrap items-center gap-space-xs p-1 rounded-lg bg-surface-container shadow-sm" id="mapFilters">
+<button class="px-space-sm py-space-2xs rounded-lg font-label-md text-label-md bg-surface-container-lowest text-primary font-bold shadow-sm transition-all" data-filter="all" type="button">All Incidents</button>
+<button class="px-space-sm py-space-2xs rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all" data-filter="critical" type="button">Critical</button>
+<button class="px-space-sm py-space-2xs rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all" data-filter="progress" type="button">Work in Progress</button>
+<button class="px-space-sm py-space-2xs rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all" data-filter="resolved" type="button">Resolved</button>
+</div>
+</div>
+<!-- Styled Simulated Map Canvas Container -->
+<div class="relative w-full h-[480px] rounded-xl overflow-hidden shadow-lg bg-surface-container-high">
+<!-- Google Maps Static Pipeline Background Anchor -->
+<div class="w-full h-full bg-cover bg-center" data-location="Chicago Downtown, Illinois" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDOxhFcanVlDAcQogQpZ81VW9C53P9ieQhePagg1MnFT1EeZiz8k1Y21OiE_SEY18SwNsHI8iQYBD1ppsALZvc7TlsJVtJC2563iqEfepSaDDandp5TAfLJARXQ8bRCZvEiHOSTrR6keYO562d9NNxs-egcbK5wLzrHEzuayLtFY1KFeMCCk22iYs2TzAgq70amju_dcec1PhbXx-aM3LpEMZUFjG0DVjkzn-TOhcfBKNCLqSbLAlx1')"></div>
+<!-- Interactive Floating Markers & Hotspots -->
+<!-- Hotspot 1: Grand Avenue (Active Card Popup) -->
+<div class="absolute top-[28%] left-[45%] z-20">
+<div class="relative flex items-center justify-center cursor-pointer group">
+<span class="animate-ping absolute inline-flex h-8 w-8 rounded-full bg-primary opacity-60"></span>
+<div class="relative w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md">
+<span class="material-symbols-outlined text-[16px]">disc_full</span>
+</div>
+<!-- Active Marker Pop-up Card -->
+<div class="absolute -top-36 -left-32 w-72 p-space-md rounded-xl bg-surface-container-lowest shadow-xl pointer-events-auto transition-transform">
+<div class="flex items-center justify-between">
+<span class="font-mono-code text-mono-code text-primary font-bold">#RC-8942</span>
+<span class="px-space-xs py-space-2xs rounded-full bg-secondary-fixed text-on-secondary-fixed font-mono-code text-mono-code font-semibold">94.7% CONF</span>
+</div>
+<p class="font-headline-sm text-headline-sm text-on-surface mt-space-2xs">Severe Pothole</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Grand Avenue &amp; N State St</p>
+<div class="mt-space-xs flex items-center gap-space-xs text-primary font-label-sm text-label-sm font-semibold">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+                Work Crew En Route (ETA 12m)
+              </div>
+</div>
+</div>
+</div>
+<!-- Hotspot 2: Road Obstacle (Red) -->
+<div class="absolute top-[55%] left-[22%] z-10">
+<div class="relative flex items-center justify-center cursor-pointer" title="Obstacle: Fallen Debris on Michigan Ave">
+<div class="w-6 h-6 rounded-full bg-error text-on-error flex items-center justify-center shadow-md">
+<span class="material-symbols-outlined text-[14px]">warning</span>
+</div>
+</div>
+</div>
+<!-- Hotspot 3: Road Crack (Purple / Tertiary) -->
+<div class="absolute top-[68%] left-[62%] z-10">
+<div class="relative flex items-center justify-center cursor-pointer" title="Structural Cracking on Wacker Dr">
+<div class="w-6 h-6 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center shadow-md">
+<span class="material-symbols-outlined text-[14px]">broken_image</span>
+</div>
+</div>
+</div>
+<!-- Hotspot 4: Road Flooding (Cyan / Secondary) -->
+<div class="absolute top-[35%] left-[78%] z-10">
+<div class="relative flex items-center justify-center cursor-pointer" title="Flooding: Underpass Drainage on Columbus">
+<div class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shadow-md">
+<span class="material-symbols-outlined text-[14px]">flood</span>
+</div>
+</div>
+</div>
+<!-- Floating Map Legend Overlay -->
+<div class="absolute bottom-4 left-4 p-space-sm rounded-xl bg-surface-container-lowest/90 backdrop-blur-md shadow-md flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-full bg-primary"></span>
+<span class="font-label-sm text-label-sm text-on-surface">Potholes</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-full bg-tertiary-container"></span>
+<span class="font-label-sm text-label-sm text-on-surface">Cracks</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-full bg-error"></span>
+<span class="font-label-sm text-label-sm text-on-surface">Obstacles</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-full bg-secondary-container"></span>
+<span class="font-label-sm text-label-sm text-on-surface">Floods</span>
+</div>
+</div>
+<!-- Direct Action Control on Map -->
+<div class="absolute top-4 right-4">
+<a class="px-space-md py-space-xs rounded-lg bg-surface-container-lowest/95 backdrop-blur-md text-primary font-label-md text-label-md font-semibold shadow-md hover:bg-surface-container transition-all flex items-center gap-space-xs" data-path="incident-map" href="#">
+<span class="material-symbols-outlined text-[18px]">open_in_new</span>
+            Launch Full Screen GIS
+          </a>
+</div>
+</div>
+</div>
+</section>
+<!-- HOW AI VERIFICATION WORKS (3-STEP WORKFLOW) -->
+<section class="w-full bg-surface-container-low px-gutter-desktop py-space-2xl">
+<div class="max-w-7xl mx-auto">
+<div class="text-center max-w-2xl mx-auto mb-space-2xl">
+<span class="font-mono-code text-mono-code text-primary uppercase tracking-widest font-semibold">Automated Pipeline</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mt-space-2xs">How AI Verification Works</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-space-xs">
+          From street-level smartphone photo to municipal asphalt repair in under three autonomous steps.
+        </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-lg relative">
+<!-- Step 1 -->
+<div class="p-space-xl rounded-xl bg-surface-container-lowest shadow-sm flex flex-col items-start relative hover:shadow-md transition-shadow">
+<div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-primary mb-space-md">
+<span class="material-symbols-outlined text-[26px]">camera_enhance</span>
+</div>
+<span class="font-mono-code text-mono-code text-primary font-bold mb-space-2xs">PHASE 01</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-space-xs">Citizen Snap &amp; Geo-Tag</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+            The citizen or municipal patrol vehicle takes a photo. High-precision GPS coordinates, compass bearing, and timestamp are automatically embedded.
+          </p>
+<div class="mt-space-md w-full pt-space-xs">
+<span class="inline-flex items-center gap-space-2xs font-mono-code text-mono-code text-on-surface-variant bg-surface-container-low px-space-xs py-space-2xs rounded">
+<span class="material-symbols-outlined text-[14px]">pin_drop</span>EXIF Spatial Embedding
+            </span>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="p-space-xl rounded-xl bg-surface-container-lowest shadow-sm flex flex-col items-start relative hover:shadow-md transition-shadow">
+<div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-secondary mb-space-md">
+<span class="material-symbols-outlined text-[26px]">memory</span>
+</div>
+<span class="font-mono-code text-mono-code text-secondary font-bold mb-space-2xs">PHASE 02</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-space-xs">Edge Neural Detection</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+            YOLOv8-RoadCare model runs instant inference. Generates precision bounding boxes, classifies damage category, and assigns an objective severity score.
+          </p>
+<div class="mt-space-md w-full pt-space-xs">
+<span class="inline-flex items-center gap-space-2xs font-mono-code text-mono-code text-on-surface-variant bg-surface-container-low px-space-xs py-space-2xs rounded">
+<span class="material-symbols-outlined text-[14px]">bolt</span>35ms Neural Inference
+            </span>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="p-space-xl rounded-xl bg-surface-container-lowest shadow-sm flex flex-col items-start relative hover:shadow-md transition-shadow">
+<div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-primary mb-space-md">
+<span class="material-symbols-outlined text-[26px]">send_time_extension</span>
+</div>
+<span class="font-mono-code text-mono-code text-primary font-bold mb-space-2xs">PHASE 03</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-space-xs">Automated Triage Dispatch</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+            A priority dispatch ticket routes directly into the district road works department. Live status tracking updates citizens upon confirmed repair.
+          </p>
+<div class="mt-space-md w-full pt-space-xs">
+<span class="inline-flex items-center gap-space-2xs font-mono-code text-mono-code text-on-surface-variant bg-surface-container-low px-space-xs py-space-2xs rounded">
+<span class="material-symbols-outlined text-[14px]">sync</span>Bidirectional SLA Tracking
+            </span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- BOTTOM CALL-TO-ACTION BANNER -->
+<section class="w-full bg-surface px-gutter-desktop py-space-2xl">
+<div class="max-w-7xl mx-auto">
+<div class="relative rounded-2xl bg-gradient-to-r from-primary to-secondary p-space-xl md:p-space-2xl text-on-primary overflow-hidden shadow-xl">
+<!-- Decorative Ambient Light -->
+<div class="absolute -right-20 -bottom-20 w-80 h-80 rounded-full bg-surface-container-lowest/10 blur-2xl pointer-events-none"></div>
+<div class="relative z-10 max-w-3xl flex flex-col items-start">
+<span class="px-space-sm py-space-2xs rounded-full bg-surface-container-lowest/20 backdrop-blur-md font-mono-code text-mono-code text-on-primary font-semibold mb-space-md">
+            CIVIC INFRASTRUCTURE INITIATIVE
+          </span>
+<h2 class="font-display-lg text-display-lg font-bold leading-tight">
+            See a Hazard on Your Commute? Fix It in 30 Seconds.
+          </h2>
+<p class="font-body-lg text-body-lg text-on-primary/90 mt-space-sm max-w-2xl leading-relaxed">
+            Join 12,000+ proactive citizens and municipal engineers safeguarding metropolitan streets. Every report directly coordinates civil maintenance squads.
+          </p>
+<div class="flex flex-wrap items-center gap-space-md mt-space-xl">
+<a class="inline-flex items-center gap-space-xs px-space-lg py-space-sm bg-surface-container-lowest text-primary font-label-lg text-label-lg rounded-lg shadow-md hover:bg-surface-container transition-all hover:scale-[1.02]" data-path="report-incident" href="#">
+<span class="material-symbols-outlined text-[20px]">photo_camera</span>
+<span>Report Road Hazard Now</span>
+</a>
+<a class="inline-flex items-center gap-space-xs px-space-lg py-space-sm bg-surface-container-lowest/10 hover:bg-surface-container-lowest/20 backdrop-blur-md text-on-primary font-label-lg text-label-lg rounded-lg transition-all" data-path="my-reports" href="#">
+<span class="material-symbols-outlined text-[20px]">assignment_turned_in</span>
+<span>Track Your Submitted Reports</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Simple map filter interaction for instant client responsiveness
+  document.addEventListener('DOMContentLoaded', () => {
+    const filterContainer = document.getElementById('mapFilters');
+    if (!filterContainer) return;
+
+    const buttons = filterContainer.querySelectorAll('button');
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        buttons.forEach((b) => {
+          b.className = 'px-space-sm py-space-2xs rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all';
+        });
+        btn.className = 'px-space-sm py-space-2xs rounded-lg font-label-md text-label-md bg-surface-container-lowest text-primary font-bold shadow-sm transition-all';
+      });
+    });
+  });
+</script></main><footer class="w-full bg-surface-container-lowest border-t border-outline-variant/40 py-space-lg"><div class="w-full px-gutter-desktop mx-auto flex flex-col md:flex-row items-center justify-between gap-space-md text-on-surface-variant"><div class="flex items-center gap-space-xs"><span class="font-headline-sm text-headline-sm text-on-surface">RoadCare</span><span class="font-body-sm text-body-sm">| Municipal AI Vision &amp; Spatial Triage Platform</span></div><div class="font-mono-code text-mono-code text-on-surface-variant">© 2025 Smart Mobility &amp; Public Safety Commission. All telemetry rights reserved.</div><div class="flex items-center gap-space-md"><span class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface cursor-pointer">Telemetry Protocol</span><span class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface cursor-pointer">Operational API</span><span class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface cursor-pointer">Privacy &amp; Security</span></div></div></footer></body></html>
