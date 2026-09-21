@@ -38,8 +38,4 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
                                   Pageable pageable);
 
     List<Incident> findByStatusAndResolvedAtBefore(IncidentStatus status, LocalDateTime thresholdTime);
-
-    long countByStatusNotIn(List<IncidentStatus> statuses);
-
-    long countByStatusIn(List<IncidentStatus> statuses);
 }

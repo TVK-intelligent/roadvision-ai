@@ -261,13 +261,13 @@ public class AiInferenceService {
                     // 4. ROAD_OBSTACLE: Chướng ngại vật thực tế dạng khối 3D -> Ngưỡng tối thiểu an toàn là 0.25 (khử nhiễu gờ đường 11.5%)
                     float classSpecificThresh;
                     if ("ROAD_CRACK".equals(className)) {
-                        classSpecificThresh = Math.max(0.06f, effectiveThreshold * 0.35f);
+                        classSpecificThresh = Math.max(0.06f, effectiveThreshold * 0.55f);
                     } else if ("POTHOLE".equals(className)) {
                         classSpecificThresh = Math.max(0.32f, effectiveThreshold);
                     } else if ("ROAD_FLOODING".equals(className)) {
                         classSpecificThresh = Math.max(0.38f, effectiveThreshold);
                     } else if ("ROAD_OBSTACLE".equals(className)) {
-                        classSpecificThresh = Math.max(0.48f, effectiveThreshold);
+                        classSpecificThresh = Math.max(0.25f, effectiveThreshold);
                     } else {
                         classSpecificThresh = effectiveThreshold;
                     }
@@ -288,12 +288,7 @@ public class AiInferenceService {
                         int gx = lx + offsetX;
                         int gy = ly + offsetY;
 
-                        // Lọc tiêu điểm mặt đường (Road ROI): Loại bỏ vùng bầu trời phía trên (< 15%) và nắp capo (> 96%)
-                        // Với ảnh đã cắt mặt đường (aspectRatio >= 2.0), không cắt bỏ phía trên vì đó là mặt đường xa
-                        float currentAspect = (float) origWidth / Math.max(1, origHeight);
-                        if (currentAspect < 2.0f) {
-                            if ((gy + lh) < origHeight * 0.15f || gy > origHeight * 0.96f) continue;
-                        }
+                        if (gy < origHeight * 0.08f && (gy + lh) < origHeight * 0.12f) continue;
 
                         double boxAreaRatio = (double) (lw * lh) / (origWidth * origHeight);
                         float boxWidthRatio = (float) lw / origWidth;
@@ -315,8 +310,6 @@ public class AiInferenceService {
                             if (boxAreaRatio > 0.75) continue;
                         } else if ("ROAD_OBSTACLE".equals(className)) {
                             if (boxWidthRatio > 0.85 || boxAreaRatio > 0.60) continue;
-                            // Khử nhiễu viền cắt mép ảnh (border artifact) ở sát mép khung hình video:
-                            if (lw < 45 && (gx <= 6 || (gx + lw) >= origWidth - 6)) continue;
                         } else if ("ROAD_FLOODING".equals(className)) {
                             if (boxAreaRatio > 0.85) continue;
                             // Khử báo động giả ngập úng trên mặt đường nhựa khô thông thường:
@@ -362,98 +355,42 @@ public class AiInferenceService {
     private List<Rectangle> generateRoadTiles(int origW, int origH) {
         List<Rectangle> tiles = new ArrayList<>();
 
-        // Hỗ trợ mọi kích thước ảnh từ 180x100 trở lên
-        if (origW < 180 || origH < 100) {
+        // Hỗ trợ mọi kích thước ảnh từ 200x150 trở lên
+        if (origW < 200 || origH < 150) {
             return tiles;
         }
 
-        float aspectRatio = (float) origW / Math.max(1, origH);
+        int roadY0 = (int) (origH * 0.15); // Bỏ 15% bầu trời phía trên
+        int roadH = origH - roadY0;
 
-        // KHI ẢNH SIÊU RỘNG (Đã trích xuất Road ROI từ video dashcam, aspect ratio >= 2.2):
-        // Để tránh dải đường bị ép mỏng dẹt khi letterbox, chia thành các ô cột vuông/gần vuông (tỉ lệ ~1.2:1)
-        // trượt ngang qua mặt đường với độ phóng đại cao (Zoom 3x - 4x)
-        if (aspectRatio >= 2.0f) {
-            int colW = Math.min(origW, Math.max((int) (origH * 1.35f), (int) (origW * 0.28f)));
-            int stepX = Math.max(20, (int) (colW * 0.45f));
+        // Tile 1: Vùng trung cảnh & xa (Mid-Far Road - nơi vết nứt bị phối cảnh nén nhỏ)
+        int farY = roadY0;
+        int farH = (int) (roadH * 0.65);
+        tiles.add(new Rectangle(0, farY, origW, farH));
 
-            int nearY = (int) (origH * 0.15);
-            int nearH = origH - nearY;
+        // Tile 2: Vùng cận cảnh (Near Road - mặt đường sát mép dưới)
+        int nearY = roadY0 + (int) (roadH * 0.35);
+        int nearH = origH - nearY;
+        tiles.add(new Rectangle(0, nearY, origW, nearH));
 
-            for (int x = 0; x <= origW - colW; x += stepX) {
-                tiles.add(new Rectangle(x, 0, colW, origH));
-                tiles.add(new Rectangle(x, nearY, colW, nearH));
-            }
-            // Đảm bảo mép phải cùng (lề phải - nơi vết nứt và ổ gà tụ nhiều nhất) luôn có tile bao trọn:
-            int rightX = origW - colW;
-            if (rightX > 0 && (tiles.isEmpty() || tiles.get(tiles.size() - 2).x != rightX)) {
-                tiles.add(new Rectangle(rightX, 0, colW, origH));
-                tiles.add(new Rectangle(rightX, nearY, colW, nearH));
-            }
-        } else if (aspectRatio >= 1.4f) {
-            // KHI ẢNH RỘNG (Dashcam video 16:9 chưa crop):
-            int colW = Math.min(origW, (int) (origW * 0.38));
-            int col1X = 0;                                // Lề trái
-            int col2X = (int) (origW * 0.20);             // Làn trái
-            int col3X = (int) (origW * 0.42);             // Làn phải
-            int col4X = origW - colW;                     // Lề phải & vệt bánh phải
+        // Tile 3: Làn đường bên phải (Right Shoulder & Curb - trung cảnh)
+        int rightX = (int) (origW * 0.35);
+        int rightW = origW - rightX;
+        tiles.add(new Rectangle(rightX, farY, rightW, farH));
 
-            // 1. Cột Lề Phải (Nơi vệt bánh xe và lề đường nứt vỡ nhiều nhất)
-            tiles.add(new Rectangle(col4X, 0, colW, origH));
+        // Tile 4: Làn đường bên trái
+        int leftW = (int) (origW * 0.65);
+        tiles.add(new Rectangle(0, farY, leftW, farH));
 
-            // 2. Cột Làn Phải (Làn xe di chuyển)
-            tiles.add(new Rectangle(col3X, 0, colW, origH));
+        // Tile 5: Làn đường cận cảnh bên phải (bắt nhánh nứt bên cạnh - Near Right)
+        tiles.add(new Rectangle(rightX, nearY, rightW, nearH));
 
-            // 3. Cột Làn Trái (Làn ngược chiều / tim đường)
-            tiles.add(new Rectangle(col2X, 0, colW, origH));
-
-            // 4. Cột Lề Trái
-            tiles.add(new Rectangle(col1X, 0, colW, origH));
-
-            // 5. Cột Làn Phải Cận Cảnh (Near Right - bắt nứt toác sát mũi xe)
-            int nearY = (int) (origH * 0.25);
-            int nearH = origH - nearY;
-            tiles.add(new Rectangle(col4X, nearY, colW, nearH));
-            tiles.add(new Rectangle(col3X, nearY, colW, nearH));
-
-            // 6. Cột Trung Tâm Xa (Far Center)
-            int farH = (int) (origH * 0.75);
-            int midW = (int) (origW * 0.50);
-            int midX = (int) (origW * 0.25);
-            tiles.add(new Rectangle(midX, 0, midW, farH));
-        } else {
-            // KHI ẢNH DẠNG TỶ LỆ BÌNH THƯỜNG / CHÂN DUNG (Ảnh chụp điện thoại 4:3, 3:2):
-            int roadY0 = (int) (origH * 0.12); // Bỏ 12% bầu trời phía trên
-            int roadH = origH - roadY0;
-
-            // Tile 1: Vùng trung cảnh & xa
-            int farY = roadY0;
-            int farH = (int) (roadH * 0.65);
-            tiles.add(new Rectangle(0, farY, origW, farH));
-
-            // Tile 2: Vùng cận cảnh
-            int nearY = roadY0 + (int) (roadH * 0.35);
-            int nearH = origH - nearY;
-            tiles.add(new Rectangle(0, nearY, origW, nearH));
-
-            // Tile 3: Làn đường bên phải
-            int rightX = (int) (origW * 0.35);
-            int rightW = origW - rightX;
-            tiles.add(new Rectangle(rightX, farY, rightW, farH));
-
-            // Tile 4: Làn đường bên trái
-            int leftW = (int) (origW * 0.65);
-            tiles.add(new Rectangle(0, farY, leftW, farH));
-
-            // Tile 5: Làn đường cận cảnh bên phải
-            tiles.add(new Rectangle(rightX, nearY, rightW, nearH));
-
-            // Tile 6: Zoom dải nứt trung tâm
-            int midX = (int) (origW * 0.20);
-            int midW = (int) (origW * 0.65);
-            int midY = roadY0 + (int) (roadH * 0.10);
-            int midH = (int) (roadH * 0.55);
-            tiles.add(new Rectangle(midX, midY, midW, midH));
-        }
+        // Tile 6: Zoom dải nứt trung tâm kéo dài về phía sau (Far Extension Road - bắt vết nứt đằng sau)
+        int midX = (int) (origW * 0.20);
+        int midW = (int) (origW * 0.65);
+        int midY = roadY0 + (int) (roadH * 0.10);
+        int midH = (int) (roadH * 0.55);
+        tiles.add(new Rectangle(midX, midY, midW, midH));
 
         return tiles;
     }

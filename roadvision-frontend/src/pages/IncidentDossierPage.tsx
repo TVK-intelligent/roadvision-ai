@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
 import { Incident } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -14,20 +14,7 @@ import { ArrowLeft, CheckCircle2, Star, Upload, Hammer } from 'lucide-react';
 export const IncidentDossierPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const toast = useToast();
-
-  const handleBack = () => {
-    if (window.history.length > 2) {
-      navigate(-1);
-    } else if (user?.role === 'ROLE_ADMIN') {
-      navigate('/dispatch');
-    } else if (user?.role === 'ROLE_STAFF') {
-      navigate('/tasks');
-    } else {
-      navigate('/my-reports');
-    }
-  };
 
   const [incident, setIncident] = useState<Incident | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -145,13 +132,13 @@ export const IncidentDossierPage: React.FC = () => {
     <div className="flex flex-col gap-6 py-4">
       {/* Breadcrumbs */}
       <div className="flex items-center justify-between">
-        <button
-          onClick={handleBack}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-primary hover:underline cursor-pointer"
+        <Link
+          to="/my-reports"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-primary hover:underline"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Quay lại</span>
-        </button>
+          <span>Quay lại danh sách</span>
+        </Link>
         <span className="font-mono text-xs text-on-surface-variant">
           TELEMETRY STREAM: STABLE (42ms)
         </span>

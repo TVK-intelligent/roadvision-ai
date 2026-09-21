@@ -75,7 +75,7 @@ export const Navbar: React.FC = () => {
           </Link>
 
           {/* 2. Menu Điều Hướng - Sắp xếp logic theo luồng sử dụng, chỉ highlight khi đang ở trang đó */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1">
             {/* Trang Chủ */}
             <Link
               to="/"
@@ -174,22 +174,12 @@ export const Navbar: React.FC = () => {
           </nav>
         </div>
 
-        {/* 3. Khối Tiện Ích Phải: Chỉ Báo Trạng Thái AI & Tài Khoản */}
-        <div className="flex items-center gap-3 pl-3 border-l border-slate-200/90">
-          {/* AI System Telemetry Indicator (Chỉ báo trạng thái hệ thống, không phải nút bấm) */}
-          <div
-            className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-50/90 border border-slate-200 text-slate-600 select-none cursor-default shadow-2xs"
-            title="Mô hình AI thị giác đang hoạt động: YOLOv8-RoadCare v2.4 (ONNX Runtime)"
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">AI Core</span>
-            </div>
-            <span className="h-3 w-px bg-slate-200"></span>
-            <span className="font-mono text-[11px] font-bold text-slate-700">YOLOv8 v2.4</span>
+        {/* 3. Khối Bên Phải: Model Badge & Tài khoản */}
+        <div className="flex items-center gap-3">
+          {/* AI Model Badge */}
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200">
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            <span className="font-mono text-[11px] font-bold text-slate-700">YOLOv8-RoadCare v2.4</span>
           </div>
 
           {/* Hồ Sơ Tài Khoản */}
@@ -236,7 +226,7 @@ export const Navbar: React.FC = () => {
           {/* Nút Hamburger Mở Mobile Menu */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="md:hidden p-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             aria-label="Mở menu điều hướng"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -244,9 +234,9 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile Drawer (Menu Trượt Cho Điện Thoại & Tablet) */}
+      {/* Mobile Drawer (Menu Trượt Cho Điện Thoại) */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden flex">
+        <div className="fixed inset-0 z-40 md:hidden flex">
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
             onClick={closeMobile}

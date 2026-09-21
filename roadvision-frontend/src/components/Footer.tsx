@@ -54,11 +54,6 @@ export const Footer: React.FC = () => {
                   Báo Cáo Sự Cố 1-Chạm
                 </Link>
               </li>
-              <li>
-                <Link to="/patrol" className="hover:text-primary transition-colors">
-                  Video Tuần Tra Mặt Đường
-                </Link>
-              </li>
             </ul>
           </div>
 

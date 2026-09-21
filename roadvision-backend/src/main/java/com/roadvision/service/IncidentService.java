@@ -24,9 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 @Slf4j
@@ -366,32 +364,6 @@ public class IncidentService {
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
-    }
-
-    /**
-     * Lấy các chỉ số tổng quan thời gian thực từ cơ sở dữ liệu cho Dashboard và Trang chủ
-     */
-    @Transactional(readOnly = true)
-    public Map<String, Object> getPublicStats() {
-        long total = incidentRepository.count();
-        long pending = incidentRepository.countByStatusNotIn(List.of(IncidentStatus.RESOLVED, IncidentStatus.CLOSED, IncidentStatus.REJECTED));
-        long activeDispatches = incidentRepository.countByStatusIn(List.of(IncidentStatus.ASSIGNED, IncidentStatus.IN_PROGRESS));
-        long resolved = incidentRepository.countByStatusIn(List.of(IncidentStatus.RESOLVED, IncidentStatus.CLOSED));
-
-        Double avgConf = aiDetectionRepository.findAverageConfidence();
-        String confidenceStr = (avgConf != null && avgConf > 0)
-                ? String.format("%.1f%%", avgConf * 100)
-                : "96.8%";
-
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalIncidents", total);
-        stats.put("pendingIncidents", pending);
-        stats.put("activeDispatches", activeDispatches > 0 ? activeDispatches : (total > 0 ? 1 : 0));
-        stats.put("resolvedCount", resolved);
-        stats.put("aiConfidenceMedian", confidenceStr);
-        stats.put("meanResolutionSpeed", "3.8 Giờ");
-        stats.put("activeVisionModel", "YOLOv8-RoadCare v2.4 Active");
-        return stats;
     }
 
     private Incident getIncidentEntity(Long id) {

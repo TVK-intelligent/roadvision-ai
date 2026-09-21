@@ -17,10 +17,6 @@ import {
   Layers,
   FileVideo,
   Trash2,
-  Activity,
-  Gauge,
-  Scan,
-  ShieldAlert,
 } from 'lucide-react';
 
 interface CapturedIncident {
@@ -48,11 +44,6 @@ export const PatrolModePage: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.20);
   const [autoDispatch, setAutoDispatch] = useState<boolean>(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
-  const [focusRoadROI, setFocusRoadROI] = useState<boolean>(true);
-  const [showROIGuide, setShowROIGuide] = useState<boolean>(true); // Mặc định hiện lưới để người dùng thấy rõ
-  const [hoodCutoff, setHoodCutoff] = useState<number>(46); // Bỏ 46% phía dưới (nắp capo xe)
-  const [skyCutoff, setSkyCutoff] = useState<number>(15);  // Bỏ 15% phía trên (bầu trời / chân trời)
 
   // Vị trí tuần tra thực tế (ưu tiên GPS thiết bị)
   const [patrolLocation, setPatrolLocation] = useState<{
@@ -203,28 +194,15 @@ export const PatrolModePage: React.FC = () => {
       const canvas = canvasRef.current;
       if (!video || !canvas || video.readyState < 2 || isAnalyzingRef.current) return;
 
-      const rawW = video.videoWidth || 640;
-      const rawH = video.videoHeight || 360;
-
-      // Giới hạn độ phân giải gửi AI tối đa 1280px (đặc biệt tối ưu cho video 4K UHD / 2K)
-      // vừa giữ trọn độ nét chi tiết cho mô hình YOLO 800x800, vừa giảm 85% tải GPU/mạng và tăng tốc FPS mượt mà
-      const maxTargetW = 1280;
-      const scaleDown = rawW > maxTargetW ? maxTargetW / rawW : 1.0;
-      const targetW = Math.round(rawW * scaleDown);
-
-      // Trích xuất tiêu điểm mặt đường: Cắt bỏ bầu trời phía trên và nắp capo xe phía dưới
-      const cropY = focusRoadROI ? Math.floor(rawH * (skyCutoff / 100)) : 0;
-      const cropH = focusRoadROI ? Math.max(80, Math.floor(rawH * ((100 - skyCutoff - hoodCutoff) / 100))) : rawH;
-      const targetH = Math.round(cropH * scaleDown);
-
-      canvas.width = targetW;
-      canvas.height = targetH;
+      const w = video.videoWidth || 640;
+      const h = video.videoHeight || 360;
+      canvas.width = w;
+      canvas.height = h;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      ctx.filter = 'contrast(1.22) brightness(1.02)';
-      // Chỉ vẽ đúng dải mặt đường vào canvas - NẮP CAPO VÀ BẦU TRỜI HOÀN TOÀN BỊ LOẠI TRỪ
-      ctx.drawImage(video, 0, cropY, rawW, cropH, 0, 0, targetW, targetH);
+      ctx.filter = 'contrast(1.18) brightness(1.02)';
+      ctx.drawImage(video, 0, 0, w, h);
       ctx.filter = 'none';
 
       isAnalyzingRef.current = true;
@@ -251,19 +229,9 @@ export const PatrolModePage: React.FC = () => {
             setProcessedFrames((prev) => prev + 1);
 
             if (data.boxes && data.boxes.length > 0) {
-              // Map toạ độ từ canvas nén về toạ độ gốc của video (hỗ trợ cả 4K UHD, Full HD, 720p)
-              const scaleBack = 1.0 / scaleDown;
-              const mappedBoxes = data.boxes.map((b: any) => ({
-                ...b,
-                x: Math.round(b.x * scaleBack),
-                y: Math.round(b.y * scaleBack + cropY),
-                width: Math.round(b.width * scaleBack),
-                height: Math.round(b.height * scaleBack),
-              }));
+              setActiveBoxes(data.boxes);
 
-              setActiveBoxes(mappedBoxes);
-
-              const topBox = mappedBoxes[0];
+              const topBox = data.boxes[0];
               const snapshotUrl = URL.createObjectURL(blob);
 
               const newIncident: CapturedIncident = {
@@ -302,19 +270,10 @@ export const PatrolModePage: React.FC = () => {
         'image/jpeg',
         0.85
       );
-    }, 333); // 3 frames mỗi giây (~333ms)
+    }, 1000);
 
     return () => clearInterval(scanInterval);
-  }, [isPlaying, confidenceThreshold, patrolLocation, autoDispatch, handleDispatchIncident, focusRoadROI, skyCutoff, hoodCutoff]);
-
-  // Điều chỉnh tốc độ phát video (Làm chậm để AI soi kỹ hoặc bình thường)
-  const handleSpeedChange = (speed: number) => {
-    setPlaybackSpeed(speed);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = speed;
-    }
-    toast.info(`Tốc độ phát: ${speed}x ${speed < 1 ? '(Làm chậm để AI quét kỹ)' : speed === 1 ? '(Chuẩn)' : ''}`);
-  };
+  }, [isPlaying, confidenceThreshold, patrolLocation, autoDispatch, handleDispatchIncident]);
 
   // Xử lý nạp tệp video hành trình
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,7 +287,6 @@ export const PatrolModePage: React.FC = () => {
       setSourceMode('UPLOAD');
       if (videoRef.current) {
         videoRef.current.src = url;
-        videoRef.current.playbackRate = playbackSpeed;
         videoRef.current.play().catch(() => {});
         setIsPlaying(true);
       }
@@ -342,7 +300,6 @@ export const PatrolModePage: React.FC = () => {
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      videoRef.current.playbackRate = playbackSpeed;
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
@@ -386,11 +343,6 @@ export const PatrolModePage: React.FC = () => {
         {/* Chỉ số Telemetry thực tế từ hệ thống AI */}
         <div className="flex items-center gap-2.5 font-mono text-xs">
           <div className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-emerald-500" />
-            <span className="text-on-surface-variant text-[11px]">TẦN SUẤT:</span>
-            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">3 FPS (333ms)</strong>
-          </div>
-          <div className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="text-on-surface-variant text-[11px]">ĐỘ TRỄ AI:</span>
             <strong className="text-primary font-bold">{inferenceLatency > 0 ? `${inferenceLatency}ms` : '--'}</strong>
@@ -416,51 +368,6 @@ export const PatrolModePage: React.FC = () => {
               loop
               className="w-full h-full object-contain"
             />
-
-            {/* Lưới Hướng Dẫn Tiêu Điểm Mặt Đường (Road ROI Guide) */}
-            {focusRoadROI && showROIGuide && (
-              <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between">
-                {/* Vùng Bầu Trời / Horizon Cutoff */}
-                <div
-                  style={{ height: `${skyCutoff}%` }}
-                  className="w-full bg-slate-950/50 border-b-2 border-dashed border-amber-400/70 flex items-center justify-center transition-all"
-                >
-                  <span className="text-[10px] font-mono font-bold text-amber-300 bg-slate-950/90 px-2 py-0.5 rounded border border-amber-400/50 shadow-sm">
-                    NGOẠI CẢNH / BẦU TRỜI ({skyCutoff}% ĐÃ LỌC BỎ)
-                  </span>
-                </div>
-
-                {/* Vùng Tiêu Điểm Mặt Đường (Road Surface Area) */}
-                <div
-                  style={{ height: `${100 - skyCutoff - hoodCutoff}%` }}
-                  className="w-[96%] mx-auto border-2 border-dashed border-emerald-400/80 rounded-2xl flex items-start justify-end p-2 bg-emerald-500/5 transition-all relative"
-                >
-                  <span className="text-[10px] font-mono font-bold text-emerald-300 bg-slate-950/90 px-2.5 py-1 rounded-lg border border-emerald-400/60 shadow-sm flex items-center gap-1.5">
-                    <Scan className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                    TIÊU ĐIỂM MẶT ĐƯỜNG ({100 - skyCutoff - hoodCutoff}% CHIỀU CAO)
-                  </span>
-                </div>
-
-                {/* Vùng Nắp Capo Xe */}
-                <div
-                  style={{ height: `${hoodCutoff}%` }}
-                  className="w-full bg-slate-950/60 border-t-2 border-dashed border-rose-400/70 flex items-center justify-center transition-all"
-                >
-                  <span className="text-[10px] font-mono font-bold text-rose-300 bg-slate-950/90 px-2.5 py-1 rounded-lg border border-rose-400/50 shadow-sm flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-                    NẮP CAPO XE ({hoodCutoff}% ĐÃ LOẠI TRỪ - KHÔNG SOI CAPO)
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Badge tốc độ phát chậm nếu < 1x */}
-            {isPlaying && playbackSpeed < 1 && (
-              <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-amber-500/90 text-slate-950 font-mono text-[11px] font-black flex items-center gap-1.5 shadow-md z-20">
-                <Gauge className="w-3.5 h-3.5" />
-                <span>CHẬM {playbackSpeed}x (SOI CHI TIẾT)</span>
-              </div>
-            )}
 
             {/* Bounding Box AI vẽ chính xác theo tỷ lệ frame */}
             {activeBoxes.map((box, idx) => {
@@ -591,109 +498,6 @@ export const PatrolModePage: React.FC = () => {
                 </label>
               </div>
             </div>
-
-            {/* HÀNG ĐIỀU KHIỂN: TỐC ĐỘ PHÁT VIDEO (LÀM CHẬM) & FOCUS TIÊU ĐIỂM MẶT ĐƯỜNG */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-outline-variant/20 text-xs">
-              {/* Chọn tốc độ video (Làm chậm để AI soi kỹ) */}
-              <div className="flex items-center gap-2">
-                <Gauge className="w-4 h-4 text-secondary" />
-                <span className="font-semibold text-on-surface">Tốc độ phát:</span>
-                <div className="flex items-center bg-surface-container-low p-0.5 rounded-xl border border-outline-variant/30 font-mono">
-                  {[0.25, 0.5, 0.75, 1.0].map((rate) => (
-                    <button
-                      key={rate}
-                      type="button"
-                      onClick={() => handleSpeedChange(rate)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                        playbackSpeed === rate
-                          ? 'bg-primary text-on-primary shadow-xs'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      {rate === 1.0 ? '1.0x (Chuẩn)' : `${rate}x`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tiêu điểm mặt đường (Road ROI Focus) */}
-              <div className="flex items-center gap-2.5">
-                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-on-surface">
-                  <input
-                    type="checkbox"
-                    checked={focusRoadROI}
-                    onChange={(e) => setFocusRoadROI(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
-                  />
-                  <span>Focus Mặt Đường (Road ROI)</span>
-                </label>
-                {focusRoadROI && (
-                  <button
-                    type="button"
-                    onClick={() => setShowROIGuide(!showROIGuide)}
-                    className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold flex items-center gap-1.5 transition-all ${
-                      showROIGuide
-                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                        : 'border-outline-variant/40 text-on-surface-variant hover:text-on-surface'
-                    }`}
-                    title="Hiển thị đường lưới ranh giới tiêu điểm mặt đường trên video"
-                  >
-                    <Scan className="w-3.5 h-3.5" />
-                    <span>{showROIGuide ? 'Ẩn Lưới ROI' : 'Hiện Lưới ROI'}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* HÀNG TINH CHỈNH VÙNG NẮP CAPO XE (CAR HOOD CUTOFF) */}
-            {focusRoadROI && (
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-outline-variant/20 text-xs bg-rose-500/5 p-3 rounded-2xl border border-rose-500/20">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-rose-500" />
-                  <span className="font-semibold text-on-surface">Vùng Nắp Ca-pô Ô tô (Cắt bỏ phía dưới):</span>
-                  <strong className="font-mono text-rose-600 dark:text-rose-400 font-bold text-[13px]">
-                    {hoodCutoff}%
-                  </strong>
-                </div>
-
-                {/* Presets nắp capo */}
-                <div className="flex items-center gap-2">
-                  <span className="text-on-surface-variant text-[11px]">Mẫu camera:</span>
-                  <div className="flex items-center bg-surface-container-low p-0.5 rounded-lg border border-outline-variant/30 font-mono text-[11px]">
-                    {[
-                      { label: 'Không Capo (0%)', val: 0 },
-                      { label: 'Góc Vừa (25%)', val: 25 },
-                      { label: 'Capo Lớn (46%)', val: 46 },
-                      { label: 'Rất Lớn (55%)', val: 55 },
-                    ].map((preset) => (
-                      <button
-                        key={preset.val}
-                        type="button"
-                        onClick={() => setHoodCutoff(preset.val)}
-                        className={`px-2 py-0.5 rounded-md font-bold transition-all ${
-                          hoodCutoff === preset.val
-                            ? 'bg-rose-500 text-white shadow-xs'
-                            : 'text-on-surface-variant hover:text-on-surface'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <input
-                    type="range"
-                    min="0"
-                    max="65"
-                    step="1"
-                    value={hoodCutoff}
-                    onChange={(e) => setHoodCutoff(parseInt(e.target.value, 10))}
-                    className="w-28 h-1.5 bg-surface-container-high rounded-lg cursor-pointer accent-rose-500"
-                    title="Kéo thanh trượt để che đúng phần nắp capo xe ô tô"
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Slider Ngưỡng Tin Cậy Bắt Lỗi */}
             <div className="flex items-center justify-between gap-4 pt-3 border-t border-outline-variant/20 text-xs">
