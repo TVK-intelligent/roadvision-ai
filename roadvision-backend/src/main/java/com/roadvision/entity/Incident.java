@@ -71,6 +71,17 @@ public class Incident {
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
 
+    @Column(name = "rework_reason", length = 500)
+    private String reworkReason;
+
+    @Column(name = "rework_count", nullable = false)
+    @Builder.Default
+    private Integer reworkCount = 0;
+
+    @Column(name = "upvote_count", nullable = false)
+    @Builder.Default
+    private Integer upvoteCount = 1;
+
     @OneToOne(mappedBy = "incident", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private AiDetection aiDetection;
 

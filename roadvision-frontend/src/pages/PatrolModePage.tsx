@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { incidentApi } from '../services/incidentApi';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
+import { AuthModal } from '../components/AuthModal';
 import { LeafletMap } from '../components/LeafletMap';
 import {
   Video,
@@ -34,6 +36,8 @@ interface CapturedIncident {
 
 export const PatrolModePage: React.FC = () => {
   const toast = useToast();
+  const { user, isAuthenticated } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isAnalyzingRef = useRef<boolean>(false);
@@ -66,40 +70,53 @@ export const PatrolModePage: React.FC = () => {
   // Danh sách các hư hại đã bắt được từ luồng video
   const [capturedList, setCapturedList] = useState<CapturedIncident[]>([]);
 
-  // Lấy tọa độ GPS thực tế của thiết bị
+  // Lấy tọa độ GPS thực tế của thiết bị (có fallback mạng khi chạy trên desktop/PC không có GPS)
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast.warning('Trình duyệt không hỗ trợ Geolocation');
       return;
     }
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        let addr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-            { headers: { 'Accept-Language': 'vi' } }
-          );
-          const data = await res.json();
-          if (data && data.display_name) {
-            addr = data.display_name;
-          }
-        } catch {
-          // Bỏ qua lỗi reverse geocode
+
+    const applyPos = async (pos: GeolocationPosition, isFallback = false) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      let addr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+          { headers: { 'Accept-Language': 'vi' } }
+        );
+        const data = await res.json();
+        if (data && data.display_name) {
+          addr = data.display_name;
         }
-        setPatrolLocation({ lat, lng, address: addr });
-        setIsLocating(false);
-        toast.success('Đã cập nhật vị trí tuần tra từ GPS thiết bị');
-      },
+      } catch {
+        // Bỏ qua lỗi reverse geocode
+      }
+      setPatrolLocation({ lat, lng, address: addr });
+      setIsLocating(false);
+      toast.success(isFallback ? 'Đã lấy vị trí qua mạng Internet!' : 'Đã cập nhật vị trí tuần tra từ GPS thiết bị');
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => applyPos(pos, false),
       (err) => {
-        console.warn('Lỗi lấy GPS:', err);
-        setIsLocating(false);
-        toast.warning('Không thể lấy GPS: ' + err.message);
+        if (err.code === 3 || err.code === 2) {
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPos) => applyPos(fallbackPos, true),
+            () => {
+              setIsLocating(false);
+              toast.info('Không thể lấy GPS tự động (máy tính không có GPS vệ tinh). Bạn có thể chỉnh tọa độ theo bản đồ.');
+            },
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+          );
+        } else {
+          setIsLocating(false);
+          toast.info('Quyền truy cập vị trí chưa được cấp.');
+        }
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
     );
   };
 
@@ -142,6 +159,11 @@ export const PatrolModePage: React.FC = () => {
 
   // Xử lý gửi sự cố tuần tra vào hệ thống trung tâm
   const handleDispatchIncident = useCallback(async (incident: CapturedIncident, isAuto = false) => {
+    if (!isAuthenticated || !user) {
+      setIsAuthModalOpen(true);
+      toast.warning('Vui lòng đăng nhập để gửi sự cố vào Hàng đợi điều phối.');
+      return;
+    }
     try {
       const formData = new FormData();
       formData.append('image', incident.blob, 'patrol_detected.jpg');
@@ -649,6 +671,8 @@ export const PatrolModePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>
   );
 };

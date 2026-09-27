@@ -73,7 +73,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
   );
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border border-outline-variant/50 shadow-sm ${className}`}>
+    <div className={`relative z-0 isolate overflow-hidden rounded-xl border border-outline-variant/50 shadow-sm ${className}`}>
       <MapContainer
         center={position}
         zoom={15}

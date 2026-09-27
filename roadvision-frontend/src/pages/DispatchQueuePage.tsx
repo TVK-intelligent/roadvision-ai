@@ -281,9 +281,16 @@ export const DispatchQueuePage: React.FC = () => {
                           <span className="font-bold text-on-surface line-clamp-1 max-w-[220px]">
                             {incident.title}
                           </span>
-                          <span className="text-[11px] text-on-surface-variant line-clamp-1 max-w-[220px]">
-                            {incident.address || `${incident.latitude?.toFixed(5)}, ${incident.longitude?.toFixed(5)}`}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] text-on-surface-variant line-clamp-1 max-w-[160px]">
+                              {incident.address || `${incident.latitude?.toFixed(5)}, ${incident.longitude?.toFixed(5)}`}
+                            </span>
+                            {incident.upvoteCount != null && incident.upvoteCount > 1 && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 font-mono text-[10px] font-bold" title="Lượt công dân đồng tình phản ánh">
+                                👍 {incident.upvoteCount}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -374,7 +381,7 @@ export const DispatchQueuePage: React.FC = () => {
 
       {/* Modal Phân Công Kỹ Thuật Viên */}
       {isAssignModalOpen && selectedIncident && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface-container-lowest w-full max-w-md rounded-3xl border border-outline-variant/30 shadow-2xl p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
               <div className="flex items-center gap-2">
@@ -462,7 +469,7 @@ export const DispatchQueuePage: React.FC = () => {
 
       {/* Modal Từ Chối Tiếp Nhận */}
       {isRejectModalOpen && selectedIncident && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface-container-lowest w-full max-w-md rounded-3xl border border-outline-variant/30 shadow-2xl p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
               <div>

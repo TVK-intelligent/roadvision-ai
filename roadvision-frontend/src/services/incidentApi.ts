@@ -106,6 +106,16 @@ export const incidentApi = {
     return axiosClient.post<Incident>(`/incidents/${id}/close`, data);
   },
 
+  // Pha 5: Người dân khiếu nại nghiệm thu chưa đạt (Dispute)
+  disputeIncident: (id: number | string, data: { reason: string; rating?: number }) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/dispute`, data);
+  },
+
+  // Pha 5: Quản trị viên bác bỏ nghiệm thu và ra lệnh thi công lại (Rework)
+  reworkIncident: (id: number | string, data: { instructions: string; priority?: string }) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/rework`, data);
+  },
+
   // Danh sách kỹ thuật viên
   getStaffList: () => {
     return axiosClient.get<any[]>('/incidents/staff-list');
@@ -119,5 +129,15 @@ export const incidentApi = {
   // Danh sách sự cố hiển thị bản đồ số GIS công khai
   getPublicMapIncidents: () => {
     return axiosClient.get<Incident[]>('/incidents/public-map');
+  },
+
+  // Pha 1.8: Kiểm tra trùng lặp không gian lân cận (Spatial Deduplication)
+  checkNearbyDuplicate: (params: { latitude: number; longitude: number; category?: string; radius?: number }) => {
+    return axiosClient.get<import('../types').NearbyIncidentCheckResponse>('/incidents/check-nearby', { params });
+  },
+
+  // Pha 1.9: Đồng tình với phản ánh đã có (+1 Upvote)
+  upvoteIncident: (id: number | string) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/upvote`);
   },
 };

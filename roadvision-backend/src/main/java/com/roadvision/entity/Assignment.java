@@ -44,6 +44,6 @@ public class Assignment {
     private String notes;
 
     @CreationTimestamp
-    @Column(name = "assigned_at", nullable = false, updatable = false)
+    @Column(name = "assigned_at", nullable = false)
     private LocalDateTime assignedAt;
 }

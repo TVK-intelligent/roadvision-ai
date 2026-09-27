@@ -52,7 +52,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   ];
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-outline-variant/50 shadow-sm relative ${className}`}>
+    <div className={`overflow-hidden rounded-xl border border-outline-variant/50 shadow-sm relative z-0 isolate ${className}`}>
       <MapContainer
         center={position}
         zoom={15}

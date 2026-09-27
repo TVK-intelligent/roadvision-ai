@@ -30,6 +30,10 @@ public class IncidentResponse {
     private Severity severity;
     private String flag;
     private String rejectionReason;
+    private String reworkReason;
+    private Integer reworkCount;
+    private Integer upvoteCount;
+    private Boolean hasUpvoted;
 
     private Long citizenId;
     private String reporterName;
@@ -73,6 +77,11 @@ public class IncidentResponse {
         private String staffName;
         private String proofImageUrl;
         private String notes;
+        private String aiVerificationStatus;
+        private java.math.BigDecimal aiVerificationConfidence;
+        private String aiVerificationDetectionsJson;
+        private String aiVerificationNotes;
+        private java.util.List<com.roadvision.util.ImageTensorUtil.BoundingBox> verificationBoxes;
         private LocalDateTime resolvedAt;
     }
 

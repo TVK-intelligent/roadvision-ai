@@ -38,4 +38,13 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
                                   Pageable pageable);
 
     List<Incident> findByStatusAndResolvedAtBefore(IncidentStatus status, LocalDateTime thresholdTime);
+
+    @Query("SELECT i FROM Incident i WHERE " +
+           "i.latitude BETWEEN :minLat AND :maxLat AND " +
+           "i.longitude BETWEEN :minLng AND :maxLng AND " +
+           "i.status IN ('SUBMITTED', 'AI_ANALYZED', 'ASSIGNED', 'IN_PROGRESS')")
+    List<Incident> findActiveInGeoBox(@Param("minLat") java.math.BigDecimal minLat,
+                                      @Param("maxLat") java.math.BigDecimal maxLat,
+                                      @Param("minLng") java.math.BigDecimal minLng,
+                                      @Param("maxLng") java.math.BigDecimal maxLng);
 }

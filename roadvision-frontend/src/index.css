@@ -29,3 +29,18 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #004ac6;
 }
+
+/* Đảm bảo toàn bộ Leaflet Map không bao giờ nổi đè lên Modal / Dialog */
+.leaflet-container {
+  z-index: 0 !important;
+}
+
+.leaflet-pane {
+  z-index: 10 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
+}
+

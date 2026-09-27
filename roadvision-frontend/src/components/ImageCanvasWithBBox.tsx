@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AiDetection } from '../types';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
 
 interface ImageCanvasProps {
   imageUrl: string;
@@ -14,6 +14,7 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
   className = '',
 }) => {
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -43,108 +44,150 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
     ? (aiDetection.bboxHeight / naturalSize.height) * 100
     : 0;
 
-  return (
-    <div className={`relative overflow-hidden rounded-xl bg-surface-container-high flex items-center justify-center p-2 ${className}`}>
-      {/* Wrapper bọc khít ảnh để tỷ lệ Bounding Box chính xác */}
-      <div className="relative inline-block max-w-full max-h-full">
-        <img
-          src={imageUrl}
-          alt="Hiện trường sự cố"
-          className="max-w-full max-h-64 object-contain rounded-lg block"
-          crossOrigin="anonymous"
-          onLoad={handleImageLoad}
-        />
+  const renderImageContent = (isModal = false) => (
+    <div className="relative inline-block max-w-full max-h-full">
+      <img
+        src={imageUrl}
+        alt="Hiện trường sự cố"
+        className={`max-w-full ${isModal ? 'max-h-[80vh]' : 'max-h-[520px]'} object-contain rounded-xl block shadow-md`}
+        crossOrigin="anonymous"
+        onLoad={handleImageLoad}
+      />
 
-        {/* Render danh sách TẤT CẢ các Hộp bao Bounding Box của AI */}
-        {naturalSize && naturalSize.width > 0 && naturalSize.height > 0 && (
-          <>
-            {aiDetection?.boxes && aiDetection.boxes.length > 0 ? (
-              aiDetection.boxes.map((box, idx) => {
-                const bTop = (box.y / naturalSize.height) * 100;
-                const bLeft = (box.x / naturalSize.width) * 100;
-                const bW = (box.width / naturalSize.width) * 100;
-                const bH = (box.height / naturalSize.height) * 100;
+      {/* Render danh sách TẤT CẢ các Hộp bao Bounding Box của AI */}
+      {naturalSize && naturalSize.width > 0 && naturalSize.height > 0 && (
+        <>
+          {aiDetection?.boxes && aiDetection.boxes.length > 0 ? (
+            aiDetection.boxes.map((box, idx) => {
+              const bTop = (box.y / naturalSize.height) * 100;
+              const bLeft = (box.x / naturalSize.width) * 100;
+              const bW = (box.width / naturalSize.width) * 100;
+              const bH = (box.height / naturalSize.height) * 100;
 
-                // Phân màu hộp bao theo loại hư hỏng để trực quan chuyên nghiệp
-                const isCrack = box.className?.includes('CRACK');
-                const isFlood = box.className?.includes('FLOOD');
-                const isObstacle = box.className?.includes('OBSTACLE');
+              // Phân màu hộp bao theo loại hư hỏng để trực quan chuyên nghiệp
+              const isCrack = box.className?.includes('CRACK');
+              const isFlood = box.className?.includes('FLOOD');
+              const isObstacle = box.className?.includes('OBSTACLE');
 
-                const borderColor = isCrack
-                  ? 'border-amber-500 bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
-                  : isFlood
-                  ? 'border-cyan-500 bg-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
-                  : isObstacle
-                  ? 'border-rose-500 bg-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.4)]'
-                  : 'border-primary bg-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.4)]';
+              const borderColor = isCrack
+                ? 'border-amber-500 bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                : isFlood
+                ? 'border-cyan-500 bg-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                : isObstacle
+                ? 'border-rose-500 bg-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.4)]'
+                : 'border-primary bg-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.4)]';
 
-                const badgeColor = isCrack
-                  ? 'bg-amber-500 text-slate-950'
-                  : isFlood
-                  ? 'bg-cyan-500 text-slate-950'
-                  : isObstacle
-                  ? 'bg-rose-500 text-white'
-                  : 'bg-primary text-on-primary';
+              const badgeColor = isCrack
+                ? 'bg-amber-500 text-slate-950'
+                : isFlood
+                ? 'bg-cyan-500 text-slate-950'
+                : isObstacle
+                ? 'bg-rose-500 text-white'
+                : 'bg-primary text-on-primary';
 
-                return (
-                  <div
-                    key={idx}
-                    className={`absolute border-2 backdrop-blur-[1px] rounded transition-all duration-300 pointer-events-none ${borderColor}`}
-                    style={{
-                      top: `${Math.max(0, bTop)}%`,
-                      left: `${Math.max(0, bLeft)}%`,
-                      width: `${Math.min(100 - bLeft, bW)}%`,
-                      height: `${Math.min(100 - bTop, bH)}%`,
-                    }}
-                  >
-                    {/* Nhãn loại hư hại và độ tin cậy */}
-                    <div className={`absolute -top-6 left-0 font-mono text-xs font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 whitespace-nowrap ${badgeColor}`}>
-                      <span>⚠️ #{idx + 1}</span>
-                      <span>{box.className}</span>
-                      <span className="opacity-90">
-                        ({(box.confidence * 100).toFixed(1)}%)
-                      </span>
-                    </div>
+              return (
+                <div
+                  key={idx}
+                  className={`absolute border-2 backdrop-blur-[1px] rounded transition-all duration-300 pointer-events-none ${borderColor}`}
+                  style={{
+                    top: `${Math.max(0, bTop)}%`,
+                    left: `${Math.max(0, bLeft)}%`,
+                    width: `${Math.min(100 - bLeft, bW)}%`,
+                    height: `${Math.min(100 - bTop, bH)}%`,
+                  }}
+                >
+                  {/* Nhãn loại hư hại và độ tin cậy */}
+                  <div className={`absolute -top-6 left-0 font-mono text-xs font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 whitespace-nowrap ${badgeColor}`}>
+                    <span>⚠️ #{idx + 1}</span>
+                    <span>{box.className}</span>
+                    <span className="opacity-90">
+                      ({(box.confidence * 100).toFixed(1)}%)
+                    </span>
                   </div>
-                );
-              })
-            ) : hasValidBox ? (
-              <div
-                className="absolute border-2 border-primary bg-primary/20 backdrop-blur-[1px] rounded transition-all duration-300 shadow-[0_0_15px_rgba(37,99,235,0.4)] pointer-events-none"
-                style={{
-                  top: `${Math.max(0, topPct)}%`,
-                  left: `${Math.max(0, leftPct)}%`,
-                  width: `${Math.min(100 - leftPct, widthPct)}%`,
-                  height: `${Math.min(100 - topPct, heightPct)}%`,
-                }}
-              >
-                <div className="absolute -top-6 left-0 bg-primary text-on-primary font-mono text-xs font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 whitespace-nowrap">
-                  <span>⚠️</span>
-                  <span>{aiDetection?.className}</span>
-                  <span className="opacity-90">
-                    ({((aiDetection?.confidence || 0) * 100).toFixed(1)}%)
-                  </span>
                 </div>
-                <div className="absolute -bottom-5 right-0 bg-surface-container-lowest/90 text-primary font-mono text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
-                  TENSOR: {naturalSize.width}x{naturalSize.height}
-                </div>
+              );
+            })
+          ) : hasValidBox ? (
+            <div
+              className="absolute border-2 border-primary bg-primary/20 backdrop-blur-[1px] rounded transition-all duration-300 shadow-[0_0_15px_rgba(37,99,235,0.4)] pointer-events-none"
+              style={{
+                top: `${Math.max(0, topPct)}%`,
+                left: `${Math.max(0, leftPct)}%`,
+                width: `${Math.min(100 - leftPct, widthPct)}%`,
+                height: `${Math.min(100 - topPct, heightPct)}%`,
+              }}
+            >
+              <div className="absolute -top-6 left-0 bg-primary text-on-primary font-mono text-xs font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 whitespace-nowrap">
+                <span>⚠️</span>
+                <span>{aiDetection?.className}</span>
+                <span className="opacity-90">
+                  ({((aiDetection?.confidence || 0) * 100).toFixed(1)}%)
+                </span>
               </div>
-            ) : null}
-          </>
+              <div className="absolute -bottom-5 right-0 bg-surface-container-lowest/90 text-primary font-mono text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                TENSOR: {naturalSize.width}x{naturalSize.height}
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <div className={`relative overflow-hidden rounded-2xl bg-slate-950 flex items-center justify-center p-3 border border-outline-variant/30 ${className}`}>
+        {renderImageContent(false)}
+
+        {/* Nút phóng to toàn màn hình */}
+        <button
+          type="button"
+          onClick={() => setIsFullscreen(true)}
+          className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm shadow border border-white/20 transition-all hover:scale-105"
+          title="Phóng to ảnh toàn màn hình để quan sát chi tiết"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+
+        {/* Thông báo trạng thái khi không có hộp bao */}
+        {!hasValidBox && (
+          <div className="absolute bottom-3 left-3 right-3 bg-surface-container-lowest/90 backdrop-blur-sm border border-outline-variant/40 rounded-lg px-3 py-2 flex items-center gap-2 text-xs text-on-surface shadow-sm">
+            <AlertCircle className="w-4 h-4 text-secondary shrink-0" />
+            <span>
+              {aiDetection
+                ? `AI quét ảnh (${aiDetection.inferenceMs || 0}ms): Chưa phát hiện hư hỏng có độ tin cậy ≥ ${Math.round((aiDetection.activeThreshold ?? 0.20) * 100)}%. Bạn có thể kéo thanh trượt xuống để phát hiện nhạy hơn hoặc gửi báo cáo để chuyên viên thẩm định.`
+                : 'Đang chuẩn bị quét thị giác AI...'}
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Thông báo trạng thái khi không có hộp bao */}
-      {!hasValidBox && (
-        <div className="absolute bottom-3 left-3 right-3 bg-surface-container-lowest/90 backdrop-blur-sm border border-outline-variant/40 rounded-lg px-3 py-2 flex items-center gap-2 text-xs text-on-surface shadow-sm">
-          <AlertCircle className="w-4 h-4 text-secondary shrink-0" />
-          <span>
-            {aiDetection
-              ? `AI quét ảnh (${aiDetection.inferenceMs || 0}ms): Chưa phát hiện hư hỏng có độ tin cậy ≥ ${Math.round((aiDetection.activeThreshold ?? 0.20) * 100)}%. Bạn có thể kéo thanh trượt xuống để phát hiện nhạy hơn hoặc gửi báo cáo để chuyên viên thẩm định.`
-              : 'Đang chuẩn bị quét thị giác AI...'}
-          </span>
+      {/* Fullscreen Lightbox Modal */}
+      {isFullscreen && (
+        <div className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-md flex flex-col p-4 md:p-6 animate-in fade-in">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10 text-white">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-base">Xem Toàn Cảnh Độ Phân Giải Cao & Khung Nhận Diện AI</span>
+              {naturalSize && (
+                <span className="text-xs font-mono text-white/70 bg-white/10 px-2 py-0.5 rounded">
+                  {naturalSize.width} x {naturalSize.height} px
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
+            >
+              <Minimize2 className="w-4 h-4" />
+              <span>Đóng / Thu Nhỏ</span>
+            </button>
+          </div>
+
+          <div className="flex-1 flex items-center justify-center p-2 overflow-auto">
+            {renderImageContent(true)}
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };

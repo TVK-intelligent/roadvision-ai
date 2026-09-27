@@ -164,7 +164,7 @@ public class IncidentController {
      * PHA 3: Quản trị viên lấy danh sách hàng đợi điều phối (Dispatch Queue)
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     @Operation(summary = "Pha 3: Quản trị viên lấy danh sách sự cố theo bộ lọc (Hàng đợi điều phối)")
     public ResponseEntity<Page<IncidentResponse>> getIncidents(
             @RequestParam(value = "status", required = false) IncidentStatus status,
@@ -296,6 +296,37 @@ public class IncidentController {
     }
 
     /**
+     * PHA 5: Người dân gửi khiếu nại nghiệm thu chưa đạt (Dispute)
+     */
+    @PostMapping("/{id}/dispute")
+    @PreAuthorize("hasAnyRole('CITIZEN', 'ADMIN')")
+    @Operation(summary = "Pha 5: Người dân khiếu nại mặt đường chưa đạt chuẩn hoặc AI cảnh báo lỗi sót lại")
+    public ResponseEntity<IncidentResponse> disputeIncident(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @Valid @RequestBody DisputeRequest request) {
+
+        Long userId = getUserIdFromHeader(authHeader);
+        Role userRole = Role.valueOf(jwtTokenProvider.extractRole(authHeader.substring(7)));
+        return ResponseEntity.ok(incidentService.disputeIncident(id, request, userId, userRole));
+    }
+
+    /**
+     * PHA 5: Quản trị viên bác bỏ nghiệm thu và ra lệnh thi công lại (Rework Order)
+     */
+    @PostMapping("/{id}/rework")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Pha 5: Quản trị viên bác bỏ nghiệm thu và ra lệnh thi công lại cho Kỹ thuật viên")
+    public ResponseEntity<IncidentResponse> reworkIncident(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @Valid @RequestBody ReworkRequest request) {
+
+        Long adminId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.reworkIncident(id, request, adminId));
+    }
+
+    /**
      * API Tiện ích: Lấy danh sách nhân viên kỹ thuật cho dropdown phân công
      */
     @GetMapping("/staff-list")
@@ -326,6 +357,32 @@ public class IncidentController {
     @Operation(summary = "API công khai cung cấp danh sách sự cố kèm tọa độ hiển thị trên bản đồ số GIS")
     public ResponseEntity<List<IncidentResponse>> getPublicMapIncidents() {
         return ResponseEntity.ok(incidentService.getAllIncidentsForMap());
+    }
+
+    /**
+     * PHA 1.8: Kiểm tra sự cố tương tự gần kề (Spatial Deduplication)
+     */
+    @GetMapping("/check-nearby")
+    @Operation(summary = "Pha 1.8: Kiểm tra xem tại tọa độ GPS có sự cố tương tự trong bán kính lân cận không")
+    public ResponseEntity<NearbyIncidentCheckResponse> checkNearby(
+            @RequestParam("latitude") BigDecimal latitude,
+            @RequestParam("longitude") BigDecimal longitude,
+            @RequestParam(value = "category", required = false) Category category,
+            @RequestParam(value = "radius", required = false, defaultValue = "25.0") Double radius) {
+        return ResponseEntity.ok(incidentService.checkNearbyDuplicate(latitude, longitude, category, radius));
+    }
+
+    /**
+     * PHA 1.9: Đồng tình với sự cố đã có (+1 Upvote)
+     */
+    @PostMapping("/{id}/upvote")
+    @PreAuthorize("hasAnyRole('CITIZEN', 'ADMIN', 'STAFF')")
+    @Operation(summary = "Pha 1.9: Người dùng bấm đồng tình (+1 Upvote) với sự cố đã được báo cáo")
+    public ResponseEntity<IncidentResponse> upvoteIncident(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id) {
+        Long userId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.upvoteIncident(id, userId));
     }
 
     private Long getUserIdFromHeader(String authHeader) {

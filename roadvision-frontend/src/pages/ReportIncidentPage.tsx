@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
 import { MapPicker } from '../components/MapPicker';
 import { ImageCanvasWithBBox } from '../components/ImageCanvasWithBBox';
-import { Category } from '../types';
+import { Category, NearbyIncidentCheckResponse } from '../types';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
+import { AuthModal } from '../components/AuthModal';
 import { preprocessImage } from '../utils/imagePreprocess';
-import { Upload, MapPin, Sparkles, CheckCircle2, AlertCircle, Loader2, Crosshair, Search, Sliders, ShieldAlert, Zap, Layers, Image as ImageIcon } from 'lucide-react';
+import { extractGpsFromExif } from '../utils/exifGps';
+import { Upload, MapPin, Sparkles, CheckCircle2, AlertCircle, Loader2, Crosshair, Search, Sliders, ShieldAlert, Zap, Layers, Image as ImageIcon, ThumbsUp, LogIn } from 'lucide-react';
 
 interface AiPreviewResult {
   className: string;
@@ -36,7 +39,9 @@ interface AiPreviewResult {
 export const ReportIncidentPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
+  const { user, isAuthenticated } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   const [rawFile, setRawFile] = useState<File | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -64,6 +69,37 @@ export const ReportIncidentPage: React.FC = () => {
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Trạng thái kiểm tra trùng lặp không gian (Spatial Deduplication)
+  const [nearbyDuplicate, setNearbyDuplicate] = useState<NearbyIncidentCheckResponse | null>(null);
+  const [isCheckingNearby, setIsCheckingNearby] = useState<boolean>(false);
+  const [dismissDuplicate, setDismissDuplicate] = useState<boolean>(false);
+
+  const checkNearby = async (lat: number, lng: number) => {
+    try {
+      setIsCheckingNearby(true);
+      const res = await incidentApi.checkNearbyDuplicate({
+        latitude: lat,
+        longitude: lng,
+        category: selectedCategories[0],
+        radius: 25,
+      });
+      if (res.data.hasNearbyDuplicate && res.data.existingIncident) {
+        setNearbyDuplicate(res.data);
+        setDismissDuplicate(false);
+      } else {
+        setNearbyDuplicate(null);
+      }
+    } catch {
+      // Ignored
+    } finally {
+      setIsCheckingNearby(false);
+    }
+  };
+
+  useEffect(() => {
+    checkNearby(latitude, longitude);
+  }, []);
 
   // Tự động định vị địa chỉ ngược khi thay đổi tọa độ từ bản đồ
   const reverseGeocode = async (lat: number, lng: number) => {
@@ -97,11 +133,13 @@ export const ReportIncidentPage: React.FC = () => {
         const lon = parseFloat(data[0].lon);
         setLatitude(lat);
         setLongitude(lon);
+        checkNearby(lat, lon);
         if (data[0].display_name) {
           setAddress(data[0].display_name);
         }
+        toast.success(`Đã định vị thành công: ${address.split(',')[0]}`, 'Bản Đồ Không Gian');
       } else {
-        setErrorMsg('Không tìm thấy tọa độ trên bản đồ cho địa chỉ này, bạn có thể nhấp trực tiếp vào bản đồ bên dưới.');
+        toast.warning('Không tìm thấy tọa độ cho địa chỉ này. Bạn hãy nhấp trực tiếp vào bản đồ bên dưới để chọn.');
       }
     } catch (err) {
       console.warn('Lỗi forward geocode:', err);
@@ -110,27 +148,53 @@ export const ReportIncidentPage: React.FC = () => {
     }
   };
 
-  // Lấy vị trí GPS hiện tại từ thiết bị
+  // Lấy vị trí GPS hiện tại từ thiết bị (có thông báo rõ ràng nếu lấy từ IP mạng máy tính)
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
-      setErrorMsg('Trình duyệt không hỗ trợ Geolocation');
+      toast.warning('Trình duyệt của bạn không hỗ trợ định vị Geolocation');
       return;
     }
     setIsLocating(true);
+
+    const applyPosition = (pos: GeolocationPosition, isFallback = false) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
+      setLatitude(lat);
+      setLongitude(lng);
+      reverseGeocode(lat, lng);
+      checkNearby(lat, lng);
+      setIsLocating(false);
+
+      if (acc > 2500) {
+        toast.info(
+          `Vị trí ước lượng từ trạm mạng Internet (sai số ~${Math.round(acc / 1000)}km do máy tính không có chip GPS vệ tinh). Bạn có thể nhấp trực tiếp lên bản đồ hoặc bấm nút vị trí nhanh để đặt chuẩn xác.`,
+          'Lưu Ý Định Vị PC'
+        );
+      } else {
+        toast.success(isFallback ? 'Đã định vị vị trí qua mạng Internet!' : 'Đã xác định vị trí GPS hiện tại!');
+      }
+    };
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setLatitude(lat);
-        setLongitude(lng);
-        reverseGeocode(lat, lng);
-        setIsLocating(false);
-      },
+      (pos) => applyPosition(pos, false),
       (err) => {
-        console.warn('Không thể lấy GPS trực tiếp', err);
-        setIsLocating(false);
+        // Nếu lỗi do Timeout hoặc không có chip GPS (thường gặp trên PC máy bàn), thử chế độ IP/Network
+        if (err.code === 3 || err.code === 2) {
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPos) => applyPosition(fallbackPos, true),
+            () => {
+              setIsLocating(false);
+              toast.info('Không thể lấy GPS tự động (máy tính không có phần cứng GPS). Vui lòng nhấp trực tiếp lên bản đồ bên dưới.');
+            },
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+          );
+        } else {
+          setIsLocating(false);
+          toast.info('Trình duyệt bị từ chối quyền truy cập vị trí. Bạn có thể chọn trực tiếp trên bản đồ.');
+        }
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
     );
   };
 
@@ -139,6 +203,7 @@ export const ReportIncidentPage: React.FC = () => {
     setLatitude(lat);
     setLongitude(lng);
     reverseGeocode(lat, lng);
+    checkNearby(lat, lng);
   };
 
   // Hàm thực hiện quét AI từ tệp ảnh và ngưỡng tin cậy
@@ -264,6 +329,23 @@ export const ReportIncidentPage: React.FC = () => {
     setErrorMsg(null);
     setAiResult(null);
 
+    // Tự động kiểm tra và trích xuất tọa độ GPS từ thẻ EXIF của ảnh chụp hiện trường
+    try {
+      const exifCoord = await extractGpsFromExif(file);
+      if (exifCoord) {
+        setLatitude(exifCoord.latitude);
+        setLongitude(exifCoord.longitude);
+        reverseGeocode(exifCoord.latitude, exifCoord.longitude);
+        checkNearby(exifCoord.latitude, exifCoord.longitude);
+        toast.success(
+          `Đã tự động lấy tọa độ GPS từ ảnh chụp hiện trường (${exifCoord.latitude.toFixed(5)}, ${exifCoord.longitude.toFixed(5)})!`,
+          'Định Vị EXIF Thành Công'
+        );
+      }
+    } catch {
+      // Bỏ qua nếu ảnh không có thẻ EXIF GPS
+    }
+
     await runAiAnalysis(finalFile, thresh);
   };
 
@@ -365,6 +447,12 @@ export const ReportIncidentPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated || !user) {
+      setIsAuthModalOpen(true);
+      toast.warning('Vui lòng đăng nhập tài khoản Công Dân để nộp báo cáo chính thức.');
+      return;
+    }
+
     if (!selectedFile) {
       toast.warning('Vui lòng chọn hoặc chụp ảnh mặt đường hư hại');
       setErrorMsg('Vui lòng chọn hoặc chụp ảnh mặt đường hư hại');
@@ -413,6 +501,30 @@ export const ReportIncidentPage: React.FC = () => {
           Tải lên ảnh chụp sự cố mặt đường. Mô hình AI YOLOv8 ONNX sẽ quét nhận diện và đồng bộ vị trí GPS theo bản đồ không gian tương tác.
         </p>
       </div>
+
+      {!isAuthenticated && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div className="text-xs space-y-0.5">
+              <div className="font-bold text-amber-300">Bạn đang ở chế độ Khách (Chưa đăng nhập)</div>
+              <div className="text-amber-200/80">
+                Để nộp báo cáo hoặc đồng tình (+1 Upvote) sự cố, vui lòng đăng nhập tài khoản Công dân (Hỗ trợ 1-Click đăng nhập nhanh).
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsAuthModalOpen(true)}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 flex items-center gap-1.5"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Đăng Nhập Nhanh</span>
+          </button>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="p-4 rounded-xl bg-error-container text-error flex items-center gap-3 text-sm">
@@ -721,7 +833,101 @@ export const ReportIncidentPage: React.FC = () => {
                   <span>Định vị</span>
                 </button>
               </div>
+
+              {/* Gợi ý vị trí nhanh khu vực trọng điểm */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-2">
+                <span className="text-[11px] text-on-surface-variant font-medium">Chọn nhanh:</span>
+                {[
+                  { label: 'Thanh Liêm (Hà Nam)', lat: 20.436036, lng: 105.904596, addr: 'Thanh Liêm, Hà Nam' },
+                  { label: 'TP. Phủ Lý (Hà Nam)', lat: 20.5435, lng: 105.9175, addr: 'Phủ Lý, Hà Nam' },
+                  { label: 'Cầu Giấy (Hà Nội)', lat: 21.0333, lng: 105.7833, addr: 'Cầu Giấy, Hà Nội' },
+                  { label: 'Hoàn Kiếm (Hà Nội)', lat: 21.0285, lng: 105.8542, addr: 'Hoàn Kiếm, Hà Nội' },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setLatitude(preset.lat);
+                      setLongitude(preset.lng);
+                      setAddress(preset.addr);
+                      checkNearby(preset.lat, preset.lng);
+                      toast.info(`Đã ghim bản đồ tới: ${preset.label}`);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-primary/20 hover:text-primary text-[11px] font-semibold text-on-surface-variant transition-colors border border-outline-variant/30"
+                  >
+                    📍 {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* CẢNH BÁO TRÙNG LẶP KHÔNG GIAN (SPATIAL DEDUPLICATION & UPVOTE) */}
+            {nearbyDuplicate?.hasNearbyDuplicate && nearbyDuplicate.existingIncident && !dismissDuplicate && (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-3 shadow-xs">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <MapPin className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-amber-900 dark:text-amber-200 uppercase tracking-wide">
+                          Đoạn đường này đã có phản ánh cách {nearbyDuplicate.distanceMeters?.toFixed(1)}m
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-mono text-[10px] font-bold">
+                          {nearbyDuplicate.existingIncident.ticketCode}
+                        </span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant mt-1">
+                        Sự cố "{nearbyDuplicate.existingIncident.title}" đã được ghi nhận với {nearbyDuplicate.existingIncident.upvoteCount || 1} lượt đồng tình. Bạn có thể nhấn <strong>Đồng tình (+1 Upvote)</strong> để tăng mức độ khẩn cấp xử lý mà không cần gửi phiếu trùng lặp.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDismissDuplicate(true)}
+                    className="text-on-surface-variant hover:text-on-surface text-xs font-bold px-2 py-1 rounded-lg"
+                  >
+                    Bỏ qua
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-500/20">
+                  <div className="text-[11px] font-mono text-on-surface-variant">
+                    {nearbyDuplicate.existingIncident.address || 'Hiện trường lân cận'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!isAuthenticated || !user) {
+                          setIsAuthModalOpen(true);
+                          toast.warning('Vui lòng đăng nhập để đồng tình phản ánh này.');
+                          return;
+                        }
+                        try {
+                          await incidentApi.upvoteIncident(nearbyDuplicate.existingIncident!.id);
+                          toast.success('Đã gửi +1 Đồng tình thành công! Mức độ khẩn cấp của sự cố đã được tăng.', 'Cộng Đồng Đồng Tình');
+                          navigate(`/incidents/${nearbyDuplicate.existingIncident!.id}`);
+                        } catch (err: any) {
+                          toast.info(err.response?.data?.message || 'Bạn đã đồng tình với phản ánh này trước đó rồi.');
+                          navigate(`/incidents/${nearbyDuplicate.existingIncident!.id}`);
+                        }
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      <span>Đồng Tình (+1 Upvote)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDismissDuplicate(true)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold text-on-surface-variant hover:bg-surface-container"
+                    >
+                      Vẫn nộp báo cáo mới
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* BẢN ĐỒ TƯƠNG TÁC LEAFLET / OPENSTREETMAP */}
             <div>
@@ -837,6 +1043,9 @@ export const ReportIncidentPage: React.FC = () => {
           </div>
         </div>
       </form>
+
+      {/* Modal đăng nhập nhanh nếu người dùng thao tác ở chế độ khách */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>
   );
 };

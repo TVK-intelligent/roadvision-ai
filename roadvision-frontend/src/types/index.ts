@@ -64,6 +64,18 @@ export interface Resolution {
   staffName: string;
   proofImageUrl: string;
   notes?: string;
+  aiVerificationStatus?: 'AI_VERIFIED_CLEAN' | 'AI_WARNING_DEFECT_REMAINS';
+  aiVerificationConfidence?: number;
+  aiVerificationDetectionsJson?: string;
+  aiVerificationNotes?: string;
+  verificationBoxes?: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    confidence: number;
+    className: string;
+  }>;
   resolvedAt: string;
 }
 
@@ -87,6 +99,10 @@ export interface Incident {
   severity: Severity;
   flag?: string;
   rejectionReason?: string;
+  reworkReason?: string;
+  reworkCount?: number;
+  upvoteCount?: number;
+  hasUpvoted?: boolean;
   citizenId: number;
   reporterName: string;
   reporterPhone?: string;
@@ -98,6 +114,13 @@ export interface Incident {
   updatedAt?: string;
   resolvedAt?: string;
   closedAt?: string;
+}
+
+export interface NearbyIncidentCheckResponse {
+  hasNearbyDuplicate: boolean;
+  distanceMeters?: number;
+  existingIncident?: Incident;
+  message?: string;
 }
 
 export interface AuthResponse {

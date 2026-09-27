@@ -86,10 +86,24 @@ export const StaffTasksPage: React.FC = () => {
     formData.append('notes', proofNotes);
 
     try {
-      await incidentApi.resolveIncident(selectedTask.id, formData);
-      toast.success(`Đã nộp ảnh nghiệm thu sự cố #${selectedTask.ticketCode}!`, 'Nghiệm Thu Thành Công');
+      const res = await incidentApi.resolveIncident(selectedTask.id, formData);
+      const updated = res.data;
+      if (updated.resolution?.aiVerificationStatus === 'AI_VERIFIED_CLEAN') {
+        toast.success(
+          `AI đã thẩm định đạt chuẩn: Mặt đường đã được hoàn trả phẳng phiu!`,
+          'AI Nghiệm Thu Đạt Chuẩn'
+        );
+      } else if (updated.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS') {
+        toast.warning(
+          updated.resolution.aiVerificationNotes || 'Cảnh báo AI: Phát hiện dấu hiệu hư hỏng còn sót lại!',
+          'Cảnh Báo Kiểm Định AI'
+        );
+      } else {
+        toast.success(`Đã nộp ảnh nghiệm thu sự cố #${selectedTask.ticketCode}!`, 'Nghiệm Thu Thành Công');
+      }
       setSelectedTask(null);
       setProofFile(null);
+      setProofNotes('');
       fetchTasks(page, pageSize);
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Có lỗi xảy ra khi nộp ảnh nghiệm thu';
@@ -207,6 +221,21 @@ export const StaffTasksPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Cảnh báo yêu cầu thi công lại nếu có */}
+                {task.reworkCount && task.reworkCount > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/30 text-rose-950 dark:text-rose-200 p-2.5 rounded-xl text-xs flex flex-col gap-1">
+                    <div className="font-bold flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <span>YÊU CẦU THI CÔNG LẠI (LẦN #{task.reworkCount})</span>
+                    </div>
+                    {task.reworkReason && (
+                      <div className="text-[11px] opacity-90 pl-5">
+                        <strong>Chỉ đạo:</strong> {task.reworkReason}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Chân Thẻ & Thao Tác Trạng Thái */}
                 <div className="flex items-center justify-between pt-3 border-t border-outline-variant/15 text-xs">
                   <Link
@@ -242,10 +271,22 @@ export const StaffTasksPage: React.FC = () => {
                     )}
 
                     {(task.status === 'RESOLVED' || task.status === 'CLOSED') && (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Đã Hoàn Thành</span>
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {task.resolution?.aiVerificationStatus === 'AI_VERIFIED_CLEAN' && (
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
+                            ✅ AI Đạt Chuẩn
+                          </span>
+                        )}
+                        {task.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS' && (
+                          <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] font-bold">
+                            ⚠️ AI Cảnh Báo
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Đã Hoàn Thành</span>
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -270,7 +311,7 @@ export const StaffTasksPage: React.FC = () => {
 
       {/* Modal Nộp Nghiệm Thu (Proof of Work) */}
       {selectedTask && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface-container-lowest max-w-lg w-full rounded-3xl border border-outline-variant/40 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
             <div className="p-5 border-b border-outline-variant/20 flex items-center justify-between">
               <div className="flex items-center gap-2 text-secondary font-bold text-sm">
