@@ -10,7 +10,7 @@ import { ImageCanvasWithBBox } from '../components/ImageCanvasWithBBox';
 import { LeafletMap } from '../components/LeafletMap';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, CheckCircle2, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock } from 'lucide-react';
 
 export const IncidentDossierPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -27,9 +27,10 @@ export const IncidentDossierPage: React.FC = () => {
   const [isUpvoting, setIsUpvoting] = useState<boolean>(false);
 
   // Trạng thái Khiếu nại (Citizen) & Lệnh thi công lại (Admin)
-  const [disputeReason, setDisputeReason] = useState<string>('Mặt đường vẫn còn ổ gà nguy hiểm hoặc khuyết tật chưa được xử lý triệt để.');
+  const [adminDecision, setAdminDecision] = useState<'APPROVE' | 'REWORK'>('APPROVE');
+  const [disputeReason, setDisputeReason] = useState<string>('Mặt đường vẫn còn hư hỏng hoặc chưa được xử lý triệt để.');
   const [isSubmittingDispute, setIsSubmittingDispute] = useState<boolean>(false);
-  const [reworkInstructions, setReworkInstructions] = useState<string>('Yêu cầu đội kỹ thuật khẩn trương quay lại hiện trường xử lý dứt điểm các khuyết tật còn sót lại theo cảnh báo của AI và phản hồi của người dân.');
+  const [reworkInstructions, setReworkInstructions] = useState<string>('Yêu cầu đội kỹ thuật khẩn trương quay lại hiện trường xử lý dứt điểm các vị trí hư hỏng còn sót lại theo cảnh báo của AI.');
   const [isSubmittingRework, setIsSubmittingRework] = useState<boolean>(false);
   const [showDefectBoxes, setShowDefectBoxes] = useState<boolean>(false);
 
@@ -196,10 +197,10 @@ export const IncidentDossierPage: React.FC = () => {
           className="inline-flex items-center gap-2 text-xs font-semibold text-primary hover:underline"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Quay lại danh sách</span>
+          <span>Quay lại danh sách sự cố</span>
         </Link>
-        <span className="font-mono text-xs text-on-surface-variant">
-          TELEMETRY STREAM: STABLE (42ms)
+        <span className="font-mono text-xs text-slate-500">
+          Mã phản ánh: #{incident.ticketCode}
         </span>
       </div>
 
@@ -232,8 +233,13 @@ export const IncidentDossierPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Timeline 7 Bước */}
-      <Timeline status={incident.status} />
+      {/* Stepper Tiến Độ 5 Pha Chuẩn */}
+      <Timeline
+        status={incident.status}
+        isRework={Boolean(incident.reworkReason || (incident.reworkCount && incident.reworkCount > 0))}
+        reworkCount={incident.reworkCount}
+        isDisputed={incident.flag === 'DISPUTED'}
+      />
 
       {/* Bố cục 2 Cột Đối Chiếu */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
@@ -298,8 +304,8 @@ export const IncidentDossierPage: React.FC = () => {
             />
 
             <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant bg-surface-container-low p-3 rounded-xl">
-              <span>Người báo cáo: {incident.reporterName}</span>
-              <span>SĐT: {incident.reporterPhone || '0912345678'}</span>
+              <span>Người báo cáo: {incident.reporterName || 'Ẩn danh'}</span>
+              <span>SĐT: {incident.reporterPhone || 'Chưa cung cấp'}</span>
             </div>
           </div>
         </div>
@@ -309,58 +315,208 @@ export const IncidentDossierPage: React.FC = () => {
       <div className="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col gap-4">
         <h3 className="text-base font-bold text-on-surface">Hành Động Khắc Phục & Nghiệm Thu</h3>
 
-        {/* Kỹ thuật viên (Staff) bấm bắt đầu thi công */}
+        {/* PHA 4.1: TRẠNG THÁI ASSIGNED */}
         {incident.status === 'ASSIGNED' && (
-          <div className="flex items-center justify-between bg-primary-fixed/30 p-4 rounded-xl">
-            <div>
-              <div className="font-semibold text-sm text-primary">Nhiệm vụ đã được phân công cho đội của bạn</div>
-              <div className="text-xs text-on-surface-variant">Nhấn nút bên cạnh khi bạn đã có mặt tại hiện trường</div>
+          user?.role === 'ROLE_STAFF' ? (
+            <div className="flex items-center justify-between bg-primary-fixed/30 p-4 rounded-xl">
+              <div>
+                <div className="font-semibold text-sm text-primary">Nhiệm vụ đã được phân công cho bạn</div>
+                <div className="text-xs text-on-surface-variant">Nhấn nút bên cạnh khi bạn đã có mặt tại hiện trường</div>
+              </div>
+              <button
+                onClick={handleStartRepair}
+                className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow hover:bg-primary-container flex items-center gap-2"
+              >
+                <Hammer className="w-4 h-4" />
+                <span>Bắt Đầu Xử Lý (IN_PROGRESS)</span>
+              </button>
             </div>
-            <button
-              onClick={handleStartRepair}
-              className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow hover:bg-primary-container flex items-center gap-2"
-            >
-              <Hammer className="w-4 h-4" />
-              <span>Bắt Đầu Xử Lý (IN_PROGRESS)</span>
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between bg-surface-container-high p-4 rounded-xl border border-outline-variant/30">
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-secondary shrink-0" />
+                <div>
+                  <div className="font-semibold text-xs text-on-surface">
+                    Đã điều phối cho Kỹ thuật viên: <span className="text-primary font-bold">{incident.assignment?.assignedToStaffName || 'Đội kỹ thuật'}</span>
+                  </div>
+                  <div className="text-[11px] text-on-surface-variant">
+                    Hệ thống đang chờ Kỹ thuật viên di chuyển đến hiện trường và kích hoạt trạng thái thi công.
+                  </div>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-secondary-container/30 text-secondary shrink-0">
+                CHỜ CÓ MẶT
+              </span>
+            </div>
+          )
         )}
 
-        {/* Kỹ thuật viên (Staff) tải ảnh nghiệm thu hoàn tất */}
+        {/* PHA 4.2: TRẠNG THÁI IN_PROGRESS */}
         {incident.status === 'IN_PROGRESS' && (
-          <form onSubmit={handleResolveSubmit} className="flex flex-col gap-3 bg-secondary-fixed/30 p-4 rounded-xl">
-            <div className="font-semibold text-sm text-secondary">
-              Nộp ảnh nghiệm thu hiện trường hoàn thiện (Proof of Work)
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1">Chụp ảnh sau khi đã vá phẳng</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setProofFile(e.target.files ? e.target.files[0] : null)}
-                  className="w-full text-xs"
-                  required
-                />
+          <div className="flex flex-col gap-4">
+            {/* ĐỐI CHIẾU SONG SONG ẢNH A VÀ ẢNH B KHI ĐANG TÁI THI CÔNG (REWORK) */}
+            {incident.resolution?.proofImageUrl && (
+              <div className="flex flex-col gap-3 p-4 rounded-2xl bg-surface-container-high border border-outline-variant/40 shadow-xs">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold text-xs uppercase tracking-wide">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span>HỒ SƠ TÁI THI CÔNG: ĐỐI CHIẾU HIỆN TRẠNG GỐC VÀ LẦN SỬA CHƯA ĐẠT</span>
+                  </div>
+                  {incident.reworkCount && (
+                    <span className="text-[11px] font-mono text-rose-600 font-bold bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20">
+                      Tái thi công lần #{incident.reworkCount}
+                    </span>
+                  )}
+                </div>
+
+                {/* Khung 2 ảnh song song Side-by-Side */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Cột 1: Ảnh A - Người dân chụp ban đầu */}
+                  {/* Cột 1: Ảnh A - Người dân chụp ban đầu kèm Bounding Box AI */}
+                  <div className="flex flex-col gap-2 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-on-surface flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">A</span>
+                        Ảnh Gốc Ban Đầu (Người Dân Báo)
+                      </span>
+                      {incident.aiDetection?.confidence ? (
+                        <span className="text-[10px] font-mono text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
+                          AI: {(incident.aiDetection.confidence * 100).toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono text-on-surface-variant">Hiện trạng gốc</span>
+                      )}
+                    </div>
+
+                    <div className="relative rounded-lg overflow-hidden border border-outline-variant/20 bg-black/5 aspect-video">
+                      <ImageCanvasWithBBox
+                        imageUrl={incident.imageUrl}
+                        aiDetection={incident.aiDetection}
+                        className="w-full h-full"
+                      />
+                    </div>
+                    <span className="text-[11px] text-on-surface-variant italic">
+                      Hộp bao AI ban đầu xác định vị trí và quy mô ổ gà/vết nứt gốc.
+                    </span>
+                  </div>
+
+                  {/* Cột 2: Ảnh B - Ảnh thợ đã sửa nhưng bị bắt lỗi */}
+                  <div className="flex flex-col gap-2 p-3 rounded-xl bg-surface-container-lowest border border-rose-500/30">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300 flex items-center justify-center font-bold text-[10px]">B</span>
+                        Ảnh Nghiệm Thu Vừa Qua (Bị Bác Bỏ)
+                      </span>
+                      <span className="text-[10px] font-mono text-rose-600 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded">
+                        AI CẢNH BÁO
+                      </span>
+                    </div>
+
+                    <div className="relative rounded-lg overflow-hidden border border-rose-500/30 bg-black/5 aspect-video">
+                      <ImageCanvasWithBBox
+                        imageUrl={incident.resolution.proofImageUrl}
+                        aiDetection={{
+                          className: 'DEFECT_REMAINS',
+                          confidence: Number(incident.resolution.aiVerificationConfidence) || 0.85,
+                          bboxX: 0,
+                          bboxY: 0,
+                          bboxWidth: 0,
+                          bboxHeight: 0,
+                          inferenceMs: 0,
+                          boxes: incident.resolution.verificationBoxes || (incident.resolution.aiVerificationDetectionsJson ? JSON.parse(incident.resolution.aiVerificationDetectionsJson) : [])
+                        }}
+                        className="w-full h-full"
+                      />
+                    </div>
+                    <span className="text-[11px] text-rose-700 dark:text-rose-400 font-medium">
+                      {incident.resolution.aiVerificationNotes || 'Khung viền màu đánh dấu các vị trí hư hỏng còn sót lại cần thợ xử lý dứt điểm.'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Lời chỉ đạo của Admin */}
+                {incident.reworkReason && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 text-xs">
+                    <strong>📢 Lệnh chỉ đạo thi công của Ban Quản Lý:</strong> "{incident.reworkReason}"
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1">Ghi chú vật liệu thi công</label>
-                <input
-                  type="text"
-                  value={proofNotes}
-                  onChange={(e) => setProofNotes(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-lg bg-surface-container-lowest border"
-                />
+            )}
+
+            {/* FORM HOẶC THẺ TIẾN ĐỘ TÙY THEO VAI TRÒ */}
+            {user?.role === 'ROLE_STAFF' ? (
+              <form onSubmit={handleResolveSubmit} className="flex flex-col gap-3 bg-secondary-fixed/30 p-4 rounded-xl">
+                <div className="font-semibold text-sm text-secondary flex items-center gap-2">
+                  <Hammer className="w-4 h-4" />
+                  <span>
+                    {incident.reworkCount && incident.reworkCount > 0
+                      ? `Nộp ảnh nghiệm thu mới sau khi đã khắc phục lại (Lần ${incident.reworkCount + 1})`
+                      : 'Nộp ảnh nghiệm thu hiện trường hoàn thiện (Proof of Work)'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Chụp ảnh sau khi đã vá phẳng hoàn tất</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setProofFile(e.target.files ? e.target.files[0] : null)}
+                      className="w-full text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Ghi chú vật liệu & biện pháp khắc phục</label>
+                    <input
+                      type="text"
+                      value={proofNotes}
+                      onChange={(e) => setProofNotes(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-surface-container-lowest border"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="self-end px-5 py-2 rounded-xl bg-secondary text-on-primary font-bold text-xs shadow hover:bg-secondary/90 flex items-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Xác Nhận Nghiệm Thu (RESOLVED)</span>
+                </button>
+              </form>
+            ) : (
+              <div className="flex flex-col gap-3 bg-primary-fixed/20 p-4 rounded-xl border border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                    </div>
+                    <span className="font-bold text-xs uppercase tracking-wide text-primary">
+                      Đội Kỹ Thuật Đang Thi Công Xử Lý Hiện Trường
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-on-surface-variant bg-surface-container-highest px-2.5 py-1 rounded-lg">
+                    Phụ trách: {incident.assignment?.assignedToStaffName || incident.resolution?.staffName || 'Đội kỹ thuật'}
+                  </span>
+                </div>
+
+                {incident.reworkReason && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-800 dark:text-rose-200 text-xs">
+                    <strong>🔄 Đang thi công lại theo chỉ đạo:</strong> "{incident.reworkReason}"
+                    {incident.reworkCount && (
+                      <span className="ml-2 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20">
+                        Lần {incident.reworkCount}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-xs text-on-surface-variant">
+                  Kỹ thuật viên đang có mặt tại hiện trường để san phẳng và khắc phục triệt để các hư hỏng mặt đường. Sau khi hoàn thành, Kỹ thuật viên sẽ tải lên hình ảnh nghiệm thu mới để AI và Quản trị viên thẩm định.
+                </p>
               </div>
-            </div>
-            <button
-              type="submit"
-              className="self-end px-5 py-2 rounded-xl bg-secondary text-on-primary font-bold text-xs shadow hover:bg-secondary/90 flex items-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Xác Nhận Nghiệm Thu (RESOLVED)</span>
-            </button>
-          </form>
+            )}
+          </div>
         )}
 
         {/* Người dân (Citizen) đối chiếu ảnh Trước/Sau & Đóng sự cố hoặc Khiếu nại */}
@@ -394,7 +550,7 @@ export const IncidentDossierPage: React.FC = () => {
               </div>
             )}
 
-            {/* Thẻ Kết Quả Kiểm Định Chất Lượng AI (AI Quality Verification) */}
+            {/* Thẻ Kết QuẢ Kiểm Định Chất Lượng AI (AI Quality Verification) */}
             {incident.resolution?.aiVerificationStatus && (
               <div
                 className={`p-4 rounded-2xl border flex items-start gap-3.5 transition-all ${
@@ -412,7 +568,7 @@ export const IncidentDossierPage: React.FC = () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-xs uppercase tracking-wide">
                       {incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
-                        ? 'Thẩm Định Nghiệm Thu AI: Đạt Chuẩn Hoàn Trả (0 Khuyết Tật)'
+                        ? 'Thẩm Định Nghiệm Thu AI: Đạt Chuẩn Hoàn Trả (Mặt đường đạt chuẩn)'
                         : 'Cảnh Báo Kiểm Định AI: Phát Hiện Dấu Hiệu Hư Hỏng Còn Sót Lại'}
                     </span>
                     <span
@@ -451,7 +607,7 @@ export const IncidentDossierPage: React.FC = () => {
             {showDefectBoxes && incident.resolution?.proofImageUrl ? (
               <div className="flex flex-col gap-2">
                 <div className="text-xs font-mono text-on-surface-variant flex items-center justify-between">
-                  <span className="font-bold text-amber-600">LỚP PHỦ THỊ GIÁC AI - CÁC ĐIỂM KHUYẾT TẬT CÒN SÓT LẠI TRÊN ẢNH AFTER:</span>
+                  <span className="font-bold text-amber-600">KẾT QUẢ KIỂM ĐỊNH AI - CÁC VỊ TRÍ CẦN XỬ LÝ LẠI TRÊN ẢNH SAU THI CÔNG:</span>
                   <span>Mô hình: YOLOv8-RoadCare Active</span>
                 </div>
                 <ImageCanvasWithBBox
@@ -502,128 +658,217 @@ export const IncidentDossierPage: React.FC = () => {
             ) : (user?.role === 'ROLE_ADMIN' || (user?.role === 'ROLE_CITIZEN' && incident.citizenId === user?.id)) ? (
               /* 2. NẾU LÀ QUẢN TRỊ VIÊN HOẶC CHÍNH CÔNG DÂN TẠO BÁO CÁO */
               <div className="flex flex-col gap-3">
-                {/* KHU VỰC THẨM QUYỀN QUẢN TRỊ VIÊN (ADMIN PANEL) */}
-                {user?.role === 'ROLE_ADMIN' && (
-                  <div className="p-4 rounded-2xl bg-surface-container-high border border-outline-variant/40 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
-                        <ShieldAlert className="w-4 h-4 text-primary" />
-                        <span>Thẩm Quyền Quản Trị Viên: Quyết Định Tái Thi Công</span>
+                {user?.role === 'ROLE_ADMIN' ? (
+                  /* BẢNG THẨM ĐỊNH NGHIỆM THU ĐIỀU PHỐI (ADMIN REVIEW PANEL - GỘP 1 KHUNG DUY NHẤT) */
+                  <div className="p-5 rounded-2xl bg-surface-container-high border border-outline-variant/40 flex flex-col gap-4 shadow-xs">
+                    {/* Header */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="w-5 h-5 text-primary" />
+                        <span className="font-bold text-sm text-on-surface">Thẩm Quyền Quản Trị Viên: Quyết Định Nghiệm Thu</span>
                       </div>
-                      <span className="text-[11px] font-mono text-secondary font-bold">Admin Dispatcher</span>
+                      <span className="text-[11px] font-mono text-secondary bg-secondary-container/30 px-2.5 py-1 rounded-lg font-bold">
+                        Admin Dispatcher
+                      </span>
                     </div>
-                    <p className="text-xs text-on-surface-variant">
-                      Nếu nhận thấy hiện trường chưa đạt chuẩn hoặc AI cảnh báo vi phạm, Quản trị viên ra lệnh bác bỏ nghiệm thu và chỉ đạo Kỹ thuật viên thi công lại (chuyển trạng thái về IN_PROGRESS).
-                    </p>
-                    <div>
-                      <label className="block text-xs font-semibold mb-1 text-on-surface">Chỉ đạo thi công bổ sung cho Kỹ thuật viên:</label>
-                      <input
-                        type="text"
-                        value={reworkInstructions}
-                        onChange={(e) => setReworkInstructions(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-lowest border"
-                        placeholder="Nhập nội dung chỉ đạo đội thi công..."
-                      />
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-1">
+
+                    {/* Bộ chuyển đổi quyết định trực quan (Segmented Toggle) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-1.5 bg-surface-container-lowest rounded-xl border border-outline-variant/30">
                       <button
                         type="button"
-                        disabled={isSubmittingRework}
-                        onClick={handleReworkSubmit}
-                        className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow flex items-center gap-2 transition-colors disabled:opacity-50"
+                        onClick={() => setAdminDecision('APPROVE')}
+                        className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-xs transition-all ${
+                          adminDecision === 'APPROVE'
+                            ? 'bg-primary text-on-primary shadow-sm'
+                            : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>1. Nghiệm Thu Đạt & Đóng Sự Cố</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAdminDecision('REWORK')}
+                        className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-xs transition-all ${
+                          adminDecision === 'REWORK'
+                            ? 'bg-rose-600 text-white shadow-sm'
+                            : 'text-on-surface-variant hover:text-rose-600 hover:bg-rose-500/10'
+                        }`}
                       >
                         <RotateCcw className="w-4 h-4" />
-                        <span>{isSubmittingRework ? 'Đang gửi...' : 'Bác Bỏ Nghiệm Thu & Yêu Cầu Thi Công Lại (REWORK)'}</span>
+                        <span>2. Chưa Đạt - Yêu Cầu Thi Công Lại (REWORK)</span>
                       </button>
                     </div>
-                  </div>
-                )}
 
-                {/* KHU VỰC ĐÁNH GIÁ & KHIẾU NẠI CỦA NGƯỜI DÂN HOẶC ADMIN */}
-                <form onSubmit={handleCloseSubmit} className="flex flex-col gap-3 pt-2">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold">
-                        {user?.role === 'ROLE_ADMIN' ? 'Quản trị viên đánh giá chất lượng hoàn trả:' : 'Chấm điểm chất lượng hoàn trả:'}
-                      </span>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          type="button"
-                          key={star}
-                          onClick={() => setRating(star)}
-                          className={`p-1 rounded transition-transform hover:scale-110 ${rating >= star ? 'text-amber-500' : 'text-gray-300'}`}
-                        >
-                          <Star className="w-5 h-5 fill-current" />
-                        </button>
-                      ))}
-                      <span className="text-xs font-mono font-bold ml-1 text-amber-600">({rating} sao)</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">
-                      {rating <= 3 || incident.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS'
-                        ? 'Nội dung phản ánh / Lý do khiếu nại chưa đạt chuẩn:'
-                        : 'Cảm nhận đóng góp ý kiến:'}
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={feedbackComments}
-                      onChange={(e) => {
-                        setFeedbackComments(e.target.value);
-                        setDisputeReason(e.target.value);
-                      }}
-                      placeholder={
-                        rating <= 3 || incident.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS'
-                          ? 'Mô tả rõ lý do chưa đạt chuẩn (vẫn còn ổ gà, nước đọng, mặt đường gồ ghề...)'
-                          : 'Chia sẻ cảm nhận của bạn về chất lượng thi công...'
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-lowest border"
-                    />
-                  </div>
-
-                  {/* Nút hành động phân hóa thông minh */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-outline-variant/20">
-                    {(rating <= 3 || incident.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS') ? (
-                      <>
-                        <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
-                          <AlertTriangle className="w-4 h-4 shrink-0" />
-                          <span>Hiện trường chưa đạt hoặc AI cảnh báo: Bạn có quyền khiếu nại lên BQL để yêu cầu thợ làm lại.</span>
+                    {/* Nội dung form theo quyết định */}
+                    {adminDecision === 'APPROVE' ? (
+                      /* KỊCH BẢN 1: DUYỆT ĐẠT CHUẨN & ĐÓNG PHIẾU */
+                      <form onSubmit={handleCloseSubmit} className="flex flex-col gap-3 pt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-on-surface">Đánh giá chất lượng hoàn trả:</span>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              type="button"
+                              key={star}
+                              onClick={() => setRating(star)}
+                              className={`p-1 rounded transition-transform hover:scale-110 ${rating >= star ? 'text-amber-500' : 'text-gray-300'}`}
+                            >
+                              <Star className="w-5 h-5 fill-current" />
+                            </button>
+                          ))}
+                          <span className="text-xs font-mono font-bold ml-1 text-amber-600">({rating} sao)</span>
                         </div>
-                        <div className="flex items-center justify-end gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            disabled={isSubmittingDispute}
-                            onClick={handleDisputeSubmit}
-                            className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                          >
-                            <AlertTriangle className="w-4 h-4" />
-                            <span>{isSubmittingDispute ? 'Đang gửi...' : 'Không Đạt - Gửi Khiếu Nại (DISPUTE)'}</span>
-                          </button>
+
+                        <div>
+                          <label className="block text-xs font-semibold mb-1 text-on-surface">
+                            Ghi chú thẩm định hoàn tất mặt đường:
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={feedbackComments}
+                            onChange={(e) => setFeedbackComments(e.target.value)}
+                            placeholder="Nhập ghi chú thẩm định của Quản trị viên..."
+                            className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-outline-variant/20">
+                          <span className="text-xs text-on-surface-variant flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            Mặt đường hoàn trả đạt chuẩn kỹ thuật. Xác nhận lưu trữ hồ sơ.
+                          </span>
                           <button
                             type="submit"
-                            className="px-4 py-2.5 rounded-xl bg-surface-container-highest text-on-surface hover:bg-surface-container-high font-bold text-xs transition-colors"
+                            className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs shadow flex items-center gap-2 transition-colors shrink-0"
                           >
-                            Vẫn Đồng Ý Đóng Sự Cố
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Xác Nhận Nghiệm Thu & Đóng Sự Cố (CLOSED)</span>
                           </button>
                         </div>
-                      </>
+                      </form>
                     ) : (
-                      <>
-                        <div className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" />
-                          <span>Mặt đường hoàn thiện đạt chuẩn. Bạn hài lòng để đóng hồ sơ sự cố?</span>
+                      /* KỊCH BẢN 2: BÁC BỎ & YÊU CẦU THI CÔNG LẠI */
+                      <div className="flex flex-col gap-3 pt-1">
+                        <div className="text-xs text-rose-700 dark:text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20 flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <span>
+                            Quản trị viên từ chối nghiệm thu. Sự cố sẽ được thu hồi trạng thái và chuyển về <b>IN_PROGRESS</b> để Kỹ thuật viên khẩn trương xử lý lại hiện trường.
+                          </span>
                         </div>
-                        <button
-                          type="submit"
-                          className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow hover:bg-primary-container transition-colors self-end"
-                        >
-                          Hài Lòng & Đóng Sự Cố (CLOSED)
-                        </button>
-                      </>
+
+                        <div>
+                          <label className="block text-xs font-semibold mb-1 text-on-surface">
+                            Chỉ đạo thi công khắc phục cho Kỹ thuật viên:
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={reworkInstructions}
+                            onChange={(e) => setReworkInstructions(e.target.value)}
+                            placeholder="Mô tả cụ thể các điểm chưa đạt cần thợ xử lý lại dứt điểm..."
+                            className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end pt-2 border-t border-outline-variant/20">
+                          <button
+                            type="button"
+                            disabled={isSubmittingRework}
+                            onClick={handleReworkSubmit}
+                            className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow flex items-center gap-2 transition-colors disabled:opacity-50"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                            <span>{isSubmittingRework ? 'Đang gửi...' : 'Ra Lệnh Bác Bỏ & Yêu Cầu Thi Công Lại (REWORK)'}</span>
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
-                </form>
+                ) : (
+                  /* KHU VỰC ĐÁNH GIÁ & KHIẾU NẠI CỦA CÔNG DÂN TẠO PHẢN ÁNH */
+                  <form onSubmit={handleCloseSubmit} className="flex flex-col gap-3 pt-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold">Chấm điểm chất lượng hoàn trả:</span>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            type="button"
+                            key={star}
+                            onClick={() => setRating(star)}
+                            className={`p-1 rounded transition-transform hover:scale-110 ${rating >= star ? 'text-amber-500' : 'text-gray-300'}`}
+                          >
+                            <Star className="w-5 h-5 fill-current" />
+                          </button>
+                        ))}
+                        <span className="text-xs font-mono font-bold ml-1 text-amber-600">({rating} sao)</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">
+                        {rating <= 3 || incident.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS'
+                          ? 'Nội dung phản ánh / Lý do khiếu nại chưa đạt chuẩn:'
+                          : 'Cảm nhận đóng góp ý kiến:'}
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={feedbackComments}
+                        onChange={(e) => {
+                          setFeedbackComments(e.target.value);
+                          setDisputeReason(e.target.value);
+                        }}
+                        placeholder={
+                          rating <= 3 || incident.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS'
+                            ? 'Mô tả rõ lý do chưa đạt chuẩn (vẫn còn ổ gà, nước đọng, mặt đường gồ ghề...)'
+                            : 'Chia sẻ cảm nhận của bạn về chất lượng thi công...'
+                        }
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-lowest border"
+                      />
+                    </div>
+
+                    {/* Nút hành động cho công dân */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-outline-variant/20">
+                      {rating <= 3 || incident.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS' ? (
+                        <>
+                          <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span>Hiện trường chưa đạt hoặc AI cảnh báo: Bạn có quyền khiếu nại lên BQL để yêu cầu thợ làm lại.</span>
+                          </div>
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              disabled={isSubmittingDispute}
+                              onClick={handleDisputeSubmit}
+                              className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                            >
+                              <AlertTriangle className="w-4 h-4" />
+                              <span>{isSubmittingDispute ? 'Đang gửi...' : 'Không Đạt - Gửi Khiếu Nại (DISPUTE)'}</span>
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-4 py-2.5 rounded-xl bg-surface-container-highest text-on-surface hover:bg-surface-container-high font-bold text-xs transition-colors"
+                            >
+                              Vẫn Đồng Ý Đóng Sự Cố
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>Mặt đường hoàn thiện đạt chuẩn. Bạn hài lòng để đóng hồ sơ sự cố?</span>
+                          </div>
+                          <button
+                            type="submit"
+                            className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow hover:bg-primary-container transition-colors self-end"
+                          >
+                            Hài Lòng & Đóng Sự Cố (CLOSED)
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </form>
+                )}
               </div>
             ) : (
               /* 3. NẾU CHƯA ĐĂNG NHẬP HOẶC LÀ CÔNG DÂN KHÁC */

@@ -140,4 +140,20 @@ export const incidentApi = {
   upvoteIncident: (id: number | string) => {
     return axiosClient.post<Incident>(`/incidents/${id}/upvote`);
   },
+
+  // Quản trị viên: Lấy báo cáo phân tích KPI tổng thể (Admin Control Center & Analytics)
+  getAdminAnalytics: (params?: { timeframe?: string; district?: string }) => {
+    return axiosClient.get<import('../types').AdminAnalyticsResponse>('/admin/analytics', { params });
+  },
+
+  // Quản trị viên: Xuất toàn bộ sự cố dưới dạng GIS GeoJSON
+  exportGeoJson: () => {
+    return axiosClient.get('/admin/export-geojson', { responseType: 'blob' });
+  },
+
+  // Giám sát viễn trắc AI Model
+  getAiTelemetry: () => {
+    return axiosClient.get<Record<string, any>>('/ai/telemetry');
+  },
 };
+

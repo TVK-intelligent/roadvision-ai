@@ -46,7 +46,7 @@ export const MyReportsPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-primary font-mono text-xs font-bold uppercase tracking-wider">
             <FileText className="w-4 h-4" />
-            CIVIC TELEMETRY RECORD • HỒ SƠ PHẢN ÁNH CỦA BẠN
+            HỒ SƠ PHẢN ÁNH CÔNG DÂN
           </div>
           <h1 className="font-display text-2xl font-black text-on-surface mt-1">Lịch Sử Phản Ánh Hiện Trường</h1>
           <p className="text-xs text-on-surface-variant">

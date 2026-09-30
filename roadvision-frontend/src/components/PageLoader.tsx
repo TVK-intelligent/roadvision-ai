@@ -17,7 +17,7 @@ export const PageLoader: React.FC = () => {
           Đang nạp dữ liệu RoadVision...
         </div>
         <div className="font-mono text-[11px] text-on-surface-variant">
-          TELEMETRY SYNC • V2.4
+          Hệ thống giám sát giao thông thông minh
         </div>
       </div>
     </div>

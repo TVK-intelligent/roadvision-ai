@@ -15,7 +15,7 @@ export const Footer: React.FC = () => {
               </div>
               <div className="flex flex-col">
                 <span className="font-display text-base font-bold text-on-surface leading-tight">RoadVision</span>
-                <span className="font-mono text-[9px] text-primary uppercase tracking-wider font-semibold">AI INFRASTRUCTURE PLATFORM</span>
+                <span className="font-mono text-[9px] text-primary uppercase tracking-wider font-semibold">NỀN TẢNG GIÁM SÁT HẠ TẦNG AI</span>
               </div>
             </div>
             <p className="text-xs text-on-surface-variant leading-relaxed max-w-md">
@@ -24,7 +24,7 @@ export const Footer: React.FC = () => {
             <div className="flex items-center gap-3 pt-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-[11px] font-mono font-bold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>TELEMETRY ONLINE</span>
+                <span>HỆ THỐNG HOẠT ĐỘNG</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-mono font-bold">
                 <Cpu className="w-3.5 h-3.5" />

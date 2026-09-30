@@ -32,6 +32,10 @@ const StaffTasksPage = lazy(() =>
 const PatrolModePage = lazy(() =>
   import('./pages/PatrolModePage').then((m) => ({ default: m.PatrolModePage }))
 );
+const AdminAnalyticsPage = lazy(() =>
+  import('./pages/AdminAnalyticsPage').then((m) => ({ default: m.AdminAnalyticsPage }))
+);
+
 
 export function App() {
   return (
@@ -82,6 +86,25 @@ export function App() {
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* Tuyến Quản Trị Viên (Admin duy nhất): Trung tâm phân tích & Điều hành KPI */}
+                  <Route
+                    path="/analytics"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
+                        <AdminAnalyticsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/analytics"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
+                        <AdminAnalyticsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
 
                   {/* Tuyến mặc định quay về trang chủ */}
                   <Route path="*" element={<Navigate to="/" replace />} />

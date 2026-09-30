@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { AuthModal } from '../components/AuthModal';
 import { preprocessImage } from '../utils/imagePreprocess';
 import { extractGpsFromExif } from '../utils/exifGps';
-import { Upload, MapPin, Sparkles, CheckCircle2, AlertCircle, Loader2, Crosshair, Search, Sliders, ShieldAlert, Zap, Layers, Image as ImageIcon, ThumbsUp, LogIn } from 'lucide-react';
+import { Upload, MapPin, Sparkles, CheckCircle2, AlertCircle, Loader2, Crosshair, Search, Sliders, ShieldAlert, Zap, Layers, Image as ImageIcon, ThumbsUp, LogIn, ChevronDown, Truck } from 'lucide-react';
 
 interface AiPreviewResult {
   className: string;
@@ -50,6 +50,7 @@ export const ReportIncidentPage: React.FC = () => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [enableEnhance, setEnableEnhance] = useState<boolean>(true);
   const [optimizationStats, setOptimizationStats] = useState<{ origKB: number; optKB: number } | null>(null);
+  const [showAdvancedAi, setShowAdvancedAi] = useState<boolean>(false);
 
   // Ngưỡng phát hiện AI tùy chỉnh (Confidence Threshold Slider: 0.15 -> 0.85, mặc định 0.20 để bắt trọn các vật cản/hư hại ngoài thực tế)
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.20);
@@ -69,6 +70,136 @@ export const ReportIncidentPage: React.FC = () => {
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Xác định Khu Quản Lý Đường Bộ Toàn Quốc (Cục Đường Bộ VN - 63 Tỉnh Thành)
+  const getCorridorInfo = (lat: number, lng: number, addr: string) => {
+    const norm = (addr || '').toLowerCase();
+
+    // 1. Phân vùng Miền Nam (Khu QLĐB IV: TP.HCM & 18 tỉnh ĐBSCL/Đông Nam Bộ)
+    const southKeywords = [
+      'hồ chí minh', 'hcm', 'sài gòn', 'thủ đức', 'bình chánh', 'cần giờ', 'củ chi', 'hóc môn',
+      'cần thơ', 'ninh kiều', 'bình dương', 'thủ dầu một', 'dĩ an', 'thuận an',
+      'đồng nai', 'biên hòa', 'vũng tàu', 'bà rịa', 'tây ninh', 'bình phước',
+      'long an', 'tiền giang', 'mỹ tho', 'bến tre', 'vĩnh long', 'trà vinh',
+      'hậu giang', 'sóc trăng', 'đồng tháp', 'cao lãnh', 'an giang', 'kiên giang',
+      'phú quốc', 'bạc liêu', 'cà mau'
+    ];
+    for (const kw of southKeywords) {
+      if (norm.includes(kw)) {
+        return {
+          corridor: 'KHU_4',
+          zoneName: 'Khu Quản lý Đường bộ IV (Miền Nam - TP.HCM & ĐBSCL)',
+          team: 'Đội Cơ Động Phản Ứng Nhanh Miền Nam',
+          badgeColor: 'border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300',
+          slaMinutes: 30,
+          contact: 'Trực Ban Khu IV: 028.3829.xxxx'
+        };
+      }
+    }
+
+    // 2. Phân vùng Miền Trung & Tây Nguyên (Khu QLĐB III: Đà Nẵng & 12 tỉnh Duyên hải / Tây Nguyên)
+    const centralKeywords = [
+      'đà nẵng', 'hải châu', 'sơn trà', 'ngũ hành sơn', 'liên chiểu', 'hòa vang',
+      'quảng nam', 'hội an', 'tam kỳ', 'quảng ngãi', 'bình định', 'quy nhơn',
+      'phú yên', 'tuy hòa', 'khánh hòa', 'nha trang', 'cam ranh',
+      'ninh thuận', 'phan rang', 'bình thuận', 'phan thiết',
+      'kon tum', 'gia lai', 'pleiku', 'đắk lắk', 'dak lak', 'buôn ma thuột',
+      'đắk nông', 'lâm đồng', 'đà lạt'
+    ];
+    for (const kw of centralKeywords) {
+      if (norm.includes(kw)) {
+        return {
+          corridor: 'KHU_3',
+          zoneName: 'Khu Quản lý Đường bộ III (Miền Trung & Tây Nguyên - Trụ sở Đà Nẵng)',
+          team: 'Đội Cơ Động Tuần Kiểm Miền Trung & Tây Nguyên',
+          badgeColor: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+          slaMinutes: 35,
+          contact: 'Trực Ban Khu III: 0236.382.xxxx'
+        };
+      }
+    }
+
+    // 3. Phân vùng Bắc Trung Bộ (Khu QLĐB II: 6 tỉnh từ Thanh Hóa đến Thừa Thiên Huế)
+    const northCentralKeywords = [
+      'thanh hóa', 'sầm sơn', 'bỉm sơn', 'nghệ an', 'vinh', 'cửa lò',
+      'hà tĩnh', 'kỳ anh', 'quảng bình', 'đồng hới', 'quảng trị', 'đông hà',
+      'thừa thiên huế', 'huế'
+    ];
+    for (const kw of northCentralKeywords) {
+      if (norm.includes(kw)) {
+        return {
+          corridor: 'KHU_2',
+          zoneName: 'Khu Quản lý Đường bộ II (Bắc Trung Bộ - Trụ sở Nghệ An)',
+          team: 'Đội Cơ Động Khắc Phục Khẩn Cấp Bắc Trung Bộ',
+          badgeColor: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+          slaMinutes: 40,
+          contact: 'Trực Ban Khu II: 0238.384.xxxx'
+        };
+      }
+    }
+
+    // 4. Phân vùng Miền Bắc (Khu QLĐB I: Hà Nội, Hải Phòng & 23 tỉnh phía Bắc)
+    const northKeywords = [
+      'hà nội', 'hoàn kiếm', 'cầu giấy', 'ba đình', 'đống đa', 'hai bà trưng', 'hoàng mai', 'thanh xuân', 'hà đông',
+      'hải phòng', 'quảng ninh', 'hạ long', 'bắc ninh', 'hà nam', 'phủ lý', 'thanh liêm', 'kim bảng',
+      'hải dương', 'hưng yên', 'nam định', 'ninh bình', 'thái bình', 'vĩnh phúc', 'phú thọ',
+      'bắc giang', 'bắc kạn', 'cao bằng', 'hà giang', 'lạng sơn', 'thái nguyên', 'tuyên quang',
+      'yên bái', 'lào cai', 'hòa bình', 'sơn la', 'điện biên', 'lai châu'
+    ];
+    for (const kw of northKeywords) {
+      if (norm.includes(kw)) {
+        return {
+          corridor: 'KHU_1',
+          zoneName: 'Khu Quản lý Đường bộ I (Miền Bắc - Trụ sở Hà Nội)',
+          team: 'Đội Cơ Động Phản Ứng Nhanh Miền Bắc',
+          badgeColor: 'border-primary/40 bg-primary/10 text-primary',
+          slaMinutes: 25,
+          contact: 'Trực Ban Khu I: 024.3768.xxxx'
+        };
+      }
+    }
+
+    // 5. Phân giải bảo hiểm bằng vĩ độ GPS (Spatial Latitudinal Bounding)
+    if (lat < 11.5) {
+      return {
+        corridor: 'KHU_4',
+        zoneName: 'Khu Quản lý Đường bộ IV (Miền Nam - TP.HCM & ĐBSCL)',
+        team: 'Đội Cơ Động Phản Ứng Nhanh Miền Nam',
+        badgeColor: 'border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300',
+        slaMinutes: 30,
+        contact: 'Trực Ban Khu IV: 028.3829.xxxx'
+      };
+    }
+    if (lat < 16.5) {
+      return {
+        corridor: 'KHU_3',
+        zoneName: 'Khu Quản lý Đường bộ III (Miền Trung & Tây Nguyên - Trụ sở Đà Nẵng)',
+        team: 'Đội Cơ Động Tuần Kiểm Miền Trung & Tây Nguyên',
+        badgeColor: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+        slaMinutes: 35,
+        contact: 'Trực Ban Khu III: 0236.382.xxxx'
+      };
+    }
+    if (lat < 20.0) {
+      return {
+        corridor: 'KHU_2',
+        zoneName: 'Khu Quản lý Đường bộ II (Bắc Trung Bộ - Trụ sở Nghệ An)',
+        team: 'Đội Cơ Động Khắc Phục Khẩn Cấp Bắc Trung Bộ',
+        badgeColor: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+        slaMinutes: 40,
+        contact: 'Trực Ban Khu II: 0238.384.xxxx'
+      };
+    }
+
+    return {
+      corridor: 'KHU_1',
+      zoneName: 'Khu Quản lý Đường bộ I (Miền Bắc - Trụ sở Hà Nội)',
+      team: 'Đội Cơ Động Phản Ứng Nhanh Miền Bắc',
+      badgeColor: 'border-primary/40 bg-primary/10 text-primary',
+      slaMinutes: 25,
+      contact: 'Trực Ban Khu I: 024.3768.xxxx'
+    };
+  };
 
   // Trạng thái kiểm tra trùng lặp không gian (Spatial Deduplication)
   const [nearbyDuplicate, setNearbyDuplicate] = useState<NearbyIncidentCheckResponse | null>(null);
@@ -539,9 +670,9 @@ export const ReportIncidentPage: React.FC = () => {
         <div className="md:col-span-5 flex flex-col gap-4">
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-on-surface">Khung Quét AI Vision</span>
-              <span className="font-mono text-[10px] text-primary bg-primary-fixed/50 px-2 py-0.5 rounded font-semibold">
-                YOLOv8 ONNX IN-PROCESS
+              <span className="text-sm font-bold text-on-surface">Ảnh Hiện Trường & Phân Tích AI</span>
+              <span className="font-mono text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-full font-semibold border border-primary/20">
+                AI Phân Tích Tự Động
               </span>
             </div>
 
@@ -574,7 +705,7 @@ export const ReportIncidentPage: React.FC = () => {
                     <div className="absolute inset-0 bg-surface/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2 rounded-xl">
                       <Loader2 className="w-8 h-8 text-primary animate-spin" />
                       <span className="font-mono text-xs font-bold text-primary">
-                        ĐANG QUÉT MẠNG NƠ-RON YOLOv8...
+                        Đang phân tích hình ảnh...
                       </span>
                     </div>
                   )}
@@ -622,16 +753,18 @@ export const ReportIncidentPage: React.FC = () => {
               </div>
             )}
 
-            {/* Hướng dẫn góc chụp chuẩn thực địa cho AI */}
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/15 text-xs text-on-surface-variant">
-              <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-on-surface">Mẹo chụp để AI phát hiện chuẩn nhất:</span>
-                <span className="text-[11px] leading-relaxed">
-                  Cúi camera góc <strong>45° – 60°</strong> hướng xuống mặt đường, cự ly <strong>1 – 2m</strong>, để mặt đường chiếm trên <strong>70%</strong> khung hình.
-                </span>
+            {/* Hướng dẫn góc chụp chuẩn thực địa cho AI (chỉ hiện khi chưa chọn ảnh để tránh rối giao diện) */}
+            {!previewUrl && (
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/15 text-xs text-on-surface-variant">
+                <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-bold text-on-surface">Mẹo chụp để AI phát hiện chuẩn nhất:</span>
+                  <span className="text-[11px] leading-relaxed">
+                    Cúi camera góc <strong>45° – 60°</strong> hướng xuống mặt đường, cự ly <strong>1 – 2m</strong>, để mặt đường chiếm trên <strong>70%</strong> khung hình.
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             <input
               ref={fileInputRef}
@@ -641,86 +774,102 @@ export const ReportIncidentPage: React.FC = () => {
               className="hidden"
             />
 
-            {/* BẢNG ĐIỀU KHIỂN & ĐO LƯỜNG AI TELEMETRY (Dành cho kiểm thử & demo đồ án) */}
+            {/* BẢNG ĐIỀU KHIỂN & ĐO LƯỜNG AI TELEMETRY (Thu gọn mặc định để giao diện sạch sẽ, có thể mở khi cần demo/tinh chỉnh) */}
             {previewUrl && (
-              <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/50 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface">
+              <div className="flex flex-col rounded-xl border border-outline-variant/40 bg-surface-container-low overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedAi(!showAdvancedAi)}
+                  className="flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container transition-colors w-full text-left"
+                >
+                  <span className="flex items-center gap-2">
                     <Sliders className="w-3.5 h-3.5 text-primary" />
-                    <span>Ngưỡng Tin Cậy (Confidence Gate):</span>
-                  </div>
-                  <span className="font-mono text-xs font-bold text-primary px-2 py-0.5 rounded bg-primary/10 border border-primary/20">
-                    {(confidenceThreshold * 100).toFixed(0)}%
+                    <span>Tùy chỉnh phân tích AI nâng cao</span>
+                    <span className="text-[10px] font-mono font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10">
+                      {(confidenceThreshold * 100).toFixed(0)}%
+                    </span>
                   </span>
-                </div>
+                  <ChevronDown className={`w-4 h-4 text-on-surface-variant transition-transform duration-200 ${showAdvancedAi ? 'rotate-180' : ''}`} />
+                </button>
 
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-mono text-on-surface-variant">5%</span>
-                  <input
-                    type="range"
-                    min="0.05"
-                    max="0.85"
-                    step="0.01"
-                    value={confidenceThreshold}
-                    onChange={(e) => handleThresholdChange(parseFloat(e.target.value))}
-                    className="w-full accent-primary h-1.5 bg-surface-container-highest rounded-lg cursor-pointer"
-                  />
-                  <span className="text-[10px] font-mono text-on-surface-variant">85%</span>
-                </div>
-
-                {/* Tùy chọn Tăng cường tương phản AI & Thống kê nén ảnh */}
-                <div className="flex flex-col gap-2 pt-2 border-t border-outline-variant/30">
-                  <label className="flex items-center justify-between p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 cursor-pointer hover:bg-surface-container transition-colors">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-xs font-semibold text-on-surface">
-                        Tăng cường tương phản AI (Làm rõ Nứt & Ổ gà)
-                      </span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={enableEnhance}
-                      onChange={(e) => handleToggleEnhance(e.target.checked)}
-                      className="w-4 h-4 accent-primary rounded cursor-pointer"
-                    />
-                  </label>
-
-                  {optimizationStats && (
-                    <div className="flex items-center justify-between text-[11px] font-mono text-on-surface-variant px-1">
-                      <span>⚡ Đã xoay chuẩn EXIF & tối ưu: <strong className="text-primary">{optimizationStats.optKB} KB</strong></span>
-                      <span className="text-outline line-through">Gốc: {optimizationStats.origKB} KB</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Telemetry HUD metrics */}
-                {aiResult && (
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-outline-variant/30 text-center">
-                    <div className="p-1.5 rounded-lg bg-surface-container-lowest flex flex-col">
-                      <span className="text-[10px] text-on-surface-variant">Số lượng phát hiện</span>
-                      <span className="text-xs font-extrabold text-primary font-mono">
-                        {aiResult.count || 0} vị trí
+                {showAdvancedAi && (
+                  <div className="p-3.5 border-t border-outline-variant/30 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-on-surface">Ngưỡng Tin Cậy (Confidence Gate):</span>
+                      <span className="font-mono text-xs font-bold text-primary px-2 py-0.5 rounded bg-primary/10 border border-primary/20">
+                        {(confidenceThreshold * 100).toFixed(0)}%
                       </span>
                     </div>
 
-                    <div className="p-1.5 rounded-lg bg-surface-container-lowest flex flex-col">
-                      <span className="text-[10px] text-on-surface-variant">Chiếm mặt đường</span>
-                      <span className="text-xs font-extrabold text-on-surface font-mono">
-                        {aiResult.footprintPercent || 0}%
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-mono text-on-surface-variant">5%</span>
+                      <input
+                        type="range"
+                        min="0.05"
+                        max="0.85"
+                        step="0.01"
+                        value={confidenceThreshold}
+                        onChange={(e) => handleThresholdChange(parseFloat(e.target.value))}
+                        className="w-full accent-primary h-1.5 bg-surface-container-highest rounded-lg cursor-pointer"
+                      />
+                      <span className="text-[10px] font-mono text-on-surface-variant">85%</span>
                     </div>
 
-                    <div className="p-1.5 rounded-lg bg-surface-container-lowest flex flex-col">
-                      <span className="text-[10px] text-on-surface-variant">Cấp độ đề xuất</span>
-                      <span className={`text-[11px] font-extrabold font-mono uppercase px-1 rounded ${
-                        aiResult.estimatedSeverity === 'CRITICAL' ? 'text-error bg-error/10' :
-                        aiResult.estimatedSeverity === 'HIGH' ? 'text-amber-600 bg-amber-500/10' :
-                        aiResult.estimatedSeverity === 'MEDIUM' ? 'text-primary bg-primary/10' :
-                        'text-secondary bg-secondary/10'
-                      }`}>
-                        {aiResult.estimatedSeverity || 'LOW'}
-                      </span>
+                    {/* Tùy chọn Tăng cường tương phản AI & Thống kê nén ảnh */}
+                    <div className="flex flex-col gap-2 pt-2 border-t border-outline-variant/30">
+                      <label className="flex items-center justify-between p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 cursor-pointer hover:bg-surface-container transition-colors">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-3.5 h-3.5 text-primary" />
+                          <span className="text-xs font-semibold text-on-surface">
+                            Tăng cường tương phản AI (Làm rõ Nứt & Ổ gà)
+                          </span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={enableEnhance}
+                          onChange={(e) => handleToggleEnhance(e.target.checked)}
+                          className="w-4 h-4 accent-primary rounded cursor-pointer"
+                        />
+                      </label>
+
+                      {optimizationStats && (
+                        <div className="flex items-center justify-between text-[11px] font-mono text-on-surface-variant px-1">
+                          <span>⚡ Đã xoay chuẩn EXIF & tối ưu: <strong className="text-primary">{optimizationStats.optKB} KB</strong></span>
+                          <span className="text-outline line-through">Gốc: {optimizationStats.origKB} KB</span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Telemetry HUD metrics */}
+                    {aiResult && (
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-outline-variant/30 text-center">
+                        <div className="p-1.5 rounded-lg bg-surface-container-lowest flex flex-col">
+                          <span className="text-[10px] text-on-surface-variant">Số lượng phát hiện</span>
+                          <span className="text-xs font-extrabold text-primary font-mono">
+                            {aiResult.count || 0} vị trí
+                          </span>
+                        </div>
+
+                        <div className="p-1.5 rounded-lg bg-surface-container-lowest flex flex-col">
+                          <span className="text-[10px] text-on-surface-variant">Chiếm mặt đường</span>
+                          <span className="text-xs font-extrabold text-on-surface font-mono">
+                            {aiResult.footprintPercent || 0}%
+                          </span>
+                        </div>
+
+                        <div className="p-1.5 rounded-lg bg-surface-container-lowest flex flex-col">
+                          <span className="text-[10px] text-on-surface-variant">Cấp độ đề xuất</span>
+                          <span className={`text-[11px] font-extrabold font-mono uppercase px-1 rounded ${
+                            aiResult.estimatedSeverity === 'CRITICAL' ? 'text-error bg-error/10' :
+                            aiResult.estimatedSeverity === 'HIGH' ? 'text-amber-600 bg-amber-500/10' :
+                            aiResult.estimatedSeverity === 'MEDIUM' ? 'text-primary bg-primary/10' :
+                            'text-secondary bg-secondary/10'
+                          }`}>
+                            {aiResult.estimatedSeverity || 'LOW'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -729,58 +878,63 @@ export const ReportIncidentPage: React.FC = () => {
             {/* Thông báo kết quả nhận diện rõ ràng cho người dùng */}
             {aiResult && (
               <div
-                className={`p-3 rounded-xl text-xs flex items-start gap-2.5 ${
+                className={`p-3.5 rounded-xl text-xs flex items-start gap-3 transition-all ${
                   aiResult.className !== 'NONE' && (aiResult.count || 0) > 0
-                    ? 'bg-primary-fixed/40 text-primary border border-primary/30'
-                    : 'bg-surface-container-high text-on-surface-variant border border-outline-variant/40'
+                    ? 'bg-blue-50/80 text-blue-900 border border-blue-200/80 shadow-xs'
+                    : 'bg-slate-50 text-slate-700 border border-slate-200'
                 }`}
               >
                 {aiResult.className !== 'NONE' && (aiResult.count || 0) > 0 ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold block">
-                        {(() => {
-                          const counts: Record<string, number> = aiResult.classCounts || {};
-                          if (!aiResult.classCounts && aiResult.boxes) {
-                            for (const b of aiResult.boxes) {
-                              counts[b.className] = (counts[b.className] || 0) + 1;
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-1">
+                      <div className="font-bold text-blue-950 flex items-center justify-between flex-wrap gap-1">
+                        <span>
+                          {(() => {
+                            const counts: Record<string, number> = aiResult.classCounts || {};
+                            if (!aiResult.classCounts && aiResult.boxes) {
+                              for (const b of aiResult.boxes) {
+                                counts[b.className] = (counts[b.className] || 0) + 1;
+                              }
                             }
-                          }
-                          const parts: string[] = [];
-                          if (counts['POTHOLE']) parts.push(`${counts['POTHOLE']} Ổ GÀ`);
-                          if (counts['ROAD_CRACK']) parts.push(`${counts['ROAD_CRACK']} VẾT NỨT MẶT ĐƯỜNG`);
-                          if (counts['ROAD_FLOODING']) parts.push(`${counts['ROAD_FLOODING']} ĐIỂM NGẬP ÚNG`);
-                          if (counts['ROAD_OBSTACLE']) parts.push(`${counts['ROAD_OBSTACLE']} CHƯỚNG NGẠI VẬT`);
+                            const parts: string[] = [];
+                            if (counts['POTHOLE']) parts.push(`${counts['POTHOLE']} Ổ GÀ`);
+                            if (counts['ROAD_CRACK']) parts.push(`${counts['ROAD_CRACK']} VẾT NỨT`);
+                            if (counts['ROAD_FLOODING']) parts.push(`${counts['ROAD_FLOODING']} ĐIỂM NGẬP ÚNG`);
+                            if (counts['ROAD_OBSTACLE']) parts.push(`${counts['ROAD_OBSTACLE']} CHƯỚNG NGẠI VẬT`);
 
-                          if (parts.length > 1) {
-                            return `AI Nhận Diện Đa Sự Cố: ${parts.join(' & ')}`;
-                          } else if (parts.length === 1) {
-                            return `AI Nhận Diện: ${parts[0]}`;
-                          } else {
-                            return `AI Nhận Diện: ${
-                              aiResult.className === 'POTHOLE'
-                                ? (aiResult.count && aiResult.count > 1 ? `${aiResult.count} Ổ GÀ TRÊN MẶT ĐƯỜNG` : 'Ổ GÀ MẶT ĐƯỜNG')
-                                : aiResult.className === 'ROAD_CRACK'
-                                ? (aiResult.count && aiResult.count > 1 ? `${aiResult.count} VẾT NỨT MẶT ĐƯỜNG` : 'VẾT NỨT MẶT ĐƯỜNG')
-                                : aiResult.className === 'ROAD_FLOODING'
-                                ? (aiResult.count && aiResult.count > 1 ? `${aiResult.count} ĐIỂM NGẬP ÚNG MẶT ĐƯỜNG` : 'ĐIỂM NGẬP ÚNG MẶT ĐƯỜNG')
-                                : (aiResult.count && aiResult.count > 1 ? `${aiResult.count} CHƯỚNG NGẠI VẬT MẶT ĐƯỜNG` : 'CHƯỚNG NGẠI VẬT MẶT ĐƯỜNG')
-                            }`;
-                          }
-                        })()}
-                      </span>
-                      <span>
-                        Độ tin cậy cao nhất: {(aiResult.confidence * 100).toFixed(1)}% • Đã đánh dấu {aiResult.count || 1} hộp bao Bounding Box. Mức độ ưu tiên đề xuất: <strong>{aiResult.estimatedSeverity}</strong>.
-                      </span>
+                            if (parts.length > 1) {
+                              return `AI Phát Hiện Đa Sự Cố: ${parts.join(' & ')}`;
+                            } else if (parts.length === 1) {
+                              return `AI Phát Hiện: ${parts[0]}`;
+                            } else {
+                              return `AI Phát Hiện: ${
+                                aiResult.className === 'POTHOLE'
+                                  ? (aiResult.count && aiResult.count > 1 ? `${aiResult.count} Ổ GÀ MẶT ĐƯỜNG` : 'Ổ GÀ MẶT ĐƯỜNG')
+                                  : aiResult.className === 'ROAD_CRACK'
+                                  ? (aiResult.count && aiResult.count > 1 ? `${aiResult.count} VẾT NỨT MẶT ĐƯỜNG` : 'VẾT NỨT MẶT ĐƯỜNG')
+                                  : aiResult.className === 'ROAD_FLOODING'
+                                  ? (aiResult.count && aiResult.count > 1 ? `${aiResult.count} ĐIỂM NGẬP ÚNG` : 'ĐIỂM NGẬP ÚNG')
+                                  : (aiResult.count && aiResult.count > 1 ? `${aiResult.count} CHƯỚNG NGẠI VẬT` : 'CHƯỚNG NGẠI VẬT')
+                              }`;
+                            }
+                          })()}
+                        </span>
+                        <span className="font-mono text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                          {(aiResult.confidence * 100).toFixed(1)}% tin cậy
+                        </span>
+                      </div>
+                      <p className="text-blue-800 text-[11px] leading-relaxed">
+                        Đã đánh dấu {aiResult.count || 1} vị trí Bounding Box • Đề xuất mức ưu tiên: <strong className="uppercase">{aiResult.estimatedSeverity || 'TRUNG BÌNH'}</strong>.
+                      </p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <AlertCircle className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
+                    <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-bold block">AI Quét Xong: Không phát hiện hư hỏng với ngưỡng &ge; {(confidenceThreshold * 100).toFixed(0)}%</span>
-                      <span>Bạn có thể <strong>kéo giảm thanh trượt ngưỡng</strong> bên trên hoặc chuyển sang thẩm định thủ công.</span>
+                      <span className="font-bold text-slate-900 block">AI Quét Xong: Không phát hiện hư hỏng với ngưỡng &ge; {(confidenceThreshold * 100).toFixed(0)}%</span>
+                      <span className="text-[11px] text-slate-600">Bạn có thể chọn mục <strong>Tùy chỉnh phân tích AI</strong> để giảm ngưỡng hoặc tiếp tục nộp để thẩm định thủ công.</span>
                     </div>
                   </>
                 )}
@@ -838,10 +992,12 @@ export const ReportIncidentPage: React.FC = () => {
               <div className="flex items-center gap-1.5 flex-wrap pt-2">
                 <span className="text-[11px] text-on-surface-variant font-medium">Chọn nhanh:</span>
                 {[
-                  { label: 'Thanh Liêm (Hà Nam)', lat: 20.436036, lng: 105.904596, addr: 'Thanh Liêm, Hà Nam' },
-                  { label: 'TP. Phủ Lý (Hà Nam)', lat: 20.5435, lng: 105.9175, addr: 'Phủ Lý, Hà Nam' },
-                  { label: 'Cầu Giấy (Hà Nội)', lat: 21.0333, lng: 105.7833, addr: 'Cầu Giấy, Hà Nội' },
-                  { label: 'Hoàn Kiếm (Hà Nội)', lat: 21.0285, lng: 105.8542, addr: 'Hoàn Kiếm, Hà Nội' },
+                  { label: 'Hà Nội (Khu I)', lat: 21.0285, lng: 105.8542, addr: 'Quận Hoàn Kiếm, TP. Hà Nội' },
+                  { label: 'TP. Hồ Chí Minh (Khu IV)', lat: 10.7769, lng: 106.7009, addr: 'Quận 1, TP. Hồ Chí Minh' },
+                  { label: 'Đà Nẵng (Khu III)', lat: 16.0678, lng: 108.2208, addr: 'Quận Hải Châu, TP. Đà Nẵng' },
+                  { label: 'Cần Thơ (Khu IV)', lat: 10.0333, lng: 105.7833, addr: 'Quận Ninh Kiều, TP. Cần Thơ' },
+                  { label: 'Nghệ An (Khu II)', lat: 18.6738, lng: 105.6813, addr: 'TP. Vinh, Tỉnh Nghệ An' },
+                  { label: 'Hà Nam (Khu I)', lat: 20.436036, lng: 105.904596, addr: 'Thanh Liêm, Tỉnh Hà Nam' },
                 ].map((preset) => (
                   <button
                     key={preset.label}
@@ -946,6 +1102,27 @@ export const ReportIncidentPage: React.FC = () => {
                 className="h-56 w-full"
               />
             </div>
+
+            {/* THÔNG TIN HẠT QUẢN LÝ ĐƯỜNG BỘ & ĐỘI DUY TU TIẾP NHẬN TRỰC TIẾP */}
+            {(() => {
+              const info = getCorridorInfo(latitude, longitude, address);
+              return (
+                <div className="p-3.5 rounded-xl border bg-surface-container-low/80 border-outline-variant/40 flex flex-col gap-2 shadow-xs transition-all">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-xs font-bold text-on-surface">Đơn Vị Quản Lý Tuyến Phụ Trách:</span>
+                    </div>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${info.badgeColor} font-mono`}>
+                      {info.corridor} • {info.team}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    📍 <strong>{info.zoneName}</strong> • Phân bổ tiếp nhận tự động theo quy định Thông tư 37/2018/TT-BGTVT. SLA dự kiến tiếp cận: <strong>~{info.slaMinutes} phút</strong> ({info.contact}).
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* Phân loại Sự cố (Hỗ trợ tích chọn đồng thời nhiều loại) */}
             <div>

@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Radio,
   Video,
+  BarChart3,
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 
@@ -157,19 +158,32 @@ export const Navbar: React.FC = () => {
               </Link>
             )}
 
-            {/* Mục Dành Riêng Cho Quản Trị Viên (Admin): Hàng đợi điều phối trung tâm */}
+            {/* Mục Dành Riêng Cho Quản Trị Viên (Admin): Hàng đợi điều phối trung tâm & Trung Tâm KPI */}
             {user?.role === 'ROLE_ADMIN' && (
-              <Link
-                to="/dispatch"
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  isActive('/dispatch')
-                    ? 'bg-rose-100 text-rose-800 border border-rose-300 font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-rose-700 hover:bg-slate-100'
-                }`}
-              >
-                <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
-                <span>Điều Phối Admin</span>
-              </Link>
+              <>
+                <Link
+                  to="/dispatch"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    isActive('/dispatch')
+                      ? 'bg-rose-100 text-rose-800 border border-rose-300 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-rose-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Điều Phối</span>
+                </Link>
+                <Link
+                  to="/analytics"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    isActive('/analytics') || isActive('/admin/analytics')
+                      ? 'bg-purple-100 text-purple-900 border border-purple-300 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-purple-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Trung Tâm KPI</span>
+                </Link>
+              </>
             )}
           </nav>
         </div>
@@ -357,19 +371,34 @@ export const Navbar: React.FC = () => {
                 )}
 
                 {user?.role === 'ROLE_ADMIN' && (
-                  <Link
-                    to="/dispatch"
-                    onClick={closeMobile}
-                    className={`flex items-center justify-between p-3 rounded-xl text-xs font-semibold ${
-                      isActive('/dispatch') ? 'bg-rose-50 text-rose-700 font-bold' : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4 text-rose-600" />
-                      <span>Hàng Đợi Điều Phối Admin</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  </Link>
+                  <>
+                    <Link
+                      to="/dispatch"
+                      onClick={closeMobile}
+                      className={`flex items-center justify-between p-3 rounded-xl text-xs font-semibold ${
+                        isActive('/dispatch') ? 'bg-rose-50 text-rose-700 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-rose-600" />
+                        <span>Hàng Đợi Điều Phối Admin</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </Link>
+                    <Link
+                      to="/analytics"
+                      onClick={closeMobile}
+                      className={`flex items-center justify-between p-3 rounded-xl text-xs font-semibold ${
+                        isActive('/analytics') || isActive('/admin/analytics') ? 'bg-purple-50 text-purple-700 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-purple-600" />
+                        <span>Trung Tâm Báo Cáo KPI</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </Link>
+                  </>
                 )}
               </nav>
             </div>

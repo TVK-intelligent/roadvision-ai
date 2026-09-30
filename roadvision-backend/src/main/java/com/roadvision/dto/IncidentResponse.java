@@ -25,6 +25,8 @@ public class IncidentResponse {
     private BigDecimal latitude;
     private BigDecimal longitude;
     private String address;
+    private String routeCorridor;
+    private String zoneName;
     private Category category;
     private IncidentStatus status;
     private Severity severity;

@@ -50,6 +50,13 @@ public class Incident {
     @Column(length = 255)
     private String address;
 
+    @Column(name = "route_corridor", length = 50)
+    private String routeCorridor; // QL1A, QL21, DOWNTOWN, DT495
+
+    @Column(name = "zone_name", length = 150)
+    private String zoneName; // Tên đầy đủ của Hạt & Tuyến
+
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default

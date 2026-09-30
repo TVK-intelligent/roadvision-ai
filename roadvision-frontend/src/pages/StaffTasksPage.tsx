@@ -128,7 +128,7 @@ export const StaffTasksPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-secondary font-mono text-xs font-bold uppercase tracking-wider">
             <Wrench className="w-4 h-4" />
-            FIELD CREW WORKSPACE • PHA 4 TRIỂN KHAI THI CÔNG
+            KHÔNG GIAN KỸ THUẬT HIỆN TRƯỜNG
           </div>
           <h1 className="font-display text-2xl font-black text-on-surface mt-1">
             Nhiệm Vụ Kỹ Thuật Hiện Trường
@@ -333,6 +333,19 @@ export const StaffTasksPage: React.FC = () => {
                 </div>
                 <div className="text-on-surface-variant">{selectedTask.address}</div>
               </div>
+
+              {selectedTask.reworkReason && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 text-xs flex flex-col gap-1">
+                  <div className="font-bold flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>LỆNH TÁI THI CÔNG (REWORK):</span>
+                  </div>
+                  <p className="italic font-medium">"{selectedTask.reworkReason}"</p>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">
+                    Vui lòng xử lý dứt điểm các lỗi còn sót theo chỉ đạo trước khi chụp ảnh nghiệm thu mới.
+                  </p>
+                </div>
+              )}
 
               {errorMessage && (
                 <div className="p-3 rounded-xl bg-error-container text-error text-xs flex items-center gap-2">

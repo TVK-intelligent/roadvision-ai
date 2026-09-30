@@ -99,7 +99,19 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
                   {/* Nhãn loại hư hại và độ tin cậy */}
                   <div className={`absolute -top-6 left-0 font-mono text-xs font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 whitespace-nowrap ${badgeColor}`}>
                     <span>⚠️ #{idx + 1}</span>
-                    <span>{box.className}</span>
+                    <span>
+                      {box.className?.includes('DEFECT')
+                        ? 'Cần sửa lại'
+                        : box.className === 'POTHOLE'
+                        ? 'Ổ gà'
+                        : box.className === 'ROAD_CRACK'
+                        ? 'Vết nứt'
+                        : box.className === 'ROAD_FLOODING'
+                        ? 'Ngập úng'
+                        : box.className === 'ROAD_OBSTACLE'
+                        ? 'Vật cản'
+                        : box.className}
+                    </span>
                     <span className="opacity-90">
                       ({(box.confidence * 100).toFixed(1)}%)
                     </span>
@@ -119,13 +131,22 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
             >
               <div className="absolute -top-6 left-0 bg-primary text-on-primary font-mono text-xs font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 whitespace-nowrap">
                 <span>⚠️</span>
-                <span>{aiDetection?.className}</span>
+                <span>
+                  {aiDetection?.className?.includes('DEFECT')
+                    ? 'Cần sửa lại'
+                    : aiDetection?.className === 'POTHOLE'
+                    ? 'Ổ gà'
+                    : aiDetection?.className === 'ROAD_CRACK'
+                    ? 'Vết nứt'
+                    : aiDetection?.className === 'ROAD_FLOODING'
+                    ? 'Ngập úng'
+                    : aiDetection?.className === 'ROAD_OBSTACLE'
+                    ? 'Vật cản'
+                    : aiDetection?.className}
+                </span>
                 <span className="opacity-90">
                   ({((aiDetection?.confidence || 0) * 100).toFixed(1)}%)
                 </span>
-              </div>
-              <div className="absolute -bottom-5 right-0 bg-surface-container-lowest/90 text-primary font-mono text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
-                TENSOR: {naturalSize.width}x{naturalSize.height}
               </div>
             </div>
           ) : null}

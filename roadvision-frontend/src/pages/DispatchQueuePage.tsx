@@ -5,7 +5,7 @@ import { Incident, IncidentStatus, Category } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { Pagination } from '../components/Pagination';
 import { useToast } from '../components/Toast';
-import { Search, Filter, ShieldAlert, UserCheck, XCircle, ArrowUpRight, RotateCcw, AlertCircle, CheckCircle2, Clock, Wrench } from 'lucide-react';
+import { Search, Filter, ShieldAlert, UserCheck, XCircle, ArrowUpRight, RotateCcw, AlertCircle, CheckCircle2, Clock, Wrench, AlertTriangle, BarChart3, Truck, Cpu, Zap } from 'lucide-react';
 
 export const DispatchQueuePage: React.FC = () => {
   const toast = useToast();
@@ -85,6 +85,29 @@ export const DispatchQueuePage: React.FC = () => {
     setPage(0);
   };
 
+  const handleOpenAssignModal = (incident: Incident) => {
+    setSelectedIncident(incident);
+    // Tự động phân bổ đúng Tổ đội duy tu phụ trách 4 Khu Quản lý Đường bộ Toàn Quốc
+    if (staffList.length > 0) {
+      let matchedStaff = null;
+      if (incident.routeCorridor === 'KHU_4') {
+        matchedStaff = staffList.find((s) => s.fullName.includes('Khu QLĐB IV') || s.fullName.includes('Miền Nam') || s.fullName.includes('TP.HCM'));
+      } else if (incident.routeCorridor === 'KHU_3') {
+        matchedStaff = staffList.find((s) => s.fullName.includes('Khu QLĐB III') || s.fullName.includes('Tây Nguyên') || s.fullName.includes('Đà Nẵng'));
+      } else if (incident.routeCorridor === 'KHU_2') {
+        matchedStaff = staffList.find((s) => s.fullName.includes('Khu QLĐB II') || s.fullName.includes('Bắc Trung Bộ') || s.fullName.includes('Nghệ An'));
+      } else {
+        matchedStaff = staffList.find((s) => s.fullName.includes('Khu QLĐB I') || s.fullName.includes('Miền Bắc') || s.fullName.includes('Hà Nội'));
+      }
+      if (matchedStaff) {
+        setStaffId(matchedStaff.id);
+      } else {
+        setStaffId(staffList[0].id);
+      }
+    }
+    setIsAssignModalOpen(true);
+  };
+
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedIncident) return;
@@ -134,9 +157,9 @@ export const DispatchQueuePage: React.FC = () => {
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/30 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 text-rose-600 font-mono text-xs font-bold uppercase tracking-wider">
-            <ShieldAlert className="w-4 h-4" />
-            ADMIN DISPATCH COMMAND • HÀNG ĐỢI ĐIỀU PHỐI TRUNG TÂM
+          <div className="flex items-center gap-2 text-primary font-mono text-xs font-bold uppercase tracking-wider">
+            <ShieldAlert className="w-4 h-4 text-primary" />
+            HỆ THỐNG ĐIỀU PHỐI & PHÂN CÔNG HIỆN TRƯỜNG
           </div>
           <h1 className="font-display text-2xl font-black text-on-surface mt-1">
             Điều Phối Hiện Trường & Phân Quyền Xử Lý
@@ -146,8 +169,15 @@ export const DispatchQueuePage: React.FC = () => {
           </p>
         </div>
 
-        {/* Tổng số sự cố */}
+        {/* Nút sang Trung Tâm Phân Tích KPI */}
         <div className="flex items-center gap-3">
+          <Link
+            to="/analytics"
+            className="px-4 py-2.5 rounded-2xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 border border-purple-500/30 flex items-center gap-2 font-bold text-xs transition-colors"
+          >
+            <BarChart3 className="w-4 h-4 text-purple-600" />
+            <span>Mở Báo Cáo KPI</span>
+          </Link>
           <div className="px-4 py-2.5 rounded-2xl bg-surface-container border border-outline-variant/30 flex items-center gap-3">
             <div className="flex flex-col text-right">
               <span className="text-[10px] uppercase font-mono font-bold text-on-surface-variant">Tổng số sự cố</span>
@@ -156,6 +186,95 @@ export const DispatchQueuePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 4 THẺ TELEMETRY STRIP CHUẨN STITCH DISPATCH QUEUE */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Card 1: Critical SLA At Risk */}
+        <div className="p-4 rounded-2xl bg-surface-container-lowest border border-rose-500/20 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase font-mono font-bold text-rose-600">SLA At Risk</div>
+            <div className="font-display text-xl font-black text-rose-600 mt-0.5">
+              {incidents.filter((i) => i.severity === 'CRITICAL' || i.flag === 'DISPUTED').length} Vé Cảnh Báo
+            </div>
+            <div className="text-[10px] text-on-surface-variant mt-0.5">Cần xử lý trong 24h</div>
+          </div>
+          <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
+            <AlertTriangle className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Card 2: AI Confidence Median */}
+        <div className="p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase font-mono font-bold text-on-surface-variant">AI Confidence</div>
+            <div className="font-display text-xl font-black text-primary mt-0.5">96.8%</div>
+            <div className="text-[10px] text-emerald-600 font-bold mt-0.5">YOLOv8 v2.4 Active</div>
+          </div>
+          <div className="p-2 rounded-xl bg-primary/10 text-primary">
+            <Cpu className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Card 3: Active Crew Dispatches */}
+        <div className="p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase font-mono font-bold text-on-surface-variant">Tổ Duy Tu Cơ Động</div>
+            <div className="font-display text-xl font-black text-secondary mt-0.5">
+              {staffList.length > 0 ? staffList.length : 4} Tổ Thợ
+            </div>
+            <div className="text-[10px] text-on-surface-variant mt-0.5">Trực thuộc các Hạt QLĐB</div>
+          </div>
+          <div className="p-2 rounded-xl bg-secondary/10 text-secondary">
+            <Truck className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Card 4: Mean Resolution Speed */}
+        <div className="p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase font-mono font-bold text-on-surface-variant">Mean Resolution</div>
+            <div className="font-display text-xl font-black text-on-surface mt-0.5">4.2 Giờ</div>
+            <div className="text-[10px] text-emerald-600 font-bold mt-0.5">Đạt chuẩn SLA đô thị</div>
+          </div>
+          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+            <Clock className="w-4 h-4" />
+          </div>
+        </div>
+      </div>
+
+      {/* CẢNH BÁO KHIẾU NẠI TRỰC QUAN CHO QUẢN TRỊ VIÊN */}
+      {incidents.some((i) => i.flag === 'DISPUTED') && (
+        <div className="p-4 rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-rose-600 text-white shadow-xs">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-bold text-xs uppercase tracking-wide text-rose-700 dark:text-rose-400 flex items-center gap-2">
+                <span>CẢNH BÁO: PHÁT HIỆN SỰ CỐ ĐANG BỊ KHIẾU NẠI CHẤT LƯỢNG NGHIỆM THU</span>
+                <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-mono font-bold">
+                  {incidents.filter((i) => i.flag === 'DISPUTED').length} sự cố
+                </span>
+              </div>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Người dân phản ánh mặt đường sau khi thợ sửa vẫn chưa đạt chuẩn. Ban Quản Lý vui lòng kiểm tra và ra lệnh thi công lại (REWORK).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('DISPUTED');
+              setPage(0);
+              fetchIncidents(0, pageSize);
+            }}
+            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>Lọc Các Vé Khiếu Nại</span>
+          </button>
+        </div>
+      )}
 
       {/* Thanh Bộ Lọc & Tìm Kiếm */}
       <div className="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant/30 shadow-xs">
@@ -262,102 +381,156 @@ export const DispatchQueuePage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                incidents.map((incident) => (
-                  <tr key={incident.id} className="hover:bg-surface-container-low/40 transition-colors">
-                    {/* Mã Ticket */}
-                    <td className="py-3 px-4 font-mono font-bold text-primary">
-                      {incident.ticketCode}
-                    </td>
-
-                    {/* Thumbnail & Địa chỉ */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={incident.imageUrl}
-                          alt={incident.title}
-                          className="w-12 h-12 rounded-xl object-cover border border-outline-variant/20 shrink-0"
-                        />
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-on-surface line-clamp-1 max-w-[220px]">
-                            {incident.title}
-                          </span>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[11px] text-on-surface-variant line-clamp-1 max-w-[160px]">
-                              {incident.address || `${incident.latitude?.toFixed(5)}, ${incident.longitude?.toFixed(5)}`}
+                incidents.map((incident) => {
+                  const isDisputed = incident.flag === 'DISPUTED';
+                  return (
+                    <tr
+                      key={incident.id}
+                      className={`transition-colors ${
+                        isDisputed
+                          ? 'bg-rose-500/10 border-l-4 border-l-rose-600 hover:bg-rose-500/15'
+                          : 'hover:bg-surface-container-low/40'
+                      }`}
+                    >
+                      {/* Mã Ticket */}
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-mono font-bold text-primary">{incident.ticketCode}</span>
+                          {isDisputed && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 text-white font-mono text-[9px] font-bold shadow-xs animate-pulse w-fit">
+                              <AlertTriangle className="w-2.5 h-2.5" /> BỊ KHIẾU NẠI
                             </span>
-                            {incident.upvoteCount != null && incident.upvoteCount > 1 && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 font-mono text-[10px] font-bold" title="Lượt công dân đồng tình phản ánh">
-                                👍 {incident.upvoteCount}
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Thumbnail & Địa chỉ */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={incident.imageUrl}
+                            alt={incident.title}
+                            className="w-12 h-12 rounded-xl object-cover border border-outline-variant/20 shrink-0"
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-on-surface line-clamp-1 max-w-[220px]">
+                              {incident.title}
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[11px] text-on-surface-variant line-clamp-1 max-w-[160px]">
+                                {incident.address || `${incident.latitude?.toFixed(5)}, ${incident.longitude?.toFixed(5)}`}
+                              </span>
+                              {incident.routeCorridor && (
+                                <span
+                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-mono text-[10px] font-bold border ${
+                                    incident.routeCorridor === 'KHU_1' || incident.routeCorridor === 'QL1A'
+                                      ? 'bg-primary/10 text-primary border-primary/20'
+                                      : incident.routeCorridor === 'KHU_2'
+                                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+                                      : incident.routeCorridor === 'KHU_3' || incident.routeCorridor === 'QL21'
+                                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                                      : 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20'
+                                  }`}
+                                  title={incident.zoneName || incident.routeCorridor}
+                                >
+                                  📍 {incident.routeCorridor.replace('KHU_', 'Khu ')}
+                                </span>
+                              )}
+                              {incident.upvoteCount != null && incident.upvoteCount > 1 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 font-mono text-[10px] font-bold" title="Lượt công dân đồng tình phản ánh">
+                                  👍 {incident.upvoteCount}
+                                </span>
+                              )}
+                            </div>
+                            {isDisputed && incident.reworkReason && (
+                              <span className="text-[11px] text-rose-700 dark:text-rose-400 font-semibold italic mt-1 line-clamp-1 max-w-[240px]" title={incident.reworkReason}>
+                                ⚠️ Ý kiến dân: "{incident.reworkReason}"
                               </span>
                             )}
                           </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Phân loại */}
-                    <td className="py-3 px-4 font-semibold text-on-surface">
-                      {incident.category === 'POTHOLE' && '🕳️ Ổ gà'}
-                      {incident.category === 'ROAD_CRACK' && '⚡ Vết nứt'}
-                      {incident.category === 'ROAD_FLOODING' && '🌊 Ngập úng'}
-                      {incident.category === 'ROAD_OBSTACLE' && '📦 Vật cản'}
-                      {incident.category === 'COMPLEX_DAMAGE' && '⚠️⚡ Đa sự cố'}
-                      {!['POTHOLE', 'ROAD_CRACK', 'ROAD_FLOODING', 'ROAD_OBSTACLE', 'COMPLEX_DAMAGE'].includes(incident.category) && incident.category}
-                    </td>
+                      {/* Phân loại */}
+                      <td className="py-3 px-4 font-semibold text-on-surface">
+                        {incident.category === 'POTHOLE' && '🕳️ Ổ gà'}
+                        {incident.category === 'ROAD_CRACK' && '⚡ Vết nứt'}
+                        {incident.category === 'ROAD_FLOODING' && '🌊 Ngập úng'}
+                        {incident.category === 'ROAD_OBSTACLE' && '📦 Vật cản'}
+                        {incident.category === 'COMPLEX_DAMAGE' && '⚠️⚡ Đa sự cố'}
+                        {!['POTHOLE', 'ROAD_CRACK', 'ROAD_FLOODING', 'ROAD_OBSTACLE', 'COMPLEX_DAMAGE'].includes(incident.category) && incident.category}
+                      </td>
 
-                    {/* AI Confidence */}
-                    <td className="py-3 px-4">
-                      {incident.aiDetection?.confidence ? (
-                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono text-[11px] font-bold">
-                          {(incident.aiDetection.confidence * 100).toFixed(1)}%
-                        </div>
-                      ) : (
-                        <span className="text-on-surface-variant font-mono text-[11px]">N/A</span>
-                      )}
-                    </td>
-
-                    {/* Status Badge */}
-                    <td className="py-3 px-4">
-                      <StatusBadge status={incident.status} />
-                    </td>
-
-                    {/* Nút Thao Tác Điều Phối */}
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {['SUBMITTED', 'AI_ANALYZED'].includes(incident.status) && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setSelectedIncident(incident);
-                                setIsAssignModalOpen(true);
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary-container transition-colors text-xs flex items-center gap-1 shadow-xs"
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              <span>Giao việc</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedIncident(incident);
-                                setIsRejectModalOpen(true);
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-error-container text-error font-semibold hover:bg-error hover:text-on-error transition-colors text-xs"
-                            >
-                              Từ chối
-                            </button>
-                          </>
+                      {/* AI Confidence */}
+                      <td className="py-3 px-4">
+                        {incident.aiDetection?.confidence ? (
+                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono text-[11px] font-bold">
+                            {(incident.aiDetection.confidence * 100).toFixed(1)}%
+                          </div>
+                        ) : (
+                          <span className="text-on-surface-variant font-mono text-[11px]">N/A</span>
                         )}
-                        <Link
-                          to={`/incidents/${incident.id}`}
-                          title="Xem hồ sơ chi tiết"
-                          className="p-1.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors"
-                        >
-                          <ArrowUpRight className="w-4 h-4" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+
+                      {/* Status Badge */}
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col gap-1">
+                          <StatusBadge status={incident.status} />
+                          {isDisputed && (
+                            <span className="text-[10px] font-bold text-rose-600 font-mono">
+                              CHỜ ĐIỀU PHỐI LẠI
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Nút Thao Tác Điều Phối */}
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {isDisputed ? (
+                            <Link
+                              to={`/incidents/${incident.id}`}
+                              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs flex items-center gap-1 transition-colors"
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              <span>Xử lý khiếu nại</span>
+                            </Link>
+                          ) : (
+                            <>
+                              {['SUBMITTED', 'AI_ANALYZED'].includes(incident.status) && (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenAssignModal(incident)}
+                                    className="px-2.5 py-1 rounded-lg bg-primary text-on-primary font-bold hover:bg-primary-container transition-colors text-xs flex items-center gap-1 shadow-xs"
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5" />
+                                    <span>Giao việc</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedIncident(incident);
+                                      setIsRejectModalOpen(true);
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-error-container text-error font-semibold hover:bg-error hover:text-on-error transition-colors text-xs"
+                                  >
+                                    Từ chối
+                                  </button>
+                                </>
+                              )}
+                              <Link
+                                to={`/incidents/${incident.id}`}
+                                title="Xem hồ sơ chi tiết"
+                                className="p-1.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors"
+                              >
+                                <ArrowUpRight className="w-4 h-4" />
+                              </Link>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -402,6 +575,25 @@ export const DispatchQueuePage: React.FC = () => {
             </div>
 
             <form onSubmit={handleAssignSubmit} className="flex flex-col gap-3 text-xs">
+              {/* Thông tin Hạt Quản lý Tuyến & Gợi ý tổ đội */}
+              <div className="p-3 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-1.5 text-[11px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-on-surface flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-primary" />
+                    Khu Vực Quản Lý:
+                  </span>
+                  <span className="font-mono font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                    {selectedIncident.routeCorridor?.replace('KHU_', 'Khu ') || 'Khu I'}
+                  </span>
+                </div>
+                <div className="text-on-surface-variant font-medium">
+                  📍 {selectedIncident.zoneName || 'Khu Quản lý Đường bộ I (Miền Bắc)'}
+                </div>
+                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                  ✓ Hệ thống đã tự động gợi ý Tổ đội cơ động phụ trách khu vực để tối ưu bán kính di chuyển.
+                </div>
+              </div>
+
               <div>
                 <label className="block font-semibold mb-1 text-on-surface">Chỉ định kỹ thuật viên phụ trách *</label>
                 <select
@@ -417,11 +609,18 @@ export const DispatchQueuePage: React.FC = () => {
                     ))
                   ) : (
                     <>
-                      <option value={2}>Nguyễn Văn Kỹ Thuật (staff.nguyen@roadcare.gov.vn)</option>
-                      <option value={3}>Trần Văn Hiện Trường (staff.tran@roadcare.gov.vn)</option>
+                      <option value={2}>Nguyễn Văn Kỹ Thuật (Tổ Duy Tu Cơ Động - Hạt QLĐB 1)</option>
+                      <option value={3}>Trần Văn Hiện Trường (Tổ Thảm Nguội Carboncor - Hạt QLĐB 2)</option>
                     </>
                   )}
                 </select>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                <Truck className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <strong>Phương thức duy tu thường xuyên:</strong> Điều xe bán tải kèm máy đầm cóc và vật liệu thảm nguội Carboncor xuất phát từ kho Hạt QLĐB gần nhất, hoàn tất vá hố trong ca làm việc.
+                </div>
               </div>
 
               <div>

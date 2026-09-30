@@ -94,6 +94,8 @@ export interface Incident {
   latitude: number;
   longitude: number;
   address?: string;
+  routeCorridor?: string;
+  zoneName?: string;
   category: Category;
   status: IncidentStatus;
   severity: Severity;
@@ -131,3 +133,29 @@ export interface AuthResponse {
   fullName: string;
   role: Role;
 }
+
+export interface StreamPoint {
+  timeLabel: string;
+  aiSensorCount: number;
+  citizenReportCount: number;
+}
+
+export interface AdminAnalyticsResponse {
+  totalIncidents: number;
+  totalGrowthPercent: number;
+  triagePendingCount: number;
+  inProgressCount: number;
+  activeCrewsCount: number;
+  resolvedCount: number;
+  clearanceRatePercent: number;
+  aiAccuracyPercent: number;
+  aiModelVersion: string;
+  avgInferenceLatencyMs: number;
+  meanResolutionHours: number;
+  categoryCounts: Record<string, number>;
+  categoryPercentages: Record<string, number>;
+  statusCounts: Record<string, number>;
+  telemetricStream: StreamPoint[];
+  urgentIncidents: Incident[];
+}
+

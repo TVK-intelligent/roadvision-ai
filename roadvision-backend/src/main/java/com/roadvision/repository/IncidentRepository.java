@@ -31,7 +31,11 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
     @Query("SELECT i FROM Incident i WHERE " +
            "(:status IS NULL OR i.status = :status) AND " +
            "(:category IS NULL OR i.category = :category) AND " +
-           "(:search IS NULL OR LOWER(i.ticketCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(i.title) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(i.address) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "(:search IS NULL OR LOWER(i.ticketCode) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(i.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(i.address) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR (i.flag IS NOT NULL AND LOWER(i.flag) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "OR (i.reworkReason IS NOT NULL AND LOWER(i.reworkReason) LIKE LOWER(CONCAT('%', :search, '%'))))")
     Page<Incident> findWithFilters(@Param("status") IncidentStatus status,
                                   @Param("category") Category category,
                                   @Param("search") String search,

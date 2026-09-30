@@ -32,10 +32,39 @@ public class DataInitializer implements CommandLineRunner {
                 Role.ROLE_ADMIN
         );
 
-        // 2. Tài khoản Kỹ thuật viên (Staff)
-        User staff = createOrUpdateUser(
+        // 2. Tài khoản Kỹ thuật viên 4 Khu Quản lý Đường bộ Toàn Quốc
+        createOrUpdateUser(
+                "staff.khu1@roadcare.gov.vn",
+                "Nguyễn Văn Kỹ Thuật (Đội Cơ Động - Khu QLĐB I Miền Bắc)",
+                "0909000002",
+                Role.ROLE_STAFF
+        );
+
+        createOrUpdateUser(
+                "staff.khu2@roadcare.gov.vn",
+                "Lê Văn Miền Trung (Đội Cơ Động - Khu QLĐB II Bắc Trung Bộ)",
+                "0909000003",
+                Role.ROLE_STAFF
+        );
+
+        createOrUpdateUser(
+                "staff.khu3@roadcare.gov.vn",
+                "Trần Văn Hiện Trường (Đội Cơ Động - Khu QLĐB III Đà Nẵng & Tây Nguyên)",
+                "0909000004",
+                Role.ROLE_STAFF
+        );
+
+        createOrUpdateUser(
+                "staff.khu4@roadcare.gov.vn",
+                "Phạm Văn Phương Nam (Đội Cơ Động - Khu QLĐB IV TP.HCM & Miền Nam)",
+                "0909000005",
+                Role.ROLE_STAFF
+        );
+
+        // Alias tương thích cũ
+        createOrUpdateUser(
                 "staff.nguyen@roadcare.gov.vn",
-                "Nguyễn Văn Kỹ Thuật (Đội 4)",
+                "Nguyễn Văn Kỹ Thuật (Đội Cơ Động - Khu QLĐB I)",
                 "0909000002",
                 Role.ROLE_STAFF
         );
