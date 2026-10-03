@@ -90,6 +90,7 @@ public class IncidentService {
                 ? request.getCustomThreshold()
                 : aiInferenceService.getConfidenceThreshold();
 
+        long inferStart = System.currentTimeMillis();
         try {
             byte[] imgBytes = image.getBytes();
             java.awt.image.BufferedImage bimg = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(imgBytes));
@@ -101,6 +102,7 @@ public class IncidentService {
         } catch (IOException e) {
             throw new RuntimeException("Lỗi khi đọc luồng ảnh để đưa vào mô hình AI", e);
         }
+        int measuredInferenceMs = (int) Math.max(1, System.currentTimeMillis() - inferStart);
 
         ImageTensorUtil.BoundingBox detectionResult = detectionBoxes.isEmpty()
                 ? aiInferenceService.emptyDetection()
@@ -169,7 +171,7 @@ public class IncidentService {
                 .bboxWidth(detectionResult.getWidth())
                 .bboxHeight(detectionResult.getHeight())
                 .rawPredictionsJson(rawJson)
-                .inferenceMs(42)
+                .inferenceMs(measuredInferenceMs)
                 .build();
 
         aiDetectionRepository.save(aiDetection);
@@ -767,7 +769,7 @@ public class IncidentService {
         }
         double meanResolutionHours = resolvedCountWithTime > 0
                 ? Math.round((totalResolutionHours / resolvedCountWithTime) * 10.0) / 10.0
-                : 4.2;
+                : 0.0;
 
         java.util.Map<String, Long> categoryCounts = new java.util.LinkedHashMap<>();
         for (Category c : Category.values()) {
@@ -805,19 +807,58 @@ public class IncidentService {
                 aiCount++;
             }
         }
-        double aiAccuracy = aiCount > 0 ? (totalConfidence / aiCount) * 100.0 : 96.8;
-        long avgLatency = aiCount > 0 ? totalLatency / aiCount : 42;
+        double aiAccuracy = aiCount > 0 ? (totalConfidence / aiCount) * 100.0 : 0.0;
+        long avgLatency = aiCount > 0 ? Math.max(1, totalLatency / aiCount) : 0L;
 
+        // Tính tốc độ tăng trưởng thực tế so với chu kỳ trước
+        int days = "today".equalsIgnoreCase(timeframe) ? 1 : "7d".equalsIgnoreCase(timeframe) ? 7 : 30;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime currentPeriodStart = now.minusDays(days);
+        LocalDateTime previousPeriodStart = currentPeriodStart.minusDays(days);
+
+        long currentPeriodCount = allIncidents.stream()
+                .filter(i -> i.getCreatedAt() != null && i.getCreatedAt().isAfter(currentPeriodStart))
+                .count();
+        long previousPeriodCount = allIncidents.stream()
+                .filter(i -> i.getCreatedAt() != null && i.getCreatedAt().isAfter(previousPeriodStart) && i.getCreatedAt().isBefore(currentPeriodStart))
+                .count();
+
+        double totalGrowthPercent;
+        if (previousPeriodCount == 0) {
+            totalGrowthPercent = currentPeriodCount > 0 ? 100.0 : 0.0;
+        } else {
+            totalGrowthPercent = Math.round(((double)(currentPeriodCount - previousPeriodCount) * 100.0 / previousPeriodCount) * 10.0) / 10.0;
+        }
+
+        // Luồng viễn trắc phân bổ theo khung giờ thực tế dựa trên createdAt của sự cố
         java.util.List<AdminAnalyticsResponse.StreamPoint> streamPoints = new java.util.ArrayList<>();
-        long baseAi = Math.max(2, total / 2);
-        long baseCit = Math.max(1, total / 3);
-        streamPoints.add(new AdminAnalyticsResponse.StreamPoint("00:00", Math.max(2L, baseAi / 5), Math.max(1L, baseCit / 6)));
-        streamPoints.add(new AdminAnalyticsResponse.StreamPoint("04:00", Math.max(3L, baseAi / 4), Math.max(1L, baseCit / 5)));
-        streamPoints.add(new AdminAnalyticsResponse.StreamPoint("08:00 (Cao Điểm)", Math.max(12L, baseAi * 2 / 3), Math.max(8L, baseCit * 3 / 4)));
-        streamPoints.add(new AdminAnalyticsResponse.StreamPoint("12:00", Math.max(7L, baseAi / 2), Math.max(4L, baseCit / 2)));
-        streamPoints.add(new AdminAnalyticsResponse.StreamPoint("16:00 (Tan Tầm)", Math.max(15L, baseAi), Math.max(10L, baseCit)));
-        streamPoints.add(new AdminAnalyticsResponse.StreamPoint("20:00", Math.max(8L, baseAi / 2), Math.max(5L, baseCit / 2)));
-        streamPoints.add(new AdminAnalyticsResponse.StreamPoint("Hiện Tại", Math.max(5L, baseAi / 3), Math.max(3L, baseCit / 3)));
+        String[] timeLabels = {"00:00", "04:00", "08:00 (Cao Điểm)", "12:00", "16:00 (Tan Tầm)", "20:00", "Hiện Tại"};
+        int[][] hourRanges = {{0, 3}, {4, 7}, {8, 11}, {12, 15}, {16, 19}, {20, 23}, {now.getHour(), now.getHour()}};
+
+        for (int idx = 0; idx < timeLabels.length; idx++) {
+            final int startH = hourRanges[idx][0];
+            final int endH = hourRanges[idx][1];
+            long aiCountInSlot = allIncidents.stream()
+                    .filter(i -> i.getCreatedAt() != null)
+                    .filter(i -> {
+                        int h = i.getCreatedAt().getHour();
+                        return h >= startH && h <= endH;
+                    })
+                    .filter(i -> (i.getTitle() != null && i.getTitle().startsWith("[Tuần Tra AI]"))
+                            || (i.getAiDetection() != null && i.getAiDetection().getConfidence() != null && i.getAiDetection().getConfidence().doubleValue() >= 0.20))
+                    .count();
+
+            long citCountInSlot = allIncidents.stream()
+                    .filter(i -> i.getCreatedAt() != null)
+                    .filter(i -> {
+                        int h = i.getCreatedAt().getHour();
+                        return h >= startH && h <= endH;
+                    })
+                    .filter(i -> i.getTitle() == null || !i.getTitle().startsWith("[Tuần Tra AI]"))
+                    .count();
+
+            streamPoints.add(new AdminAnalyticsResponse.StreamPoint(timeLabels[idx], aiCountInSlot, citCountInSlot));
+        }
 
         java.util.List<IncidentResponse> urgent = allIncidents.stream()
                 .filter(i -> "DISPUTED".equals(i.getFlag()) || "NEEDS_MANUAL_REVIEW".equals(i.getFlag()) || i.getStatus() == IncidentStatus.SUBMITTED)
@@ -826,16 +867,20 @@ public class IncidentService {
                 .map(this::mapToResponse)
                 .toList();
 
+        String aiModelVersion = aiInferenceService.isModelLoaded()
+                ? "YOLOv8-RoadCare v2.4 Active"
+                : "YOLOv8-RoadCare Standby";
+
         return AdminAnalyticsResponse.builder()
                 .totalIncidents(total)
-                .totalGrowthPercent(14.2)
+                .totalGrowthPercent(totalGrowthPercent)
                 .triagePendingCount(triagePending)
                 .inProgressCount(inProgress)
                 .activeCrewsCount(activeCrews)
                 .resolvedCount(resolved)
                 .clearanceRatePercent(clearanceRate)
                 .aiAccuracyPercent(Math.round(aiAccuracy * 10.0) / 10.0)
-                .aiModelVersion("YOLOv8-RoadCare v2.4 Active")
+                .aiModelVersion(aiModelVersion)
                 .avgInferenceLatencyMs(avgLatency)
                 .meanResolutionHours(meanResolutionHours)
                 .categoryCounts(categoryCounts)
@@ -844,5 +889,75 @@ public class IncidentService {
                 .telemetricStream(streamPoints)
                 .urgentIncidents(urgent)
                 .build();
+    }
+
+    /**
+     * SỐ LIỆU THỐNG KÊ CÔNG KHAI (PUBLIC STATS) PHỤC VỤ TRANG CHỦ & BẢN ĐỒ
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getPublicStats() {
+        java.util.Map<String, Object> stats = new java.util.LinkedHashMap<>();
+        List<Incident> all = incidentRepository.findAll();
+        long total = all.size();
+
+        long inProgress = all.stream()
+                .filter(i -> i.getStatus() == IncidentStatus.IN_PROGRESS || i.getStatus() == IncidentStatus.ASSIGNED)
+                .count();
+
+        long resolved = all.stream()
+                .filter(i -> i.getStatus() == IncidentStatus.RESOLVED || i.getStatus() == IncidentStatus.CLOSED)
+                .count();
+
+        double clearanceRate = total > 0 ? (resolved * 100.0 / total) : 100.0;
+        clearanceRate = Math.round(clearanceRate * 10.0) / 10.0;
+
+        int activeCrews = (int) all.stream()
+                .filter(i -> i.getStatus() == IncidentStatus.IN_PROGRESS && i.getAssignment() != null && i.getAssignment().getAssignedToStaff() != null)
+                .map(i -> i.getAssignment().getAssignedToStaff().getId())
+                .distinct()
+                .count();
+        if (activeCrews == 0) {
+            activeCrews = Math.max(1, userRepository.findByRole(Role.ROLE_STAFF).size());
+        }
+
+        double totalResolutionHours = 0;
+        int resolvedCountWithTime = 0;
+        for (Incident i : all) {
+            if ((i.getStatus() == IncidentStatus.RESOLVED || i.getStatus() == IncidentStatus.CLOSED)
+                    && i.getResolution() != null && i.getResolution().getResolvedAt() != null && i.getCreatedAt() != null) {
+                java.time.Duration d = java.time.Duration.between(i.getCreatedAt(), i.getResolution().getResolvedAt());
+                totalResolutionHours += (double) d.toMinutes() / 60.0;
+                resolvedCountWithTime++;
+            }
+        }
+        String meanSpeed;
+        if (resolvedCountWithTime > 0) {
+            double avgHours = Math.round((totalResolutionHours / resolvedCountWithTime) * 10.0) / 10.0;
+            meanSpeed = avgHours + " Giờ";
+        } else {
+            meanSpeed = total > 0 ? "< 4.0 Giờ" : "0.0 Giờ";
+        }
+
+        double totalConfidence = 0;
+        int aiCount = 0;
+        for (Incident i : all) {
+            if (i.getAiDetection() != null && i.getAiDetection().getConfidence() != null) {
+                totalConfidence += i.getAiDetection().getConfidence().doubleValue();
+                aiCount++;
+            }
+        }
+        String aiConfStr = aiCount > 0
+                ? String.format(java.util.Locale.US, "%.1f%%", (totalConfidence / aiCount) * 100.0)
+                : "0.0%";
+
+        stats.put("totalIncidents", total);
+        stats.put("inProgressCount", inProgress);
+        stats.put("resolvedCount", resolved);
+        stats.put("clearanceRatePercent", clearanceRate);
+        stats.put("activeDispatches", activeCrews);
+        stats.put("meanResolutionSpeed", meanSpeed);
+        stats.put("aiConfidenceMedian", aiConfStr);
+        stats.put("activeVisionModel", aiInferenceService.isModelLoaded() ? "YOLOv8-RoadCare v2.4 Active" : "YOLOv8-RoadCare Standby");
+        return stats;
     }
 }

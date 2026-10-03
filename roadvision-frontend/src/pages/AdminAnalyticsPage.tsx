@@ -38,7 +38,9 @@ export const AdminAnalyticsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [timeframe, setTimeframe] = useState<string>('30d');
   const [district, setDistrict] = useState<string>('ALL');
-  const [broadcastAlert, setBroadcastAlert] = useState<boolean>(false);
+  const [broadcastAlert, setBroadcastAlert] = useState<boolean>(() => {
+    return localStorage.getItem('roadcare_broadcast_alert') === 'true';
+  });
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const fetchAnalytics = () => {
@@ -83,6 +85,7 @@ export const AdminAnalyticsPage: React.FC = () => {
   const handleToggleBroadcast = () => {
     const next = !broadcastAlert;
     setBroadcastAlert(next);
+    localStorage.setItem('roadcare_broadcast_alert', String(next));
     if (next) {
       toast.warning('Đã kích hoạt chế độ Phát Sóng Cảnh Báo Khẩn Cấp trên toàn mạng lưới đô thị!', 'Báo Động Hạ Tầng');
     } else {
@@ -96,11 +99,47 @@ export const AdminAnalyticsPage: React.FC = () => {
 
   const total = data?.totalIncidents || 0;
   const categorySpectrum = [
-    { key: 'POTHOLE', label: 'Ổ gà / Hố sụt', color: 'bg-primary', textColor: 'text-primary', count: data?.categoryCounts?.POTHOLE || 0, pct: data?.categoryPercentages?.POTHOLE || 48 },
-    { key: 'ROAD_CRACK', label: 'Vết nứt mặt đường', color: 'bg-sky-500', textColor: 'text-sky-500', count: data?.categoryCounts?.ROAD_CRACK || 0, pct: data?.categoryPercentages?.ROAD_CRACK || 26 },
-    { key: 'ROAD_OBSTACLE', label: 'Chướng ngại vật', color: 'bg-amber-500', textColor: 'text-amber-500', count: data?.categoryCounts?.ROAD_OBSTACLE || 0, pct: data?.categoryPercentages?.ROAD_OBSTACLE || 14 },
-    { key: 'ROAD_FLOODING', label: 'Ngập úng', color: 'bg-rose-500', textColor: 'text-rose-500', count: data?.categoryCounts?.ROAD_FLOODING || 0, pct: data?.categoryPercentages?.ROAD_FLOODING || 12 },
+    { key: 'POTHOLE', label: 'Ổ gà / Hố sụt', color: 'bg-primary', textColor: 'text-primary', count: data?.categoryCounts?.POTHOLE || 0, pct: data?.categoryPercentages?.POTHOLE || 0 },
+    { key: 'ROAD_CRACK', label: 'Vết nứt mặt đường', color: 'bg-sky-500', textColor: 'text-sky-500', count: data?.categoryCounts?.ROAD_CRACK || 0, pct: data?.categoryPercentages?.ROAD_CRACK || 0 },
+    { key: 'ROAD_OBSTACLE', label: 'Chướng ngại vật', color: 'bg-amber-500', textColor: 'text-amber-500', count: data?.categoryCounts?.ROAD_OBSTACLE || 0, pct: data?.categoryPercentages?.ROAD_OBSTACLE || 0 },
+    { key: 'ROAD_FLOODING', label: 'Ngập úng', color: 'bg-rose-500', textColor: 'text-rose-500', count: data?.categoryCounts?.ROAD_FLOODING || 0, pct: data?.categoryPercentages?.ROAD_FLOODING || 0 },
   ];
+
+  const stream = data?.telemetricStream || [];
+  const maxVal = Math.max(1, ...stream.flatMap((s) => [s.aiSensorCount, s.citizenReportCount]));
+
+  const getCoordinates = (type: 'ai' | 'cit') => {
+    if (stream.length === 0) return [];
+    return stream.map((pt, idx) => {
+      const x = stream.length > 1 ? (idx / (stream.length - 1)) * 700 : 350;
+      const count = type === 'ai' ? pt.aiSensorCount : pt.citizenReportCount;
+      const y = 145 - (count / maxVal) * 120;
+      return { x, y, count };
+    });
+  };
+
+  const aiCoords = getCoordinates('ai');
+  const citCoords = getCoordinates('cit');
+
+  const buildPath = (coords: Array<{ x: number; y: number }>) => {
+    if (coords.length === 0) return 'M0,145 L700,145';
+    let d = `M ${coords[0].x},${coords[0].y}`;
+    for (let i = 1; i < coords.length; i++) {
+      const prev = coords[i - 1];
+      const curr = coords[i];
+      const cp1x = prev.x + (curr.x - prev.x) / 2;
+      const cp1y = prev.y;
+      const cp2x = prev.x + (curr.x - prev.x) / 2;
+      const cp2y = curr.y;
+      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${curr.x},${curr.y}`;
+    }
+    return d;
+  };
+
+  const aiLineD = buildPath(aiCoords);
+  const aiAreaD = `${aiLineD} L 700,160 L 0,160 Z`;
+  const citLineD = buildPath(citCoords);
+  const citAreaD = `${citLineD} L 700,160 L 0,160 Z`;
 
   return (
     <div className="flex flex-col gap-6 py-2">
@@ -258,7 +297,7 @@ export const AdminAnalyticsPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5 mt-1 text-xs">
               <TrendingUp className="w-3.5 h-3.5 text-secondary font-bold" />
-              <span className="font-mono text-secondary font-bold">+{data?.totalGrowthPercent || 14.2}%</span>
+              <span className="font-mono text-secondary font-bold">+{data?.totalGrowthPercent !== undefined ? data.totalGrowthPercent : 0}%</span>
               <span className="text-on-surface-variant text-[11px]">so kỳ trước</span>
             </div>
           </div>
@@ -310,7 +349,7 @@ export const AdminAnalyticsPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5 mt-1 text-xs">
               <Truck className="w-3.5 h-3.5 text-secondary" />
-              <span className="font-mono text-secondary font-bold">{data?.activeCrewsCount || 4} Tổ Cơ Động</span>
+              <span className="font-mono text-secondary font-bold">{data?.activeCrewsCount ?? 0} Tổ Cơ Động</span>
               <span className="text-on-surface-variant text-[11px]">thuộc Hạt QLĐB</span>
             </div>
           </div>
@@ -334,7 +373,7 @@ export const AdminAnalyticsPage: React.FC = () => {
               {data ? data.resolvedCount.toLocaleString() : '---'}
             </div>
             <div className="flex items-center gap-1.5 mt-1 text-xs">
-              <span className="font-mono text-emerald-600 font-bold">{data?.clearanceRatePercent || 91.1}%</span>
+              <span className="font-mono text-emerald-600 font-bold">{data?.clearanceRatePercent !== undefined ? data.clearanceRatePercent : 0}%</span>
               <span className="text-on-surface-variant text-[11px]">tỷ lệ giải tỏa</span>
             </div>
           </div>
@@ -355,11 +394,11 @@ export const AdminAnalyticsPage: React.FC = () => {
           </div>
           <div className="my-2">
             <div className="font-display text-2xl md:text-3xl font-black text-on-surface tracking-tight">
-              {data?.aiAccuracyPercent || 96.8}%
+              {data?.aiAccuracyPercent !== undefined ? data.aiAccuracyPercent : 0}%
             </div>
             <div className="flex items-center gap-1.5 mt-1 text-xs">
               <Zap className="w-3.5 h-3.5 text-amber-500" />
-              <span className="font-mono text-primary font-bold">~{data?.avgInferenceLatencyMs || 42}ms</span>
+              <span className="font-mono text-primary font-bold">~{data?.avgInferenceLatencyMs ?? 0}ms</span>
               <span className="text-on-surface-variant text-[11px]">độ trễ ONNX</span>
             </div>
           </div>
@@ -408,13 +447,13 @@ export const AdminAnalyticsPage: React.FC = () => {
                 {/* AI Stream Area Fill (Primary) */}
                 <path
                   className="text-primary/15"
-                  d="M0,130 C70,110 130,80 200,85 C270,90 320,40 400,35 C480,30 540,65 620,25 L700,20 L700,160 L0,160 Z"
+                  d={aiAreaD}
                   fill="currentColor"
                 />
                 {/* AI Stream Curve Stroke */}
                 <path
                   className="text-primary"
-                  d="M0,130 C70,110 130,80 200,85 C270,90 320,40 400,35 C480,30 540,65 620,25 L700,20"
+                  d={aiLineD}
                   stroke="currentColor"
                   strokeWidth="2.5"
                 />
@@ -422,33 +461,75 @@ export const AdminAnalyticsPage: React.FC = () => {
                 {/* Citizen Stream Fill (Sky Blue) */}
                 <path
                   className="text-sky-500/15"
-                  d="M0,145 C80,140 140,120 210,125 C280,130 330,110 410,105 C490,100 550,115 630,95 L700,90 L700,160 L0,160 Z"
+                  d={citAreaD}
                   fill="currentColor"
                 />
                 {/* Citizen Stream Curve Stroke */}
                 <path
                   className="text-sky-500"
-                  d="M0,145 C80,140 140,120 210,125 C280,130 330,110 410,105 C490,100 550,115 630,95 L700,90"
+                  d={citLineD}
                   stroke="currentColor"
                   strokeDasharray="4 2"
                   strokeWidth="2"
                 />
 
-                {/* Interactive Anchor Pulse Points */}
-                <circle className="fill-surface-container-lowest stroke-primary" cx="400" cy="35" r="4" strokeWidth="2.5" />
-                <circle className="fill-surface-container-lowest stroke-primary" cx="620" cy="25" r="4" strokeWidth="2.5" />
-                <circle className="fill-surface-container-lowest stroke-sky-500" cx="630" cy="95" r="3" strokeWidth="2" />
+                {/* Interactive Anchor Points */}
+                {aiCoords.map((c, i) => (
+                  <circle
+                    key={`ai-${i}`}
+                    className="fill-surface-container-lowest stroke-primary cursor-pointer hover:r-5 transition-all"
+                    cx={c.x}
+                    cy={c.y}
+                    r="4"
+                    strokeWidth="2.5"
+                  >
+                    <title>{`${stream[i]?.timeLabel}: ${c.count} sự cố (YOLOv8 AI Sensor)`}</title>
+                  </circle>
+                ))}
+                {citCoords.map((c, i) => (
+                  <circle
+                    key={`cit-${i}`}
+                    className="fill-surface-container-lowest stroke-sky-500 cursor-pointer hover:r-4 transition-all"
+                    cx={c.x}
+                    cy={c.y}
+                    r="3"
+                    strokeWidth="2"
+                  >
+                    <title>{`${stream[i]?.timeLabel}: ${c.count} sự cố (Citizen App)`}</title>
+                  </circle>
+                ))}
               </svg>
 
               {/* Trục mốc thời gian */}
               <div className="flex justify-between items-center pt-2 font-mono text-[11px] text-on-surface-variant font-medium">
-                <span>00:00</span>
-                <span>04:00</span>
-                <span className="text-primary font-bold">08:00 (Cao Điểm)</span>
-                <span>12:00</span>
-                <span className="text-secondary font-bold">16:00 (Tan Tầm)</span>
-                <span>20:00</span>
-                <span className="text-rose-600 font-bold">Hiện Tại</span>
+                {stream.length > 0 ? (
+                  stream.map((s, idx) => (
+                    <span
+                      key={idx}
+                      className={
+                        idx === stream.length - 1
+                          ? 'text-rose-600 font-bold'
+                          : idx === 2
+                          ? 'text-primary font-bold'
+                          : idx === 4
+                          ? 'text-secondary font-bold'
+                          : ''
+                      }
+                    >
+                      {s.timeLabel}
+                    </span>
+                  ))
+                ) : (
+                  <>
+                    <span>00:00</span>
+                    <span>04:00</span>
+                    <span className="text-primary font-bold">08:00 (Cao Điểm)</span>
+                    <span>12:00</span>
+                    <span className="text-secondary font-bold">16:00 (Tan Tầm)</span>
+                    <span>20:00</span>
+                    <span className="text-rose-600 font-bold">Hiện Tại</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -615,15 +696,15 @@ export const AdminAnalyticsPage: React.FC = () => {
               </div>
               <div className="flex justify-between items-center py-1.5 border-b border-outline-variant/20">
                 <span className="text-on-surface-variant">Thời Gian Trễ (Latency):</span>
-                <span className="font-mono font-bold text-emerald-600">~{data?.avgInferenceLatencyMs || 42} ms</span>
+                <span className="font-mono font-bold text-emerald-600">~{data?.avgInferenceLatencyMs ?? 0} ms</span>
               </div>
               <div className="flex justify-between items-center py-1.5 border-b border-outline-variant/20">
                 <span className="text-on-surface-variant">Thời Gian Sửa Xong Trung Bình:</span>
-                <span className="font-mono font-bold text-primary">{data?.meanResolutionHours || 4.2} Giờ (SLA Đạt)</span>
+                <span className="font-mono font-bold text-primary">{data?.meanResolutionHours !== undefined ? data.meanResolutionHours : 0} Giờ (SLA Đạt)</span>
               </div>
               <div className="flex justify-between items-center py-1.5 border-b border-outline-variant/20">
                 <span className="text-on-surface-variant">Tổ Duy Tu Cơ Động (Crews):</span>
-                <span className="font-mono font-bold text-secondary">{data?.activeCrewsCount || 4} Tổ (Thuộc các Hạt QLĐB)</span>
+                <span className="font-mono font-bold text-secondary">{data?.activeCrewsCount ?? 0} Tổ (Thuộc các Hạt QLĐB)</span>
               </div>
             </div>
 

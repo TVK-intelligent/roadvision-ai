@@ -15,7 +15,7 @@ import {
   AlertCircle,
   FileCheck,
   MapPin,
-  Sparkles,
+  X,
 } from 'lucide-react';
 
 export const StaffTasksPage: React.FC = () => {
@@ -33,7 +33,7 @@ export const StaffTasksPage: React.FC = () => {
   // Modal nộp nghiệm thu
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proofNotes, setProofNotes] = useState<string>('Đã cắt mép, vệ sinh hố sụt, quét nhũ tương và đầm nén bê tông nhựa C9.5.');
+  const [proofNotes, setProofNotes] = useState<string>('');
   const [isSubmittingProof, setIsSubmittingProof] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -61,7 +61,7 @@ export const StaffTasksPage: React.FC = () => {
   const handleStartWork = async (taskId: number) => {
     try {
       await incidentApi.updateStatus(taskId, 'IN_PROGRESS');
-      toast.info('Đã chuyển trạng thái sang Đang thi công!', 'Bắt Đầu Xử Lý');
+      toast.info('Đã chuyển trạng thái sang Đang thi công!', 'Bắt đầu xử lý');
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, status: 'IN_PROGRESS' as IncidentStatus } : t))
       );
@@ -91,24 +91,23 @@ export const StaffTasksPage: React.FC = () => {
       if (updated.resolution?.aiVerificationStatus === 'AI_VERIFIED_CLEAN') {
         toast.success(
           `AI đã thẩm định đạt chuẩn: Mặt đường đã được hoàn trả phẳng phiu!`,
-          'AI Nghiệm Thu Đạt Chuẩn'
+          'Nghiệm thu đạt chuẩn'
         );
       } else if (updated.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS') {
         toast.warning(
-          updated.resolution.aiVerificationNotes || 'Cảnh báo AI: Phát hiện dấu hiệu hư hỏng còn sót lại!',
-          'Cảnh Báo Kiểm Định AI'
+          updated.resolution.aiVerificationNotes || 'Cảnh báo: Phát hiện dấu hiệu hư hỏng còn sót lại!',
+          'Cảnh báo kiểm định'
         );
       } else {
-        toast.success(`Đã nộp ảnh nghiệm thu sự cố #${selectedTask.ticketCode}!`, 'Nghiệm Thu Thành Công');
+        toast.success(`Đã nộp báo cáo nghiệm thu cho sự cố #${selectedTask.ticketCode}!`, 'Thành công');
       }
+
+      fetchTasks(page, pageSize);
       setSelectedTask(null);
       setProofFile(null);
-      setProofNotes('');
-      fetchTasks(page, pageSize);
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Có lỗi xảy ra khi nộp ảnh nghiệm thu';
-      setErrorMessage(msg);
-      toast.error(msg, 'Lỗi Nghiệm Thu');
+      toast.error(err.response?.data?.message || 'Không thể gửi báo cáo nghiệm thu', 'Lỗi');
+      setErrorMessage(err.response?.data?.message || 'Có lỗi xảy ra khi nộp hồ sơ');
     } finally {
       setIsSubmittingProof(false);
     }
@@ -124,24 +123,24 @@ export const StaffTasksPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 py-4">
       {/* Header Banner */}
-      <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-secondary font-mono text-xs font-bold uppercase tracking-wider">
-            <Wrench className="w-4 h-4" />
-            KHÔNG GIAN KỸ THUẬT HIỆN TRƯỜNG
+          <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wide">
+            <Wrench className="w-4 h-4 text-blue-600" />
+            <span>Nhiệm vụ kỹ thuật hiện trường</span>
           </div>
-          <h1 className="font-display text-2xl font-black text-on-surface mt-1">
-            Nhiệm Vụ Kỹ Thuật Hiện Trường
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900 mt-1">
+            Quản lý nhiệm vụ thi công
           </h1>
-          <p className="text-xs text-on-surface-variant">
-            Danh sách sự cố được Ban Điều Phối chỉ định cho đội kỹ thuật xử lý và nghiệm thu số.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Danh sách các sự cố mặt đường được phân công trực tiếp cho tổ kỹ thuật tiếp nhận, thi công và nghiệm thu.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="px-4 py-2 rounded-2xl bg-surface-container border border-outline-variant/30 flex items-center gap-2">
-            <span className="text-xs text-on-surface-variant font-mono">Tổng nhiệm vụ:</span>
-            <span className="font-display text-base font-black text-primary">{totalElements}</span>
+          <div className="px-3.5 py-2 rounded-md bg-slate-50 border border-slate-200 flex items-center gap-2">
+            <span className="text-xs text-slate-500">Tổng nhiệm vụ:</span>
+            <span className="text-sm font-bold text-slate-900 leading-none">{totalElements}</span>
           </div>
         </div>
       </div>
@@ -157,16 +156,16 @@ export const StaffTasksPage: React.FC = () => {
           <button
             key={tab.id}
             onClick={() => setFilter(tab.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+            className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
               filter === tab.id
-                ? 'bg-primary text-on-primary shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/30'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200'
             }`}
           >
             <span>{tab.label}</span>
             <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                filter === tab.id ? 'bg-white/20 text-white' : 'bg-surface-container-high text-on-surface'
+              className={`px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                filter === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
               }`}
             >
               {tab.count}
@@ -177,16 +176,16 @@ export const StaffTasksPage: React.FC = () => {
 
       {/* Danh Sách Thẻ Nhiệm Vụ */}
       {loading ? (
-        <div className="py-16 text-center text-on-surface-variant bg-surface-container-lowest rounded-3xl border border-outline-variant/30">
-          <div className="inline-block animate-spin rounded-full h-7 w-7 border-2 border-primary border-t-transparent mb-2"></div>
+        <div className="py-16 text-center text-slate-500 bg-white rounded-lg border border-slate-200">
+          <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent mb-2"></div>
           <div className="text-xs font-medium">Đang tải danh sách nhiệm vụ được giao...</div>
         </div>
       ) : filteredTasks.length === 0 ? (
-        <div className="py-16 px-4 text-center bg-surface-container-lowest rounded-3xl border border-outline-variant/30 flex flex-col items-center gap-3">
-          <CheckCircle2 className="w-10 h-10 text-emerald-500/60" />
-          <h3 className="font-bold text-base text-on-surface">Không có nhiệm vụ nào trong mục này</h3>
-          <p className="text-xs text-on-surface-variant max-w-sm">
-            Tất cả sự cố được giao đã được xử lý hoặc chưa có sự cố mới nào được phân công.
+        <div className="py-16 px-4 text-center bg-white rounded-lg border border-slate-200 flex flex-col items-center gap-3">
+          <CheckCircle2 className="w-8 h-8 text-slate-400" />
+          <h3 className="font-semibold text-sm text-slate-900">Không có nhiệm vụ nào trong mục này</h3>
+          <p className="text-xs text-slate-500 max-w-sm">
+            Tất cả sự cố được giao đã được xử lý hoặc chưa có nhiệm vụ mới nào phát sinh.
           </p>
         </div>
       ) : (
@@ -195,106 +194,82 @@ export const StaffTasksPage: React.FC = () => {
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col justify-between gap-4 hover:shadow-md transition-all hover:border-outline-variant/60"
+                className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col justify-between gap-4 hover:border-slate-300 transition-colors"
               >
                 <div className="flex gap-4">
                   <img
                     src={task.imageUrl}
                     alt={task.title}
-                    className="w-24 h-24 rounded-2xl object-cover shrink-0 border border-outline-variant/20 shadow-xs"
+                    className="w-20 h-20 rounded-md object-cover shrink-0 border border-slate-200"
                   />
                   <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-bold text-primary">{task.ticketCode}</span>
+                      <span className="font-mono text-xs font-semibold text-blue-700">{task.ticketCode}</span>
                       <StatusBadge status={task.status} />
                     </div>
-                    <h3 className="font-bold text-sm text-on-surface line-clamp-1">{task.title}</h3>
-                    <div className="flex items-center gap-1 text-xs text-on-surface-variant line-clamp-1">
-                      <MapPin className="w-3.5 h-3.5 shrink-0 text-primary" />
+                    <h3 className="font-semibold text-sm text-slate-900 line-clamp-1">{task.title}</h3>
+                    <div className="flex items-center gap-1 text-xs text-slate-500 line-clamp-1">
+                      <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                       <span>{task.address || `${task.latitude?.toFixed(4)}, ${task.longitude?.toFixed(4)}`}</span>
                     </div>
-                    {task.aiDetection?.confidence && (
-                      <div className="text-[11px] text-on-surface-variant font-mono">
-                        AI Tin Cậy: <strong className="text-primary font-bold">{(task.aiDetection.confidence * 100).toFixed(1)}%</strong>
-                      </div>
-                    )}
                   </div>
                 </div>
 
                 {/* Cảnh báo yêu cầu thi công lại nếu có */}
                 {task.reworkCount && task.reworkCount > 0 && (
-                  <div className="bg-rose-500/10 border border-rose-500/30 text-rose-950 dark:text-rose-200 p-2.5 rounded-xl text-xs flex flex-col gap-1">
-                    <div className="font-bold flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
+                  <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-md text-xs flex flex-col gap-1">
+                    <div className="font-semibold flex items-center gap-1.5 text-rose-800">
                       <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      <span>YÊU CẦU THI CÔNG LẠI (LẦN #{task.reworkCount})</span>
+                      <span>Yêu cầu thi công lại (Lần #{task.reworkCount})</span>
                     </div>
                     {task.reworkReason && (
-                      <div className="text-[11px] opacity-90 pl-5">
-                        <strong>Chỉ đạo:</strong> {task.reworkReason}
-                      </div>
+                      <p className="text-slate-600 italic">"{task.reworkReason}"</p>
                     )}
                   </div>
                 )}
 
-                {/* Chân Thẻ & Thao Tác Trạng Thái */}
-                <div className="flex items-center justify-between pt-3 border-t border-outline-variant/15 text-xs">
-                  <Link
-                    to={`/incidents/${task.id}`}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors"
-                  >
-                    <span>Xem hồ sơ</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </Link>
+                {/* Thao tác kỹ thuật */}
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{task.createdAt ? new Date(task.createdAt).toLocaleDateString('vi-VN') : 'Mới giao'}</span>
+                  </div>
 
                   <div className="flex items-center gap-2">
                     {task.status === 'ASSIGNED' && (
                       <button
                         onClick={() => handleStartWork(task.id)}
-                        className="px-3.5 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs hover:bg-primary-container flex items-center gap-1.5 transition-colors"
+                        className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors"
                       >
                         <Hammer className="w-3.5 h-3.5" />
-                        <span>Đến Hiện Trường</span>
+                        <span>Bắt đầu thi công</span>
                       </button>
                     )}
 
                     {task.status === 'IN_PROGRESS' && (
                       <button
-                        onClick={() => {
-                          setSelectedTask(task);
-                          setErrorMessage(null);
-                        }}
-                        className="px-3.5 py-1.5 rounded-xl bg-secondary text-on-primary font-bold text-xs shadow-xs hover:bg-secondary/90 flex items-center gap-1.5 transition-colors"
+                        onClick={() => setSelectedTask(task)}
+                        className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors"
                       >
                         <Upload className="w-3.5 h-3.5" />
-                        <span>Nộp Nghiệm Thu</span>
+                        <span>Nộp nghiệm thu</span>
                       </button>
                     )}
 
-                    {(task.status === 'RESOLVED' || task.status === 'CLOSED') && (
-                      <div className="flex items-center gap-1.5">
-                        {task.resolution?.aiVerificationStatus === 'AI_VERIFIED_CLEAN' && (
-                          <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
-                            ✅ AI Đạt Chuẩn
-                          </span>
-                        )}
-                        {task.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS' && (
-                          <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] font-bold">
-                            ⚠️ AI Cảnh Báo
-                          </span>
-                        )}
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Đã Hoàn Thành</span>
-                        </span>
-                      </div>
-                    )}
+                    <Link
+                      to={`/incidents/${task.id}`}
+                      className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                      title="Xem chi tiết hồ sơ"
+                    >
+                      <ArrowUpRight className="w-4 h-4" />
+                    </Link>
                   </div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Phân Trang */}
+          {/* Phân trang */}
           <Pagination
             currentPage={page}
             totalPages={totalPages}
@@ -309,92 +284,89 @@ export const StaffTasksPage: React.FC = () => {
         </>
       )}
 
-      {/* Modal Nộp Nghiệm Thu (Proof of Work) */}
+      {/* Modal Nộp Nghiệm Thu */}
       {selectedTask && (
-        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest max-w-lg w-full rounded-3xl border border-outline-variant/40 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="p-5 border-b border-outline-variant/20 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-secondary font-bold text-sm">
-                <FileCheck className="w-5 h-5" />
-                <span>Nộp Bằng Chứng Nghiệm Thu (Proof of Work)</span>
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-lg w-full rounded-lg border border-slate-200 shadow-xl overflow-hidden animate-in fade-in">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
+                <FileCheck className="w-4 h-4 text-blue-600" />
+                <span>Nộp báo cáo nghiệm thu hiện trường</span>
               </div>
               <button
                 onClick={() => setSelectedTask(null)}
-                className="w-7 h-7 rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container flex items-center justify-center"
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleResolveSubmit} className="p-6 flex flex-col gap-4">
-              <div className="bg-surface-container-low p-3.5 rounded-2xl text-xs flex flex-col gap-1 border border-outline-variant/20">
-                <div className="font-bold text-on-surface">
+            <form onSubmit={handleResolveSubmit} className="p-6 flex flex-col gap-4 text-xs">
+              <div className="bg-slate-50 p-3 rounded-md flex flex-col gap-1 border border-slate-200">
+                <div className="font-semibold text-slate-900">
                   {selectedTask.ticketCode} - {selectedTask.title}
                 </div>
-                <div className="text-on-surface-variant">{selectedTask.address}</div>
+                <div className="text-slate-500">{selectedTask.address}</div>
               </div>
 
               {selectedTask.reworkReason && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 text-xs flex flex-col gap-1">
-                  <div className="font-bold flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>LỆNH TÁI THI CÔNG (REWORK):</span>
+                <div className="p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs flex flex-col gap-1">
+                  <div className="font-semibold flex items-center gap-1.5 text-rose-800">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>Lệnh tái thi công:</span>
                   </div>
-                  <p className="italic font-medium">"{selectedTask.reworkReason}"</p>
-                  <p className="text-[11px] text-on-surface-variant mt-0.5">
-                    Vui lòng xử lý dứt điểm các lỗi còn sót theo chỉ đạo trước khi chụp ảnh nghiệm thu mới.
-                  </p>
+                  <p className="italic">"{selectedTask.reworkReason}"</p>
                 </div>
               )}
 
               {errorMessage && (
-                <div className="p-3 rounded-xl bg-error-container text-error text-xs flex items-center gap-2">
+                <div className="p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{errorMessage}</span>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-on-surface mb-1.5">
-                  Ảnh Chụp Sau Khi Sửa Chữa Hiện Trường *
+                <label className="block font-medium text-slate-700 mb-1.5">
+                  Ảnh chụp sau khi hoàn tất sửa chữa *
                 </label>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(e) => setProofFile(e.target.files ? e.target.files[0] : null)}
-                  className="w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-on-primary hover:file:bg-primary/90 cursor-pointer"
+                  className="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-on-surface mb-1.5">
-                  Biên Bản Kỹ Thuật & Vật Liệu Sử Dụng
+                <label className="block font-medium text-slate-700 mb-1.5">
+                  Biên bản kỹ thuật & vật liệu sử dụng
                 </label>
                 <textarea
                   rows={3}
                   value={proofNotes}
                   onChange={(e) => setProofNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-low border border-outline-variant/30 focus:outline-none focus:border-primary font-medium"
-                  placeholder="Ghi chú quy trình đầm nén, loại nhựa, độ chặt..."
+                  className="w-full px-3 py-2 text-xs rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent font-medium text-slate-900"
+                  placeholder="Ghi chú quy trình thi công, vật liệu hoàn trả..."
                   required
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-outline-variant/15">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setSelectedTask(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors"
+                  className="px-3.5 py-1.5 rounded-md border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingProof}
-                  className="px-5 py-2.5 rounded-xl bg-secondary text-on-primary text-xs font-bold shadow-xs hover:bg-secondary/90 disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+                  className="px-4 py-1.5 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5 transition-colors shadow-xs"
                 >
-                  {isSubmittingProof ? 'Đang tải lên...' : 'Xác Nhận Nghiệm Thu'}
+                  {isSubmittingProof ? 'Đang gửi...' : 'Xác nhận nghiệm thu'}
                 </button>
               </div>
             </form>

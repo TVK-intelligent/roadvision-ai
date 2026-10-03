@@ -21,8 +21,8 @@ export const Pagination: React.FC<PaginationProps> = ({
   if (totalElements === 0 || totalPages <= 1) {
     if (totalElements === 0) return null;
     return (
-      <div className="flex items-center justify-between py-3 px-4 bg-surface-container-lowest rounded-xl border border-outline-variant/30 text-xs text-on-surface-variant mt-3">
-        <span>Tổng số <strong className="text-on-surface">{totalElements}</strong> bản ghi (1 trang duy nhất)</span>
+      <div className="flex items-center justify-between py-2.5 px-4 bg-white rounded-lg border border-slate-200 text-xs text-slate-600 mt-3">
+        <span>Tổng số <strong className="text-slate-900 font-semibold">{totalElements}</strong> bản ghi (1 trang duy nhất)</span>
       </div>
     );
   }
@@ -59,22 +59,23 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-3.5 px-4 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-xs mt-4">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-2.5 px-4 bg-white rounded-lg border border-slate-200 text-xs text-slate-600 mt-4">
       {/* Thông tin số lượng bản ghi & Kích thước trang */}
-      <div className="flex items-center gap-3 text-xs text-on-surface-variant">
+      <div className="flex items-center gap-3">
         <span>
-          Hiển thị <strong className="text-on-surface font-semibold">{startItem}</strong> -{' '}
-          <strong className="text-on-surface font-semibold">{endItem}</strong> trên{' '}
-          <strong className="text-primary font-bold">{totalElements}</strong> kết quả
+          Hiển thị <strong className="text-slate-900 font-semibold">{startItem}</strong> -{' '}
+          <strong className="text-slate-900 font-semibold">{endItem}</strong> trên{' '}
+          <strong className="text-slate-900 font-semibold">{totalElements}</strong> kết quả
         </span>
 
         {onPageSizeChange && (
-          <div className="hidden md:flex items-center gap-1.5 ml-2 pl-3 border-l border-outline-variant/40">
+          <div className="hidden md:flex items-center gap-1.5 ml-2 pl-3 border-l border-slate-200">
             <span>Mỗi trang:</span>
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="bg-surface-container-low border border-outline-variant/40 rounded-lg px-2 py-1 text-xs font-semibold text-on-surface outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              aria-label="Số bản ghi mỗi trang"
+              className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
@@ -92,7 +93,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(0)}
           disabled={currentPage === 0}
           title="Trang đầu"
-          className="p-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          aria-label="Về trang đầu"
+          className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors"
         >
           <ChevronsLeft className="w-4 h-4" />
         </button>
@@ -102,7 +104,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 0}
           title="Trang trước"
-          className="p-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          aria-label="Trang trước"
+          className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -112,7 +115,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           {getPageNumbers().map((p, idx) => {
             if (p === '...') {
               return (
-                <span key={`dots-${idx}`} className="px-2 text-xs text-on-surface-variant select-none">
+                <span key={`dots-${idx}`} className="px-2 text-xs text-slate-400 select-none">
                   ...
                 </span>
               );
@@ -124,10 +127,10 @@ export const Pagination: React.FC<PaginationProps> = ({
               <button
                 key={`page-${pageIndex}`}
                 onClick={() => onPageChange(pageIndex)}
-                className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-bold transition-all ${
+                className={`min-w-[28px] h-7 px-2 rounded-md text-xs font-medium transition-all ${
                   isCurrent
-                    ? 'bg-primary text-on-primary shadow-sm ring-1 ring-primary'
-                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container border border-outline-variant/20'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
                 }`}
               >
                 {pageIndex + 1}
@@ -141,7 +144,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages - 1}
           title="Trang sau"
-          className="p-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          aria-label="Trang sau"
+          className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -151,7 +155,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(totalPages - 1)}
           disabled={currentPage >= totalPages - 1}
           title="Trang cuối"
-          className="p-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          aria-label="Về trang cuối"
+          className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors"
         >
           <ChevronsRight className="w-4 h-4" />
         </button>

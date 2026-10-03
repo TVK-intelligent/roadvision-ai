@@ -916,4 +916,8 @@ public class AiInferenceService {
     public float getConfidenceThreshold() {
         return confidenceThreshold;
     }
+
+    public boolean isModelLoaded() {
+        return isModelLoaded;
+    }
 }

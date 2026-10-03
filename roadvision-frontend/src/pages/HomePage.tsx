@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
 import { useAuth } from '../context/AuthContext';
 import {
-  Shield,
-  Sparkles,
   AlertTriangle,
   Clock,
   Truck,
@@ -14,21 +12,16 @@ import {
   Wrench,
   ShieldAlert,
   FileText,
-  Layers,
-  Cpu,
   ChevronRight,
+  AlertCircle,
   Activity,
-  Zap
+  Droplets,
+  Box,
 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState<Record<string, any>>({
-    aiConfidenceMedian: '96.8%',
-    activeDispatches: 38,
-    meanResolutionSpeed: '4.2 Giờ',
-    activeVisionModel: 'YOLOv8-RoadCare v2.4 Active',
-  });
+  const [stats, setStats] = useState<Record<string, any> | null>(null);
 
   useEffect(() => {
     incidentApi
@@ -38,135 +31,138 @@ export const HomePage: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col gap-10 pb-16">
+    <div className="flex flex-col gap-8 pb-12 pt-2">
       {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-surface-container-lowest p-8 md:p-14 border border-outline-variant/30 shadow-xs mt-3">
-        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full bg-secondary/10 blur-3xl pointer-events-none"></div>
-
-        <div className="relative z-10 max-w-3xl flex flex-col gap-5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-mono font-bold self-start border border-primary/20">
-            <Sparkles className="w-3.5 h-3.5" />
-            NỀN TẢNG THỊ GIÁC MÁY TÍNH HẠ TẦNG GIAO THÔNG ĐÔ THỊ
+      <section className="rounded-lg bg-white p-6 md:p-10 border border-slate-200 shadow-xs">
+        <div className="max-w-3xl flex flex-col gap-4">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium self-start border border-slate-200">
+            <span>Hệ thống Giám sát & Quản lý Hạ tầng Đô thị</span>
           </div>
 
-          <h1 className="font-display text-3xl md:text-5xl font-black text-on-surface tracking-tight leading-tight">
-            Giám Sát & Điều Phối Xử Lý Sự Cố Mặt Đường Thông Minh
+          <h1 className="text-2xl md:text-4xl font-bold text-slate-900 tracking-tight leading-snug">
+            Giám sát và điều phối xử lý sự cố mặt đường đô thị
           </h1>
 
-          <p className="text-sm md:text-base text-on-surface-variant leading-relaxed">
-            Hệ thống RoadVision ứng dụng mô hình AI đa lớp YOLOv8 nhúng trực tiếp qua ONNX Runtime, tự động phân tích hiện trường (ổ gà, vết nứt, ngập úng, chướng ngại vật) và điều phối đội bảo dưỡng xử lý theo quy trình 5 pha khép kín.
+          <p className="text-sm md:text-base text-slate-600 leading-relaxed">
+            Nền tảng tiếp nhận phản ánh hư hại mặt đường từ người dân và tuần tra thực địa, tự động phân tích dữ liệu hình ảnh, định vị tọa độ GIS và hỗ trợ điều phối lực lượng duy tu bảo dưỡng.
           </p>
 
-          {/* Các nút hành động thông minh theo Role */}
+          {/* Các nút hành động chính theo phân quyền */}
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Link
               to="/report"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-on-primary font-bold text-xs shadow-sm hover:bg-primary-container transition-all hover:scale-[1.02]"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-blue-600 text-white font-medium text-xs hover:bg-blue-700 transition-colors shadow-xs"
             >
-              <span>Báo Cáo Sự Cố Mặt Đường</span>
+              <span>Gửi phản ánh sự cố</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 
             <Link
               to="/map"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-surface-container text-on-surface font-bold text-xs hover:bg-surface-container-high transition-colors border border-outline-variant/30"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-white text-slate-700 font-medium text-xs hover:bg-slate-50 transition-colors border border-slate-300 shadow-xs"
             >
-              <Map className="w-4 h-4 text-primary" />
-              <span>Bản Đồ Số GIS</span>
+              <Map className="w-4 h-4 text-slate-500" />
+              <span>Bản đồ số GIS</span>
             </Link>
 
             {user?.role === 'ROLE_ADMIN' && (
               <Link
                 to="/dispatch"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-rose-500/10 text-rose-600 font-bold text-xs hover:bg-rose-500/20 transition-colors border border-rose-500/30"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-slate-100 text-slate-800 font-medium text-xs hover:bg-slate-200 transition-colors border border-slate-200"
               >
-                <ShieldAlert className="w-4 h-4" />
-                <span>Hàng Đợi Điều Phối</span>
+                <ShieldAlert className="w-4 h-4 text-slate-600" />
+                <span>Hàng đợi điều phối</span>
               </Link>
             )}
 
             {user?.role === 'ROLE_STAFF' && (
               <Link
                 to="/tasks"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-secondary/10 text-secondary font-bold text-xs hover:bg-secondary/20 transition-colors border border-secondary/30"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-slate-100 text-slate-800 font-medium text-xs hover:bg-slate-200 transition-colors border border-slate-200"
               >
-                <Wrench className="w-4 h-4" />
-                <span>Nhiệm Vụ Kỹ Thuật</span>
+                <Wrench className="w-4 h-4 text-slate-600" />
+                <span>Nhiệm vụ kỹ thuật</span>
               </Link>
             )}
 
             {user?.role === 'ROLE_CITIZEN' && (
               <Link
                 to="/my-reports"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-500/10 text-blue-600 font-bold text-xs hover:bg-blue-500/20 transition-colors border border-blue-500/30"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-slate-100 text-slate-800 font-medium text-xs hover:bg-slate-200 transition-colors border border-slate-200"
               >
-                <FileText className="w-4 h-4" />
-                <span>Lịch Sử Phản Ánh</span>
+                <FileText className="w-4 h-4 text-slate-600" />
+                <span>Lịch sử phản ánh</span>
               </Link>
             )}
           </div>
         </div>
       </section>
 
-      {/* Dải chỉ số viễn trắc (Telemetry Metrics Strip) */}
+      {/* Chỉ số vận hành KPI */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="font-mono text-[11px] text-on-surface-variant font-bold uppercase tracking-wider">Sự Cố Cần Xử Lý</span>
-            <div className="font-display text-2xl font-black text-rose-600 mt-1">14 Điểm</div>
+            <span className="text-xs text-slate-500 font-medium">Sự cố đang xử lý</span>
+            <div className="text-2xl font-bold text-slate-900 mt-1">
+              {stats ? `${stats.inProgressCount ?? 0} điểm` : '---'}
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center">
             <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="font-mono text-[11px] text-on-surface-variant font-bold uppercase tracking-wider">Độ Tin Cậy AI</span>
-            <div className="font-display text-2xl font-black text-primary mt-1">{stats.aiConfidenceMedian}</div>
+            <span className="text-xs text-slate-500 font-medium">Tỷ lệ giải tỏa mặt đường</span>
+            <div className="text-2xl font-bold text-slate-900 mt-1">
+              {stats ? `${stats.clearanceRatePercent ?? 0}%` : '---'}
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-            <Cpu className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="font-mono text-[11px] text-on-surface-variant font-bold uppercase tracking-wider">Đội Kỹ Thuật Trực Chiến</span>
-            <div className="font-display text-2xl font-black text-secondary mt-1">{stats.activeDispatches} Đội</div>
+            <span className="text-xs text-slate-500 font-medium">Đội duy tu trực chiến</span>
+            <div className="text-2xl font-bold text-slate-900 mt-1">
+              {stats ? `${stats.activeDispatches ?? 0} tổ đội` : '---'}
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center">
+          <div className="w-10 h-10 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center">
             <Truck className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="font-mono text-[11px] text-on-surface-variant font-bold uppercase tracking-wider">Thời Gian Xử Lý TB</span>
-            <div className="font-display text-2xl font-black text-emerald-600 mt-1">{stats.meanResolutionSpeed}</div>
+            <span className="text-xs text-slate-500 font-medium">Thời gian xử lý TB</span>
+            <div className="text-2xl font-bold text-slate-900 mt-1">
+              {stats?.meanResolutionSpeed || '---'}
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
             <Clock className="w-5 h-5" />
           </div>
         </div>
       </section>
 
-      {/* Showcase 4 Danh Mục Sự Cố AI Nhận Diện */}
+      {/* Danh mục phân loại hư hại mặt đường theo quy chuẩn */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs font-mono font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="w-4 h-4" />
-              MÔ HÌNH THỊ GIÁC ĐA LỚP YOLOV8-ROADCARE
-            </div>
-            <h2 className="font-display text-xl font-black text-on-surface mt-0.5">
-              4 Nhóm Sự Cố Hạ Tầng Tự Động Định Danh
+            <h2 className="text-base font-bold text-slate-900">
+              Phân loại hư hại mặt đường theo quy chuẩn kỹ thuật
             </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Các nhóm sự cố được hệ thống tự động nhận diện và gán độ ưu tiên xử lý
+            </p>
           </div>
           <Link
             to="/map"
-            className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
           >
             <span>Xem trên bản đồ</span>
             <ChevronRight className="w-4 h-4" />
@@ -177,83 +173,81 @@ export const HomePage: React.FC = () => {
           {[
             {
               id: 'POTHOLE',
-              code: 'LỚP 0',
-              title: 'Ổ Gà / Hố Sụt',
-              desc: 'Hố trũng sâu, sụt lún mép đường nhựa, miệng hố nguy cơ lật xe và tai nạn.',
-              color: 'border-rose-500/30 bg-rose-500/5 text-rose-700 dark:text-rose-400',
-              badge: 'bg-rose-500/15 text-rose-700',
-              icon: '🕳️',
+              code: 'POTH-01',
+              title: 'Ổ gà, sụt lún',
+              desc: 'Hố trũng sâu, sụt mép đường nhựa, miệng hố gây nguy cơ mất an toàn giao thông.',
+              icon: <AlertCircle className="w-5 h-5 text-rose-600" />,
+              badge: 'bg-rose-50 text-rose-700 border border-rose-200',
             },
             {
               id: 'ROAD_CRACK',
-              code: 'LỚP 1',
-              title: 'Vết Nứt Mặt Đường',
-              desc: 'Nứt chân chim, nứt rạn mai rùa, nứt khe co giãn làm ngấm nước phá hỏng nền đường.',
-              color: 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400',
-              badge: 'bg-amber-500/15 text-amber-700',
-              icon: '⚡',
+              code: 'CRK-02',
+              title: 'Vết nứt mặt đường',
+              desc: 'Nứt chân chim, nứt rạn mai rùa hoặc nứt khe co giãn làm ngấm nước phá hỏng kết cấu.',
+              icon: <Activity className="w-5 h-5 text-amber-600" />,
+              badge: 'bg-amber-50 text-amber-700 border border-amber-200',
             },
             {
               id: 'ROAD_FLOODING',
-              code: 'LỚP 2',
-              title: 'Điểm Ngập Úng',
-              desc: 'Vùng nước đọng sâu ngập bánh xe, nước tràn mặt đường cản trở phương tiện lưu thông.',
-              color: 'border-blue-500/30 bg-blue-500/5 text-blue-700 dark:text-blue-400',
-              badge: 'bg-blue-500/15 text-blue-700',
-              icon: '🌊',
+              code: 'FLD-03',
+              title: 'Điểm ngập úng',
+              desc: 'Vùng đọng nước cục bộ, nước tràn mặt đường cản trở phương tiện lưu thông an toàn.',
+              icon: <Droplets className="w-5 h-5 text-blue-600" />,
+              badge: 'bg-blue-50 text-blue-700 border border-blue-200',
             },
             {
               id: 'ROAD_OBSTACLE',
-              code: 'LỚP 3',
-              title: 'Chướng Ngại Vật',
-              desc: 'Két nhựa, thùng xốp, rào chắn, cọc tiêu, đất đá sạt lở hoặc nắp cống rơi mất.',
-              color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400',
-              badge: 'bg-emerald-500/15 text-emerald-700',
-              icon: '📦',
+              code: 'OBS-04',
+              title: 'Chướng ngại vật',
+              desc: 'Vật thể rơi vãi, rào chắn hỏng, đất đá sạt lở hoặc nắp hố ga mất nắp trên tuyến đường.',
+              icon: <Box className="w-5 h-5 text-slate-600" />,
+              badge: 'bg-slate-100 text-slate-700 border border-slate-200',
             },
           ].map((item) => (
             <div
               key={item.id}
-              className={`p-5 rounded-3xl border ${item.color} shadow-xs flex flex-col justify-between gap-4 transition-all hover:scale-[1.02]`}
+              className="p-5 rounded-lg bg-white border border-slate-200 shadow-xs flex flex-col justify-between gap-4 hover:border-slate-300 transition-colors"
             >
               <div className="flex items-center justify-between">
-                <span className="text-2xl">{item.icon}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${item.badge}`}>
+                <div className="w-9 h-9 rounded-md bg-slate-50 border border-slate-200 flex items-center justify-center">
+                  {item.icon}
+                </div>
+                <span className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-medium ${item.badge}`}>
                   {item.code}
                 </span>
               </div>
               <div className="flex flex-col gap-1">
-                <h3 className="font-bold text-sm text-on-surface">{item.title}</h3>
-                <p className="text-xs text-on-surface-variant leading-relaxed">{item.desc}</p>
+                <h3 className="font-semibold text-sm text-slate-900">{item.title}</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Quy trình 5 Pha Khép Kín */}
-      <section className="bg-surface-container-lowest p-8 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-6">
+      {/* Quy trình xử lý sự cố 5 bước */}
+      <section className="bg-white p-6 md:p-8 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-6">
         <div>
-          <span className="font-mono text-xs font-bold text-primary uppercase tracking-wider">
-            CLOSED-LOOP INCIDENT LIFECYCLE
-          </span>
-          <h2 className="font-display text-2xl font-black text-on-surface mt-1">
-            Quy Trình 5 Pha Quản Trị Khép Kín
+          <h2 className="text-base font-bold text-slate-900">
+            Quy trình phối hợp xử lý sự cố
           </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Quy trình tiêu chuẩn từ khâu tiếp nhận hiện trường đến nghiệm thu và đóng hồ sơ
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           {[
-            { step: '01', title: 'Phản Ánh Dân Sinh', desc: 'Chụp ảnh hiện trường, tự động ghim tọa độ GPS.' },
-            { step: '02', title: 'AI Quét Tức Thời', desc: 'YOLOv8 On-Device quét bounding box và dự báo mức độ.' },
-            { step: '03', title: 'Điều Phối Trung Tâm', desc: 'Ban Quản Lý thẩm định và chỉ định đội kỹ thuật.' },
-            { step: '04', title: 'Thi Công & Nghiệm Thu', desc: 'Hiện trường xử lý, chụp ảnh hoàn thành (Proof of Work).' },
-            { step: '05', title: 'Đánh Giá & Đóng Hồ Sơ', desc: 'Người dân chấm sao hài lòng, lưu vết dữ liệu viễn trắc.' },
+            { step: '01', title: 'Tiếp nhận phản ánh', desc: 'Ghi nhận ảnh hiện trường và tọa độ GPS định vị chính xác.' },
+            { step: '02', title: 'Phân tích tự động', desc: 'Hệ thống quét sơ bộ loại hư hại, tính toán vị trí và mức độ.' },
+            { step: '03', title: 'Thẩm định & Phân công', desc: 'Ban điều hành kiểm tra hồ sơ và giao việc cho đội duy tu.' },
+            { step: '04', title: 'Thi công khắc phục', desc: 'Đội bảo dưỡng xử lý tại chỗ và chụp ảnh nghiệm thu hoàn tất.' },
+            { step: '05', title: 'Nghiệm thu & Đóng hồ sơ', desc: 'Đánh giá chất lượng xử lý và cập nhật trạng thái trên bản đồ.' },
           ].map((phase, idx) => (
-            <div key={idx} className="flex flex-col gap-2 p-4 rounded-2xl bg-surface-container-low border border-outline-variant/20">
-              <span className="font-mono text-xs font-black text-primary">{phase.step}</span>
-              <h4 className="font-bold text-xs text-on-surface">{phase.title}</h4>
-              <p className="text-[11px] text-on-surface-variant leading-relaxed">{phase.desc}</p>
+            <div key={idx} className="flex flex-col gap-2 p-4 rounded-md bg-slate-50 border border-slate-200">
+              <span className="text-xs font-mono font-bold text-blue-600">{phase.step}</span>
+              <h4 className="font-semibold text-xs text-slate-900">{phase.title}</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">{phase.desc}</p>
             </div>
           ))}
         </div>

@@ -1,57 +1,52 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Sparkles, Cpu, MapPin, Activity, Github, ExternalLink } from 'lucide-react';
+import { Shield } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="w-full bg-surface-container-lowest border-t border-outline-variant/30 mt-auto">
+    <footer className="w-full bg-white border-t border-slate-200 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Cột 1: Thông tin hệ thống */}
           <div className="md:col-span-2 flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center font-bold shadow-sm">
-                <Shield className="w-5 h-5" />
+              <div className="w-7 h-7 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold">
+                <Shield className="w-4 h-4" />
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-base font-bold text-on-surface leading-tight">RoadVision</span>
-                <span className="font-mono text-[9px] text-primary uppercase tracking-wider font-semibold">NỀN TẢNG GIÁM SÁT HẠ TẦNG AI</span>
+                <span className="font-semibold text-slate-900 text-sm leading-tight">RoadVision</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Hệ thống Quản lý & Giám sát Hạ tầng Giao thông</span>
               </div>
             </div>
-            <p className="text-xs text-on-surface-variant leading-relaxed max-w-md">
-              Hệ thống quản lý, giám sát và điều phối khắc phục hư hại hạ tầng giao thông đô thị tự động hóa dựa trên Thị giác máy tính đa lớp YOLOv8 và Bản đồ số GIS không gian.
+            <p className="text-xs text-slate-600 leading-relaxed max-w-md">
+              Nền tảng tiếp nhận phản ánh hư hỏng mặt đường, tự động phân tích hiện trường và hỗ trợ điều phối lực lượng duy tu bảo dưỡng trên không gian bản đồ số GIS.
             </p>
-            <div className="flex items-center gap-3 pt-1">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-[11px] font-mono font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>HỆ THỐNG HOẠT ĐỘNG</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-mono font-bold">
-                <Cpu className="w-3.5 h-3.5" />
-                <span>ONNX Runtime 1.20</span>
-              </div>
-            </div>
           </div>
 
           {/* Cột 2: Điều hướng nhanh */}
           <div className="flex flex-col gap-2">
-            <span className="font-mono text-xs font-bold text-on-surface uppercase tracking-wider">
-              Khám Phá
+            <span className="text-xs font-semibold text-slate-900 uppercase tracking-wide">
+              Chức năng công khai
             </span>
-            <ul className="flex flex-col gap-2 text-xs text-on-surface-variant">
+            <ul className="flex flex-col gap-1.5 text-xs text-slate-600">
               <li>
-                <Link to="/" className="hover:text-primary transition-colors">
-                  Trang Chủ & Tổng Quan
+                <Link to="/" className="hover:text-blue-600 transition-colors">
+                  Tổng quan hệ thống
                 </Link>
               </li>
               <li>
-                <Link to="/map" className="hover:text-primary transition-colors">
-                  Bản Đồ Không Gian GIS
+                <Link to="/map" className="hover:text-blue-600 transition-colors">
+                  Bản đồ số GIS
                 </Link>
               </li>
               <li>
-                <Link to="/report" className="hover:text-primary transition-colors">
-                  Báo Cáo Sự Cố 1-Chạm
+                <Link to="/report" className="hover:text-blue-600 transition-colors">
+                  Gửi phản ánh sự cố
+                </Link>
+              </li>
+              <li>
+                <Link to="/patrol" className="hover:text-blue-600 transition-colors">
+                  Tuần tra video trực tuyến
                 </Link>
               </li>
             </ul>
@@ -59,23 +54,28 @@ export const Footer: React.FC = () => {
 
           {/* Cột 3: Quản trị & Nghiệp vụ */}
           <div className="flex flex-col gap-2">
-            <span className="font-mono text-xs font-bold text-on-surface uppercase tracking-wider">
-              Nghiệp Vụ
+            <span className="text-xs font-semibold text-slate-900 uppercase tracking-wide">
+              Khu vực nghiệp vụ
             </span>
-            <ul className="flex flex-col gap-2 text-xs text-on-surface-variant">
+            <ul className="flex flex-col gap-1.5 text-xs text-slate-600">
               <li>
-                <Link to="/dispatch" className="hover:text-primary transition-colors">
-                  Hàng Đợi Điều Phối (Admin)
+                <Link to="/dispatch" className="hover:text-blue-600 transition-colors">
+                  Điều phối hiện trường (Admin)
                 </Link>
               </li>
               <li>
-                <Link to="/tasks" className="hover:text-primary transition-colors">
-                  Nhiệm Vụ Kỹ Thuật (Staff)
+                <Link to="/tasks" className="hover:text-blue-600 transition-colors">
+                  Nhiệm vụ kỹ thuật (Kỹ thuật viên)
                 </Link>
               </li>
               <li>
-                <Link to="/my-reports" className="hover:text-primary transition-colors">
-                  Lịch Sử Phản Ánh (Citizen)
+                <Link to="/my-reports" className="hover:text-blue-600 transition-colors">
+                  Lịch sử phản ánh (Người dân)
+                </Link>
+              </li>
+              <li>
+                <Link to="/analytics" className="hover:text-blue-600 transition-colors">
+                  Báo cáo thống kê & KPI
                 </Link>
               </li>
             </ul>
@@ -83,16 +83,14 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Dải chân trang bản quyền */}
-        <div className="pt-6 border-t border-outline-variant/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-on-surface-variant">
-          <div className="flex items-center gap-2">
-            <span>© 2026 RoadVision. Đồ án tốt nghiệp Kỹ sư CNTT.</span>
+        <div className="pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+          <div>
+            <span>© 2026 RoadVision. Hệ thống quản lý hạ tầng giao thông đô thị.</span>
           </div>
-          <div className="font-mono text-[11px] text-on-surface-variant flex items-center gap-3">
-            <span>YOLOv8-RoadCare 4-Class</span>
+          <div className="flex items-center gap-3">
+            <span>Tiêu chuẩn TCCS đường bộ</span>
             <span>•</span>
-            <span>Leaflet Spatial GIS</span>
-            <span>•</span>
-            <span>Spring Boot 3</span>
+            <span>Không gian GIS WGS-84</span>
           </div>
         </div>
       </div>

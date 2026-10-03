@@ -342,12 +342,7 @@ public class IncidentController {
     @GetMapping("/public-stats")
     @Operation(summary = "API công khai cung cấp số liệu thống kê cho trang chủ")
     public ResponseEntity<Map<String, Object>> getPublicStats() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("activeVisionModel", "YOLOv8-RoadCare v2.4 Active");
-        stats.put("aiConfidenceMedian", "96.8%");
-        stats.put("meanResolutionSpeed", "4.2 Hours");
-        stats.put("activeDispatches", 38);
-        return ResponseEntity.ok(stats);
+        return ResponseEntity.ok(incidentService.getPublicStats());
     }
 
     /**

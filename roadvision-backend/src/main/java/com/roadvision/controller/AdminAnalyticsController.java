@@ -96,16 +96,17 @@ public class AdminAnalyticsController {
     @GetMapping("/api/v1/ai/telemetry")
     @Operation(summary = "Giám sát trạng thái hoạt động viễn trắc của mô hình YOLOv8 ONNX Runtime")
     public ResponseEntity<Map<String, Object>> getAiTelemetry() {
+        AdminAnalyticsResponse analytics = incidentService.getAdminAnalytics("30d", "ALL");
         Map<String, Object> telemetry = new LinkedHashMap<>();
         telemetry.put("modelName", "YOLOv8-RoadCare");
-        telemetry.put("modelVersion", "v2.4-Production-ONNX");
+        telemetry.put("modelVersion", analytics.getAiModelVersion());
         telemetry.put("runtimeEngine", "Microsoft ONNX Runtime 1.18.0");
         telemetry.put("targetResolution", "640x640 RGB (NCHW)");
         telemetry.put("hardwareAccelerator", "In-Process CPU TensorRT Optimized");
         telemetry.put("activeConfidenceThreshold", aiInferenceService.getConfidenceThreshold());
         telemetry.put("supportedClasses", Arrays.asList("pothole", "crack", "flooding", "obstacle", "complex_damage"));
-        telemetry.put("medianLatencyMs", 42);
-        telemetry.put("status", "ACTIVE_HEALTHY");
+        telemetry.put("medianLatencyMs", analytics.getAvgInferenceLatencyMs());
+        telemetry.put("status", aiInferenceService.isModelLoaded() ? "ACTIVE_HEALTHY" : "MODEL_STANDBY");
         telemetry.put("timestamp", System.currentTimeMillis());
         return ResponseEntity.ok(telemetry);
     }

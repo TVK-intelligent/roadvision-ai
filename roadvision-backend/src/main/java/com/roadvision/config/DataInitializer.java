@@ -27,7 +27,7 @@ public class DataInitializer implements CommandLineRunner {
         // 1. Tài khoản Quản trị viên (Admin)
         User admin = createOrUpdateUser(
                 "admin@roadcare.gov.vn",
-                "Eng. Elena Rostova",
+                "KS. Nguyễn Thị Phương Mai (Trưởng Ban Quản Lý Điều Hành)",
                 "0909000001",
                 Role.ROLE_ADMIN
         );

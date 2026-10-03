@@ -20,17 +20,17 @@ export const IncidentDossierPage: React.FC = () => {
 
   const [incident, setIncident] = useState<Incident | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proofNotes, setProofNotes] = useState<string>('Đã trám phẳng bằng bê tông nhựa nguội, lu lèn chặt.');
+  const [proofNotes, setProofNotes] = useState<string>('');
   const [rating, setRating] = useState<number>(5);
-  const [feedbackComments, setFeedbackComments] = useState<string>('Đội thi công làm rất nhanh và phẳng đẹp. Rất hài lòng!');
+  const [feedbackComments, setFeedbackComments] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [isUpvoting, setIsUpvoting] = useState<boolean>(false);
 
   // Trạng thái Khiếu nại (Citizen) & Lệnh thi công lại (Admin)
   const [adminDecision, setAdminDecision] = useState<'APPROVE' | 'REWORK'>('APPROVE');
-  const [disputeReason, setDisputeReason] = useState<string>('Mặt đường vẫn còn hư hỏng hoặc chưa được xử lý triệt để.');
+  const [disputeReason, setDisputeReason] = useState<string>('');
   const [isSubmittingDispute, setIsSubmittingDispute] = useState<boolean>(false);
-  const [reworkInstructions, setReworkInstructions] = useState<string>('Yêu cầu đội kỹ thuật khẩn trương quay lại hiện trường xử lý dứt điểm các vị trí hư hỏng còn sót lại theo cảnh báo của AI.');
+  const [reworkInstructions, setReworkInstructions] = useState<string>('');
   const [isSubmittingRework, setIsSubmittingRework] = useState<boolean>(false);
   const [showDefectBoxes, setShowDefectBoxes] = useState<boolean>(false);
 
@@ -172,29 +172,29 @@ export const IncidentDossierPage: React.FC = () => {
 
   if (!incident) {
     return (
-      <div className="p-12 max-w-lg mx-auto my-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 text-center flex flex-col items-center gap-4 shadow-sm">
-        <div className="w-12 h-12 rounded-full bg-error-container text-error flex items-center justify-center font-bold text-xl">✕</div>
+      <div className="p-8 max-w-md mx-auto my-12 bg-white rounded-lg border border-slate-200 text-center flex flex-col items-center gap-3 shadow-xs">
+        <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg border border-rose-200">✕</div>
         <div>
-          <h2 className="font-display font-bold text-lg text-on-surface">Không Tìm Thấy Hồ Sơ Sự Cố</h2>
-          <p className="text-xs text-on-surface-variant mt-1">Sự cố này không tồn tại trong hệ thống hoặc đã được dọn dẹp sạch sẽ.</p>
+          <h2 className="font-semibold text-base text-slate-900">Không tìm thấy hồ sơ sự cố</h2>
+          <p className="text-xs text-slate-500 mt-1">Sự cố này không tồn tại trong hệ thống hoặc đã được dọn dẹp sạch sẽ.</p>
         </div>
         <Link
           to="/report"
-          className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow hover:bg-primary/90"
+          className="mt-2 px-4 py-2 rounded-md bg-blue-600 text-white font-medium text-xs hover:bg-blue-700 transition-colors shadow-xs"
         >
-          Tạo Báo Cáo Mới
+          Tạo báo cáo mới
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 py-4">
+    <div className="flex flex-col gap-5 py-3">
       {/* Breadcrumbs */}
       <div className="flex items-center justify-between">
         <Link
           to="/my-reports"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-primary hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Quay lại danh sách sự cố</span>
@@ -205,18 +205,17 @@ export const IncidentDossierPage: React.FC = () => {
       </div>
 
       {/* Header Banner */}
-      <div className="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
-        <div className="flex flex-col gap-2 pl-2">
-          <div className="flex items-center gap-3 flex-wrap">
+      <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <StatusBadge status={incident.status} />
-            <span className="font-mono text-xs font-bold text-on-surface">TICKET: {incident.ticketCode}</span>
-            <span className="text-xs text-on-surface-variant font-mono">
+            <span className="font-mono text-xs font-semibold text-slate-700">TICKET: {incident.ticketCode}</span>
+            <span className="text-xs text-slate-500 font-mono">
               Báo cáo: {new Date(incident.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
-          <h1 className="font-display text-2xl font-bold text-on-surface">{incident.title}</h1>
-          <p className="text-xs text-on-surface-variant">{incident.address}</p>
+          <h1 className="text-xl font-bold text-slate-900">{incident.title}</h1>
+          <p className="text-xs text-slate-600">{incident.address}</p>
         </div>
 
         {/* Nút & Huy Hiệu Đồng Tình (Upvote) */}
@@ -224,11 +223,11 @@ export const IncidentDossierPage: React.FC = () => {
           <button
             onClick={handleUpvote}
             disabled={isUpvoting || incident.status === 'RESOLVED' || incident.status === 'CLOSED'}
-            className="px-4 py-2 rounded-2xl bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary font-bold text-xs flex items-center gap-2 transition-all disabled:opacity-60 shadow-xs"
+            className="px-3.5 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium text-xs flex items-center gap-1.5 transition-colors disabled:opacity-60 shadow-xs"
             title="Bấm đồng tình để tăng cấp độ khẩn cấp xử lý"
           >
-            <ThumbsUp className="w-4 h-4" />
-            <span>{incident.upvoteCount || 1} Đồng Tình</span>
+            <ThumbsUp className="w-3.5 h-3.5" />
+            <span>{incident.upvoteCount || 1} Đồng tình</span>
           </button>
         </div>
       </div>
@@ -242,13 +241,13 @@ export const IncidentDossierPage: React.FC = () => {
       />
 
       {/* Bố cục 2 Cột Đối Chiếu */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
         {/* Cột Trái: Ảnh AI và Bounding Box (6 Cột) */}
         <div className="md:col-span-6 flex flex-col gap-4">
-          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col gap-3">
+          <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-on-surface">Hiện Trường Sự Cố & Hộp Bao AI</span>
-              <span className="font-mono text-xs font-bold text-primary">
+              <span className="text-xs font-semibold text-slate-800">Hiện trường sự cố & Hộp bao AI</span>
+              <span className="font-mono text-xs font-medium text-blue-700">
                 {incident.aiDetection && incident.aiDetection.className !== 'NONE'
                   ? (() => {
                       const boxes = incident.aiDetection.boxes || [];
@@ -263,7 +262,7 @@ export const IncidentDossierPage: React.FC = () => {
                       if (counts['ROAD_OBSTACLE']) parts.push(`${counts['ROAD_OBSTACLE']} Vật cản`);
 
                       if (parts.length > 1) {
-                        return `YOLOv8 Đa Sự Cố: ${parts.join(' & ')} (${(incident.aiDetection.confidence * 100).toFixed(1)}%)`;
+                        return `YOLOv8 Đa sự cố: ${parts.join(' & ')} (${(incident.aiDetection.confidence * 100).toFixed(1)}%)`;
                       }
                       const singleName = incident.aiDetection.className === 'POTHOLE' ? 'Ổ gà' :
                         incident.aiDetection.className === 'ROAD_CRACK' ? 'Vết nứt' :
@@ -278,11 +277,11 @@ export const IncidentDossierPage: React.FC = () => {
             <ImageCanvasWithBBox
               imageUrl={incident.imageUrl}
               aiDetection={incident.aiDetection}
-              className="min-h-[380px] md:h-[450px] w-full"
+              className="min-h-[360px] md:h-[420px] w-full rounded-md overflow-hidden border border-slate-200"
             />
 
-            <div className="text-xs text-on-surface-variant bg-surface-container-low p-3 rounded-xl">
-              <span className="font-bold text-on-surface">Mô tả: </span>
+            <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100">
+              <span className="font-semibold text-slate-800">Mô tả: </span>
               {incident.description}
             </div>
           </div>
@@ -290,20 +289,20 @@ export const IncidentDossierPage: React.FC = () => {
 
         {/* Cột Phải: Bản đồ GIS và Vị trí (6 Cột) */}
         <div className="md:col-span-6 flex flex-col gap-4">
-          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col gap-3">
+          <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-on-surface">Bản Đồ Không Gian Tương Tác</span>
-              <span className="font-mono text-xs text-secondary font-semibold">OpenStreetMap</span>
+              <span className="text-xs font-semibold text-slate-800">Bản đồ không gian hiện trường</span>
+              <span className="font-mono text-xs text-slate-500 font-medium">OpenStreetMap</span>
             </div>
 
             <LeafletMap
               latitude={Number(incident.latitude)}
               longitude={Number(incident.longitude)}
               popupTitle={incident.ticketCode}
-              className="h-72 w-full"
+              className="h-72 w-full rounded-md border border-slate-200 overflow-hidden"
             />
 
-            <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant bg-surface-container-low p-3 rounded-xl">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100">
               <span>Người báo cáo: {incident.reporterName || 'Ẩn danh'}</span>
               <span>SĐT: {incident.reporterPhone || 'Chưa cung cấp'}</span>
             </div>
@@ -312,39 +311,39 @@ export const IncidentDossierPage: React.FC = () => {
       </div>
 
       {/* Khu vực Hành Động Nghiệp Vụ Theo Vai Trò */}
-      <div className="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col gap-4">
-        <h3 className="text-base font-bold text-on-surface">Hành Động Khắc Phục & Nghiệm Thu</h3>
+      <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-4">
+        <h3 className="text-sm font-semibold text-slate-900">Hành động khắc phục và nghiệm thu</h3>
 
         {/* PHA 4.1: TRẠNG THÁI ASSIGNED */}
         {incident.status === 'ASSIGNED' && (
           user?.role === 'ROLE_STAFF' ? (
-            <div className="flex items-center justify-between bg-primary-fixed/30 p-4 rounded-xl">
+            <div className="flex items-center justify-between bg-blue-50 p-3.5 rounded-lg border border-blue-200">
               <div>
-                <div className="font-semibold text-sm text-primary">Nhiệm vụ đã được phân công cho bạn</div>
-                <div className="text-xs text-on-surface-variant">Nhấn nút bên cạnh khi bạn đã có mặt tại hiện trường</div>
+                <div className="font-semibold text-xs text-blue-900">Nhiệm vụ đã được phân công cho bạn</div>
+                <div className="text-xs text-slate-600 mt-0.5">Xác nhận khi bạn đã có mặt tại hiện trường để bắt đầu</div>
               </div>
               <button
                 onClick={handleStartRepair}
-                className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow hover:bg-primary-container flex items-center gap-2"
+                className="px-3.5 py-1.5 rounded-md bg-blue-600 text-white font-medium text-xs shadow-xs hover:bg-blue-700 flex items-center gap-1.5 transition-colors"
               >
-                <Hammer className="w-4 h-4" />
-                <span>Bắt Đầu Xử Lý (IN_PROGRESS)</span>
+                <Hammer className="w-3.5 h-3.5" />
+                <span>Bắt đầu xử lý</span>
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-between bg-surface-container-high p-4 rounded-xl border border-outline-variant/30">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-secondary shrink-0" />
+            <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+              <div className="flex items-center gap-2.5">
+                <Clock className="w-4 h-4 text-slate-500 shrink-0" />
                 <div>
-                  <div className="font-semibold text-xs text-on-surface">
-                    Đã điều phối cho Kỹ thuật viên: <span className="text-primary font-bold">{incident.assignment?.assignedToStaffName || 'Đội kỹ thuật'}</span>
+                  <div className="font-medium text-xs text-slate-800">
+                    Đã điều phối cho kỹ thuật viên: <span className="text-blue-700 font-semibold">{incident.assignment?.assignedToStaffName || 'Đội kỹ thuật'}</span>
                   </div>
-                  <div className="text-[11px] text-on-surface-variant">
-                    Hệ thống đang chờ Kỹ thuật viên di chuyển đến hiện trường và kích hoạt trạng thái thi công.
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Hệ thống đang chờ kỹ thuật viên di chuyển đến hiện trường và kích hoạt trạng thái thi công.
                   </div>
                 </div>
               </div>
-              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-secondary-container/30 text-secondary shrink-0">
+              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-slate-200 text-slate-700 shrink-0">
                 CHỜ CÓ MẶT
               </span>
             </div>
@@ -356,63 +355,62 @@ export const IncidentDossierPage: React.FC = () => {
           <div className="flex flex-col gap-4">
             {/* ĐỐI CHIẾU SONG SONG ẢNH A VÀ ẢNH B KHI ĐANG TÁI THI CÔNG (REWORK) */}
             {incident.resolution?.proofImageUrl && (
-              <div className="flex flex-col gap-3 p-4 rounded-2xl bg-surface-container-high border border-outline-variant/40 shadow-xs">
+              <div className="flex flex-col gap-3 p-4 rounded-lg bg-rose-50/50 border border-rose-200 shadow-xs">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold text-xs uppercase tracking-wide">
+                  <div className="flex items-center gap-2 text-rose-800 font-semibold text-xs uppercase tracking-wide">
                     <AlertTriangle className="w-4 h-4 text-rose-600" />
-                    <span>HỒ SƠ TÁI THI CÔNG: ĐỐI CHIẾU HIỆN TRẠNG GỐC VÀ LẦN SỬA CHƯA ĐẠT</span>
+                    <span>Hồ sơ tái thi công: Đối chiếu hiện trạng gốc và lần sửa chưa đạt</span>
                   </div>
                   {incident.reworkCount && (
-                    <span className="text-[11px] font-mono text-rose-600 font-bold bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20">
+                    <span className="text-[11px] font-mono text-rose-700 font-medium bg-rose-100 px-2 py-0.5 rounded border border-rose-200">
                       Tái thi công lần #{incident.reworkCount}
                     </span>
                   )}
                 </div>
 
                 {/* Khung 2 ảnh song song Side-by-Side */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Cột 1: Ảnh A - Người dân chụp ban đầu */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {/* Cột 1: Ảnh A - Người dân chụp ban đầu kèm Bounding Box AI */}
-                  <div className="flex flex-col gap-2 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20">
+                  <div className="flex flex-col gap-2 p-3 rounded-md bg-white border border-slate-200">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-on-surface flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">A</span>
-                        Ảnh Gốc Ban Đầu (Người Dân Báo)
+                      <span className="font-medium text-slate-800 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">A</span>
+                        Ảnh gốc ban đầu (Phản ánh)
                       </span>
                       {incident.aiDetection?.confidence ? (
-                        <span className="text-[10px] font-mono text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-mono text-blue-700 font-medium bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
                           AI: {(incident.aiDetection.confidence * 100).toFixed(0)}%
                         </span>
                       ) : (
-                        <span className="text-[10px] font-mono text-on-surface-variant">Hiện trạng gốc</span>
+                        <span className="text-[10px] font-mono text-slate-500">Hiện trạng gốc</span>
                       )}
                     </div>
 
-                    <div className="relative rounded-lg overflow-hidden border border-outline-variant/20 bg-black/5 aspect-video">
+                    <div className="relative rounded overflow-hidden border border-slate-200 bg-slate-100 aspect-video">
                       <ImageCanvasWithBBox
                         imageUrl={incident.imageUrl}
                         aiDetection={incident.aiDetection}
                         className="w-full h-full"
                       />
                     </div>
-                    <span className="text-[11px] text-on-surface-variant italic">
-                      Hộp bao AI ban đầu xác định vị trí và quy mô ổ gà/vết nứt gốc.
+                    <span className="text-[11px] text-slate-500 italic">
+                      Hộp bao AI ban đầu xác định vị trí và quy mô hư hỏng gốc.
                     </span>
                   </div>
 
                   {/* Cột 2: Ảnh B - Ảnh thợ đã sửa nhưng bị bắt lỗi */}
-                  <div className="flex flex-col gap-2 p-3 rounded-xl bg-surface-container-lowest border border-rose-500/30">
+                  <div className="flex flex-col gap-2 p-3 rounded-md bg-white border border-rose-200">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300 flex items-center justify-center font-bold text-[10px]">B</span>
-                        Ảnh Nghiệm Thu Vừa Qua (Bị Bác Bỏ)
+                      <span className="font-medium text-rose-800 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-[10px]">B</span>
+                        Ảnh nghiệm thu vừa qua (Chưa đạt)
                       </span>
-                      <span className="text-[10px] font-mono text-rose-600 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] font-mono text-rose-700 font-medium bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
                         AI CẢNH BÁO
                       </span>
                     </div>
 
-                    <div className="relative rounded-lg overflow-hidden border border-rose-500/30 bg-black/5 aspect-video">
+                    <div className="relative rounded overflow-hidden border border-rose-200 bg-slate-100 aspect-video">
                       <ImageCanvasWithBBox
                         imageUrl={incident.resolution.proofImageUrl}
                         aiDetection={{
@@ -428,16 +426,16 @@ export const IncidentDossierPage: React.FC = () => {
                         className="w-full h-full"
                       />
                     </div>
-                    <span className="text-[11px] text-rose-700 dark:text-rose-400 font-medium">
-                      {incident.resolution.aiVerificationNotes || 'Khung viền màu đánh dấu các vị trí hư hỏng còn sót lại cần thợ xử lý dứt điểm.'}
+                    <span className="text-[11px] text-rose-700 font-medium">
+                      {incident.resolution.aiVerificationNotes || 'Khung viền màu đánh dấu các vị trí hư hỏng còn sót lại cần xử lý dứt điểm.'}
                     </span>
                   </div>
                 </div>
 
                 {/* Lời chỉ đạo của Admin */}
                 {incident.reworkReason && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 text-xs">
-                    <strong>📢 Lệnh chỉ đạo thi công của Ban Quản Lý:</strong> "{incident.reworkReason}"
+                  <div className="p-2.5 rounded-md bg-rose-100/60 border border-rose-200 text-rose-900 text-xs leading-relaxed">
+                    <strong>Chỉ đạo thi công từ Ban Quản lý:</strong> "{incident.reworkReason}"
                   </div>
                 )}
               </div>
@@ -445,74 +443,72 @@ export const IncidentDossierPage: React.FC = () => {
 
             {/* FORM HOẶC THẺ TIẾN ĐỘ TÙY THEO VAI TRÒ */}
             {user?.role === 'ROLE_STAFF' ? (
-              <form onSubmit={handleResolveSubmit} className="flex flex-col gap-3 bg-secondary-fixed/30 p-4 rounded-xl">
-                <div className="font-semibold text-sm text-secondary flex items-center gap-2">
-                  <Hammer className="w-4 h-4" />
+              <form onSubmit={handleResolveSubmit} className="flex flex-col gap-3.5 bg-blue-50/50 p-4 rounded-lg border border-blue-200">
+                <div className="font-semibold text-xs text-blue-900 flex items-center gap-2">
+                  <Hammer className="w-4 h-4 text-blue-700" />
                   <span>
                     {incident.reworkCount && incident.reworkCount > 0
                       ? `Nộp ảnh nghiệm thu mới sau khi đã khắc phục lại (Lần ${incident.reworkCount + 1})`
-                      : 'Nộp ảnh nghiệm thu hiện trường hoàn thiện (Proof of Work)'}
+                      : 'Nộp ảnh nghiệm thu hiện trường hoàn thiện'}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Chụp ảnh sau khi đã vá phẳng hoàn tất</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Ảnh chụp sau khi hoàn tất sửa chữa</label>
                     <input
                       type="file"
                       accept="image/*"
                       onChange={(e) => setProofFile(e.target.files ? e.target.files[0] : null)}
-                      className="w-full text-xs"
+                      className="w-full text-xs text-slate-700 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-slate-300 file:text-xs file:bg-white file:text-slate-700 hover:file:bg-slate-50"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Ghi chú vật liệu & biện pháp khắc phục</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Ghi chú vật liệu & biện pháp khắc phục</label>
                     <input
                       type="text"
                       value={proofNotes}
                       onChange={(e) => setProofNotes(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-surface-container-lowest border"
+                      placeholder="Ví dụ: Đã trám phẳng bằng bê tông nhựa nguội, lu lèn chặt..."
+                      className="w-full px-3 py-1.5 text-xs rounded-md bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-blue-600"
                     />
                   </div>
                 </div>
                 <button
                   type="submit"
-                  className="self-end px-5 py-2 rounded-xl bg-secondary text-on-primary font-bold text-xs shadow hover:bg-secondary/90 flex items-center gap-2"
+                  className="self-end px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Xác Nhận Nghiệm Thu (RESOLVED)</span>
+                  <span>Xác nhận nghiệm thu</span>
                 </button>
               </form>
             ) : (
-              <div className="flex flex-col gap-3 bg-primary-fixed/20 p-4 rounded-xl border border-primary/20">
+              <div className="flex flex-col gap-2.5 bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-                    </div>
-                    <span className="font-bold text-xs uppercase tracking-wide text-primary">
-                      Đội Kỹ Thuật Đang Thi Công Xử Lý Hiện Trường
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-600"></div>
+                    <span className="font-semibold text-xs text-slate-900">
+                      Đội kỹ thuật đang thi công xử lý hiện trường
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-on-surface-variant bg-surface-container-highest px-2.5 py-1 rounded-lg">
+                  <span className="text-[11px] font-mono text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
                     Phụ trách: {incident.assignment?.assignedToStaffName || incident.resolution?.staffName || 'Đội kỹ thuật'}
                   </span>
                 </div>
 
                 {incident.reworkReason && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-800 dark:text-rose-200 text-xs">
-                    <strong>🔄 Đang thi công lại theo chỉ đạo:</strong> "{incident.reworkReason}"
+                  <div className="p-2.5 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+                    <strong>Đang thi công lại theo chỉ đạo:</strong> "{incident.reworkReason}"
                     {incident.reworkCount && (
-                      <span className="ml-2 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20">
+                      <span className="ml-2 font-mono text-[10px] font-medium px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 border border-rose-200">
                         Lần {incident.reworkCount}
                       </span>
                     )}
                   </div>
                 )}
 
-                <p className="text-xs text-on-surface-variant">
-                  Kỹ thuật viên đang có mặt tại hiện trường để san phẳng và khắc phục triệt để các hư hỏng mặt đường. Sau khi hoàn thành, Kỹ thuật viên sẽ tải lên hình ảnh nghiệm thu mới để AI và Quản trị viên thẩm định.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Kỹ thuật viên đang có mặt tại hiện trường để san phẳng và khắc phục triệt để các hư hỏng mặt đường. Sau khi hoàn thành, ảnh nghiệm thu mới sẽ được tải lên để AI và Quản trị viên thẩm định.
                 </p>
               </div>
             )}
@@ -521,30 +517,30 @@ export const IncidentDossierPage: React.FC = () => {
 
         {/* Người dân (Citizen) đối chiếu ảnh Trước/Sau & Đóng sự cố hoặc Khiếu nại */}
         {incident.status === 'RESOLVED' && (
-          <div className="flex flex-col gap-4 bg-surface-container-low p-5 rounded-2xl border border-outline-variant/30">
+          <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-sm text-primary flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-secondary" />
-                Đối chiếu tương tác Trước vs Sau (Proof of Work) & Thẩm định nghiệm thu
+              <span className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Đối chiếu tương tác Trước & Sau thi công
               </span>
-              <span className="text-xs font-mono text-on-surface-variant bg-surface-container-highest px-2.5 py-1 rounded-lg">
-                Kỹ thuật viên: {incident.resolution?.staffName || 'Đội 4'}
+              <span className="text-xs font-mono text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                Kỹ thuật viên: {incident.resolution?.staffName || 'Đội kỹ thuật'}
               </span>
             </div>
 
             {/* Thông báo cờ tranh chấp nếu đang có khiếu nại */}
             {incident.flag === 'DISPUTED' && (
-              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-950 dark:text-rose-100 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-950 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <div className="font-bold text-xs uppercase tracking-wide text-rose-700 dark:text-rose-400">
-                    Sự Cố Đang Bị Khiếu Nại Chất Lượng Nghiệm Thu
+                  <div className="font-semibold text-xs uppercase tracking-wide text-rose-800">
+                    Sự cố đang bị khiếu nại chất lượng nghiệm thu
                   </div>
-                  <p className="text-xs opacity-90 mt-1">
-                    <strong>Nội dung phản ánh:</strong> "{incident.reworkReason || 'Mặt đường chưa khắc phục triệt để.'}"
+                  <p className="text-xs text-rose-900 mt-1">
+                    <strong>Nội dung:</strong> "{incident.reworkReason || 'Mặt đường chưa khắc phục triệt để.'}"
                   </p>
-                  <div className="text-[11px] text-on-surface-variant mt-1 italic">
-                    Hồ sơ đang chờ Ban Quản Lý (Admin) thẩm định để ra lệnh cho Kỹ thuật viên quay lại hiện trường xử lý dứt điểm.
+                  <div className="text-[11px] text-slate-600 mt-0.5 italic">
+                    Hồ sơ đang chờ Ban Quản lý thẩm định để chỉ đạo thi công lại nếu cần.
                   </div>
                 </div>
               </div>
@@ -553,35 +549,35 @@ export const IncidentDossierPage: React.FC = () => {
             {/* Thẻ Kết QuẢ Kiểm Định Chất Lượng AI (AI Quality Verification) */}
             {incident.resolution?.aiVerificationStatus && (
               <div
-                className={`p-4 rounded-2xl border flex items-start gap-3.5 transition-all ${
+                className={`p-3.5 rounded-lg border flex items-start gap-2.5 transition-colors ${
                   incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-100'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-100'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                    : 'bg-amber-50 border-amber-200 text-amber-950'
                 }`}
               >
                 {incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN' ? (
-                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 ) : (
-                  <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 )}
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-xs uppercase tracking-wide">
+                    <span className="font-semibold text-xs">
                       {incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
-                        ? 'Thẩm Định Nghiệm Thu AI: Đạt Chuẩn Hoàn Trả (Mặt đường đạt chuẩn)'
-                        : 'Cảnh Báo Kiểm Định AI: Phát Hiện Dấu Hiệu Hư Hỏng Còn Sót Lại'}
+                        ? 'Thẩm định nghiệm thu AI: Đạt chuẩn hoàn trả mặt đường'
+                        : 'Cảnh báo kiểm định AI: Phát hiện dấu hiệu hư hỏng còn sót lại'}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
+                      className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-medium border ${
                         incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
-                          ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : 'bg-amber-100 text-amber-800 border-amber-200'
                       }`}
                     >
                       {incident.resolution.aiVerificationStatus}
                     </span>
                   </div>
-                  <p className="text-xs opacity-90 mt-1">
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                     {incident.resolution.aiVerificationNotes ||
                       (incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
                         ? 'Mặt đường sau thi công đã được trám phẳng, không còn hố sụt hoặc vết nứt kết cấu.'
@@ -593,10 +589,10 @@ export const IncidentDossierPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowDefectBoxes(!showDefectBoxes)}
-                      className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-100 text-xs font-bold transition-all shadow-xs"
+                      className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-medium border border-amber-200 transition-colors"
                     >
                       {showDefectBoxes ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      <span>{showDefectBoxes ? 'Ẩn khung lỗi AI (Xem thanh trượt Before/After)' : 'Xem chi tiết khung Bounding Box AI phát hiện trên ảnh After'}</span>
+                      <span>{showDefectBoxes ? 'Ẩn khung lỗi AI' : 'Xem chi tiết khung phát hiện AI'}</span>
                     </button>
                   )}
                 </div>
@@ -606,8 +602,8 @@ export const IncidentDossierPage: React.FC = () => {
             {/* Hiển thị lớp phủ Bounding Box AI hoặc Khung thanh trượt Before & After */}
             {showDefectBoxes && incident.resolution?.proofImageUrl ? (
               <div className="flex flex-col gap-2">
-                <div className="text-xs font-mono text-on-surface-variant flex items-center justify-between">
-                  <span className="font-bold text-amber-600">KẾT QUẢ KIỂM ĐỊNH AI - CÁC VỊ TRÍ CẦN XỬ LÝ LẠI TRÊN ẢNH SAU THI CÔNG:</span>
+                <div className="text-xs font-mono text-slate-600 flex items-center justify-between">
+                  <span className="font-semibold text-amber-700">Vị trí cần xử lý lại phát hiện bởi AI:</span>
                   <span>Mô hình: YOLOv8-RoadCare Active</span>
                 </div>
                 <ImageCanvasWithBBox
@@ -622,36 +618,44 @@ export const IncidentDossierPage: React.FC = () => {
                     inferenceMs: 0,
                     boxes: incident.resolution.verificationBoxes || (incident.resolution.aiVerificationDetectionsJson ? JSON.parse(incident.resolution.aiVerificationDetectionsJson) : [])
                   }}
-                  className="min-h-[420px] w-full"
+                  className="min-h-[400px] w-full rounded-md border border-slate-200 overflow-hidden"
                 />
               </div>
-            ) : (
+            ) : incident.resolution?.proofImageUrl ? (
               <BeforeAfterSlider
                 beforeImageUrl={incident.imageUrl}
-                afterImageUrl={incident.resolution?.proofImageUrl || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800'}
-                className="min-h-[440px] w-full"
+                afterImageUrl={incident.resolution.proofImageUrl}
+                className="min-h-[420px] w-full"
               />
+            ) : (
+              <div className="min-h-[220px] w-full rounded-md border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+                <Clock className="w-8 h-8 text-slate-400 mb-2" />
+                <span className="text-xs font-semibold text-slate-700">Chưa có ảnh nghiệm thu hoàn thiện</span>
+                <span className="text-[11px] text-slate-500 mt-1 max-w-sm">
+                  Đang chờ tổ kỹ thuật viên hiện trường thi công và nộp ảnh đối chứng sau xử lý.
+                </span>
+              </div>
             )}
 
             {/* PHÂN QUYỀN VÀ THẨM QUYỀN ĐÁNH GIÁ NGHIỆM THU (RESOLVED) */}
 
             {/* 1. NẾU LÀ KỸ THUẬT VIÊN (STAFF) - KHÔNG ĐƯỢC TỰ ĐÁNH GIÁ SẢN PHẨM CỦA MÌNH */}
             {user?.role === 'ROLE_STAFF' ? (
-              <div className="p-4 rounded-2xl bg-surface-container-high border border-outline-variant/30 flex items-start gap-3.5 shadow-xs">
-                <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0 mt-0.5">
-                  <CheckCircle2 className="w-5 h-5" />
+              <div className="p-3.5 rounded-lg bg-white border border-slate-200 flex items-start gap-3 shadow-xs">
+                <div className="p-2 rounded-md bg-blue-50 text-blue-600 shrink-0 mt-0.5 border border-blue-100">
+                  <CheckCircle2 className="w-4 h-4" />
                 </div>
                 <div className="flex-1 text-xs">
-                  <div className="font-bold text-on-surface text-sm mb-1 flex items-center gap-2">
-                    <span>Đã Hoàn Thành Thi Công & Chờ Nghiệm Thu Độc Lập</span>
-                    <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary font-mono text-[10px] font-bold">Kỹ Thuật Viên</span>
+                  <div className="font-semibold text-slate-900 text-sm mb-1 flex items-center gap-2">
+                    <span>Đã hoàn thành thi công và chờ nghiệm thu độc lập</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[10px] font-medium border border-slate-200">Kỹ thuật viên</span>
                   </div>
-                  <p className="text-on-surface-variant leading-relaxed">
-                    Bạn đang đăng nhập với tài khoản <span className="font-semibold text-primary">Kỹ thuật viên thi công</span>. Theo nguyên tắc khách quan, kỹ thuật viên không được tự chấm điểm chất lượng hoặc tự nghiệm thu đóng hồ sơ của chính mình.
+                  <p className="text-slate-600 leading-relaxed">
+                    Bạn đang đăng nhập với tài khoản <span className="font-medium text-slate-800">Kỹ thuật viên thi công</span>. Theo nguyên tắc khách quan, kỹ thuật viên không tự chấm điểm hoặc tự đóng hồ sơ của chính mình.
                   </p>
-                  <div className="mt-2.5 pt-2 border-t border-outline-variant/20 flex items-center gap-2 text-secondary text-[11px] font-medium">
-                    <Info className="w-4 h-4 shrink-0" />
-                    <span>Hồ sơ đang chờ người dân tạo phản ánh (<b>{incident.reporterName || 'Người dân'}</b>) hoặc Quản trị viên Ban Quản Lý kiểm tra hiện trường, chấm điểm chất lượng và xác nhận hoàn tất.</span>
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1.5 text-slate-500 text-[11px]">
+                    <Info className="w-3.5 h-3.5 shrink-0" />
+                    <span>Hồ sơ đang chờ người dân tạo phản ánh (<b>{incident.reporterName || 'Người dân'}</b>) hoặc Quản trị viên Ban Quản lý xác nhận hoàn tất.</span>
                   </div>
                 </div>
               </div>
@@ -659,45 +663,45 @@ export const IncidentDossierPage: React.FC = () => {
               /* 2. NẾU LÀ QUẢN TRỊ VIÊN HOẶC CHÍNH CÔNG DÂN TẠO BÁO CÁO */
               <div className="flex flex-col gap-3">
                 {user?.role === 'ROLE_ADMIN' ? (
-                  /* BẢNG THẨM ĐỊNH NGHIỆM THU ĐIỀU PHỐI (ADMIN REVIEW PANEL - GỘP 1 KHUNG DUY NHẤT) */
-                  <div className="p-5 rounded-2xl bg-surface-container-high border border-outline-variant/40 flex flex-col gap-4 shadow-xs">
+                  /* BẢNG THẨM ĐỊNH NGHIỆM THU ĐIỀU PHỐI (ADMIN REVIEW PANEL) */
+                  <div className="p-4 rounded-lg bg-white border border-slate-200 flex flex-col gap-3.5 shadow-xs">
                     {/* Header */}
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2">
-                        <ShieldAlert className="w-5 h-5 text-primary" />
-                        <span className="font-bold text-sm text-on-surface">Thẩm Quyền Quản Trị Viên: Quyết Định Nghiệm Thu</span>
+                        <ShieldAlert className="w-4 h-4 text-blue-600" />
+                        <span className="font-semibold text-xs text-slate-900">Thẩm quyền Quản trị viên: Quyết định nghiệm thu</span>
                       </div>
-                      <span className="text-[11px] font-mono text-secondary bg-secondary-container/30 px-2.5 py-1 rounded-lg font-bold">
+                      <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                         Admin Dispatcher
                       </span>
                     </div>
 
                     {/* Bộ chuyển đổi quyết định trực quan (Segmented Toggle) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-1.5 bg-surface-container-lowest rounded-xl border border-outline-variant/30">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-md border border-slate-200">
                       <button
                         type="button"
                         onClick={() => setAdminDecision('APPROVE')}
-                        className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-xs transition-all ${
+                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded text-xs transition-colors ${
                           adminDecision === 'APPROVE'
-                            ? 'bg-primary text-on-primary shadow-sm'
-                            : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                            ? 'bg-white text-slate-900 font-semibold shadow-xs border border-slate-200'
+                            : 'text-slate-600 hover:text-slate-900 font-medium'
                         }`}
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>1. Nghiệm Thu Đạt & Đóng Sự Cố</span>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>1. Nghiệm thu đạt và đóng sự cố</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setAdminDecision('REWORK')}
-                        className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-xs transition-all ${
+                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded text-xs transition-colors ${
                           adminDecision === 'REWORK'
-                            ? 'bg-rose-600 text-white shadow-sm'
-                            : 'text-on-surface-variant hover:text-rose-600 hover:bg-rose-500/10'
+                            ? 'bg-white text-rose-700 font-semibold shadow-xs border border-rose-200'
+                            : 'text-slate-600 hover:text-rose-700 font-medium'
                         }`}
                       >
-                        <RotateCcw className="w-4 h-4" />
-                        <span>2. Chưa Đạt - Yêu Cầu Thi Công Lại (REWORK)</span>
+                        <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                        <span>2. Chưa đạt - Yêu cầu thi công lại</span>
                       </button>
                     </div>
 
@@ -706,22 +710,22 @@ export const IncidentDossierPage: React.FC = () => {
                       /* KỊCH BẢN 1: DUYỆT ĐẠT CHUẨN & ĐÓNG PHIẾU */
                       <form onSubmit={handleCloseSubmit} className="flex flex-col gap-3 pt-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-on-surface">Đánh giá chất lượng hoàn trả:</span>
+                          <span className="text-xs font-medium text-slate-700">Đánh giá chất lượng hoàn trả:</span>
                           {[1, 2, 3, 4, 5].map((star) => (
                             <button
                               type="button"
                               key={star}
                               onClick={() => setRating(star)}
-                              className={`p-1 rounded transition-transform hover:scale-110 ${rating >= star ? 'text-amber-500' : 'text-gray-300'}`}
+                              className={`p-0.5 transition-transform hover:scale-110 ${rating >= star ? 'text-amber-500' : 'text-slate-300'}`}
                             >
-                              <Star className="w-5 h-5 fill-current" />
+                              <Star className="w-4 h-4 fill-current" />
                             </button>
                           ))}
-                          <span className="text-xs font-mono font-bold ml-1 text-amber-600">({rating} sao)</span>
+                          <span className="text-xs font-mono font-medium ml-1 text-amber-600">({rating} sao)</span>
                         </div>
 
                         <div>
-                          <label className="block text-xs font-semibold mb-1 text-on-surface">
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
                             Ghi chú thẩm định hoàn tất mặt đường:
                           </label>
                           <textarea
@@ -729,56 +733,56 @@ export const IncidentDossierPage: React.FC = () => {
                             value={feedbackComments}
                             onChange={(e) => setFeedbackComments(e.target.value)}
                             placeholder="Nhập ghi chú thẩm định của Quản trị viên..."
-                            className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface"
+                            className="w-full px-3 py-2 text-xs rounded-md bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-blue-600"
                           />
                         </div>
 
-                        <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-outline-variant/20">
-                          <span className="text-xs text-on-surface-variant flex items-center gap-1.5">
+                        <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-slate-100">
+                          <span className="text-xs text-slate-500 flex items-center gap-1.5">
                             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                             Mặt đường hoàn trả đạt chuẩn kỹ thuật. Xác nhận lưu trữ hồ sơ.
                           </span>
                           <button
                             type="submit"
-                            className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs shadow flex items-center gap-2 transition-colors shrink-0"
+                            className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors shrink-0"
                           >
                             <CheckCircle2 className="w-4 h-4" />
-                            <span>Xác Nhận Nghiệm Thu & Đóng Sự Cố (CLOSED)</span>
+                            <span>Xác nhận nghiệm thu và đóng sự cố</span>
                           </button>
                         </div>
                       </form>
                     ) : (
                       /* KỊCH BẢN 2: BÁC BỎ & YÊU CẦU THI CÔNG LẠI */
                       <div className="flex flex-col gap-3 pt-1">
-                        <div className="text-xs text-rose-700 dark:text-rose-400 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20 flex items-start gap-2">
+                        <div className="text-xs text-rose-800 bg-rose-50 p-2.5 rounded-md border border-rose-200 flex items-start gap-2">
                           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                           <span>
-                            Quản trị viên từ chối nghiệm thu. Sự cố sẽ được thu hồi trạng thái và chuyển về <b>IN_PROGRESS</b> để Kỹ thuật viên khẩn trương xử lý lại hiện trường.
+                            Quản trị viên từ chối nghiệm thu. Sự cố sẽ được chuyển về <b>IN_PROGRESS</b> để Kỹ thuật viên khẩn trương xử lý lại hiện trường.
                           </span>
                         </div>
 
                         <div>
-                          <label className="block text-xs font-semibold mb-1 text-on-surface">
-                            Chỉ đạo thi công khắc phục cho Kỹ thuật viên:
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            Chỉ đạo thi công khắc phục cho kỹ thuật viên:
                           </label>
                           <textarea
                             rows={2}
                             value={reworkInstructions}
                             onChange={(e) => setReworkInstructions(e.target.value)}
-                            placeholder="Mô tả cụ thể các điểm chưa đạt cần thợ xử lý lại dứt điểm..."
-                            className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-on-surface"
+                            placeholder="Mô tả cụ thể các điểm chưa đạt cần xử lý lại dứt điểm..."
+                            className="w-full px-3 py-2 text-xs rounded-md bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-blue-600"
                           />
                         </div>
 
-                        <div className="flex items-center justify-end pt-2 border-t border-outline-variant/20">
+                        <div className="flex items-center justify-end pt-2 border-t border-slate-100">
                           <button
                             type="button"
                             disabled={isSubmittingRework}
                             onClick={handleReworkSubmit}
-                            className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow flex items-center gap-2 transition-colors disabled:opacity-50"
+                            className="px-4 py-2 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
                           >
                             <RotateCcw className="w-4 h-4" />
-                            <span>{isSubmittingRework ? 'Đang gửi...' : 'Ra Lệnh Bác Bỏ & Yêu Cầu Thi Công Lại (REWORK)'}</span>
+                            <span>{isSubmittingRework ? 'Đang gửi...' : 'Yêu cầu thi công lại'}</span>
                           </button>
                         </div>
                       </div>
@@ -789,23 +793,23 @@ export const IncidentDossierPage: React.FC = () => {
                   <form onSubmit={handleCloseSubmit} className="flex flex-col gap-3 pt-2">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold">Chấm điểm chất lượng hoàn trả:</span>
+                        <span className="text-xs font-medium text-slate-700">Chấm điểm chất lượng hoàn trả:</span>
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
                             type="button"
                             key={star}
                             onClick={() => setRating(star)}
-                            className={`p-1 rounded transition-transform hover:scale-110 ${rating >= star ? 'text-amber-500' : 'text-gray-300'}`}
+                            className={`p-0.5 transition-transform hover:scale-110 ${rating >= star ? 'text-amber-500' : 'text-slate-300'}`}
                           >
-                            <Star className="w-5 h-5 fill-current" />
+                            <Star className="w-4 h-4 fill-current" />
                           </button>
                         ))}
-                        <span className="text-xs font-mono font-bold ml-1 text-amber-600">({rating} sao)</span>
+                        <span className="text-xs font-mono font-medium ml-1 text-amber-600">({rating} sao)</span>
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold mb-1">
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
                         {rating <= 3 || incident.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS'
                           ? 'Nội dung phản ánh / Lý do khiếu nại chưa đạt chuẩn:'
                           : 'Cảm nhận đóng góp ý kiến:'}
@@ -822,47 +826,47 @@ export const IncidentDossierPage: React.FC = () => {
                             ? 'Mô tả rõ lý do chưa đạt chuẩn (vẫn còn ổ gà, nước đọng, mặt đường gồ ghề...)'
                             : 'Chia sẻ cảm nhận của bạn về chất lượng thi công...'
                         }
-                        className="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-lowest border"
+                        className="w-full px-3 py-2 text-xs rounded-md bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-blue-600"
                       />
                     </div>
 
                     {/* Nút hành động cho công dân */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-outline-variant/20">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
                       {rating <= 3 || incident.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS' ? (
                         <>
-                          <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
-                            <AlertTriangle className="w-4 h-4 shrink-0" />
-                            <span>Hiện trường chưa đạt hoặc AI cảnh báo: Bạn có quyền khiếu nại lên BQL để yêu cầu thợ làm lại.</span>
+                          <div className="text-xs text-amber-700 flex items-center gap-1.5 font-medium">
+                            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                            <span>Hiện trường chưa đạt hoặc AI cảnh báo: Bạn có quyền gửi khiếu nại để yêu cầu xử lý lại.</span>
                           </div>
                           <div className="flex items-center justify-end gap-2 flex-wrap">
                             <button
                               type="button"
                               disabled={isSubmittingDispute}
                               onClick={handleDisputeSubmit}
-                              className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                              className="px-4 py-2 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
                             >
                               <AlertTriangle className="w-4 h-4" />
-                              <span>{isSubmittingDispute ? 'Đang gửi...' : 'Không Đạt - Gửi Khiếu Nại (DISPUTE)'}</span>
+                              <span>{isSubmittingDispute ? 'Đang gửi...' : 'Không đạt - Gửi khiếu nại'}</span>
                             </button>
                             <button
                               type="submit"
-                              className="px-4 py-2.5 rounded-xl bg-surface-container-highest text-on-surface hover:bg-surface-container-high font-bold text-xs transition-colors"
+                              className="px-3.5 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs transition-colors border border-slate-300"
                             >
-                              Vẫn Đồng Ý Đóng Sự Cố
+                              Đồng ý đóng sự cố
                             </button>
                           </div>
                         </>
                       ) : (
                         <>
-                          <div className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
-                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            <span>Mặt đường hoàn thiện đạt chuẩn. Bạn hài lòng để đóng hồ sơ sự cố?</span>
+                          <div className="text-xs text-emerald-700 flex items-center gap-1.5 font-medium">
+                            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                            <span>Mặt đường hoàn thiện đạt chuẩn. Bạn có hài lòng để đóng hồ sơ sự cố?</span>
                           </div>
                           <button
                             type="submit"
-                            className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow hover:bg-primary-container transition-colors self-end"
+                            className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-xs transition-colors self-end"
                           >
-                            Hài Lòng & Đóng Sự Cố (CLOSED)
+                            Đánh giá và đóng sự cố
                           </button>
                         </>
                       )}
@@ -872,22 +876,22 @@ export const IncidentDossierPage: React.FC = () => {
               </div>
             ) : (
               /* 3. NẾU CHƯA ĐĂNG NHẬP HOẶC LÀ CÔNG DÂN KHÁC */
-              <div className="p-4 rounded-2xl bg-surface-container-high border border-outline-variant/30 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-secondary shrink-0 mt-0.5" />
-                <div className="flex-1 text-xs text-on-surface-variant">
+              <div className="p-3.5 rounded-lg bg-white border border-slate-200 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                <div className="flex-1 text-xs text-slate-600">
                   {!isAuthenticated ? (
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span>Vui lòng đăng nhập tài khoản Công Dân đã báo cáo (<b>{incident.reporterName || 'Người dân'}</b>) hoặc Quản trị viên để chấm điểm chất lượng và đóng hồ sơ.</span>
+                      <span>Vui lòng đăng nhập tài khoản người dân đã báo cáo (<b>{incident.reporterName || 'Người dân'}</b>) hoặc Quản trị viên để chấm điểm và đóng hồ sơ.</span>
                       <button
                         type="button"
                         onClick={() => setIsAuthModalOpen(true)}
-                        className="px-3.5 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow hover:bg-primary-container transition-colors"
+                        className="px-3 py-1.5 rounded-md bg-blue-600 text-white font-medium text-xs hover:bg-blue-700 transition-colors shadow-xs"
                       >
-                        Đăng Nhập
+                        Đăng nhập
                       </button>
                     </div>
                   ) : (
-                    <span>Hồ sơ sự cố này được tạo bởi công dân <b>{incident.reporterName || 'Người dân'}</b>. Chỉ người tạo phản ánh hoặc Quản trị viên Ban Quản Lý mới có thẩm quyền đánh giá nghiệm thu và đóng hồ sơ.</span>
+                    <span>Hồ sơ sự cố này được tạo bởi người dân <b>{incident.reporterName || 'Người dân'}</b>. Chỉ người tạo phản ánh hoặc Quản trị viên Ban Quản lý mới có thẩm quyền đánh giá và đóng hồ sơ.</span>
                   )}
                 </div>
               </div>
@@ -901,35 +905,35 @@ export const IncidentDossierPage: React.FC = () => {
             {/* Thẻ Kết Quả Kiểm Định Chất Lượng AI (AI Quality Verification) */}
             {incident.resolution?.aiVerificationStatus && (
               <div
-                className={`p-4 rounded-2xl border flex items-start gap-3.5 transition-all ${
+                className={`p-3.5 rounded-lg border flex items-start gap-2.5 transition-colors ${
                   incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-100'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-100'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                    : 'bg-amber-50 border-amber-200 text-amber-950'
                 }`}
               >
                 {incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN' ? (
-                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 ) : (
-                  <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 )}
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-xs uppercase tracking-wide">
+                    <span className="font-semibold text-xs">
                       {incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
-                        ? 'Thẩm Định Nghiệm Thu AI: Đạt Chuẩn Hoàn Trả (0 Khuyết Tật)'
-                        : 'Cảnh Báo Kiểm Định AI: Phát Hiện Dấu Hiệu Hư Hỏng Còn Sót Lại'}
+                        ? 'Thẩm định nghiệm thu AI: Đạt chuẩn hoàn trả (0 Khuyết tật)'
+                        : 'Cảnh báo kiểm định AI: Phát hiện dấu hiệu hư hỏng còn sót lại'}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
+                      className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-medium border ${
                         incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
-                          ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : 'bg-amber-100 text-amber-800 border-amber-200'
                       }`}
                     >
                       {incident.resolution.aiVerificationStatus}
                     </span>
                   </div>
-                  <p className="text-xs opacity-90 mt-1">
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                     {incident.resolution.aiVerificationNotes ||
                       (incident.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
                         ? 'Mặt đường sau thi công đã được trám phẳng, không còn hố sụt hoặc vết nứt kết cấu.'
@@ -939,23 +943,29 @@ export const IncidentDossierPage: React.FC = () => {
               </div>
             )}
 
-            <BeforeAfterSlider
-              beforeImageUrl={incident.imageUrl}
-              afterImageUrl={incident.resolution?.proofImageUrl || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800'}
-              className="h-80 w-full"
-            />
+            {incident.resolution?.proofImageUrl ? (
+              <BeforeAfterSlider
+                beforeImageUrl={incident.imageUrl}
+                afterImageUrl={incident.resolution.proofImageUrl}
+                className="h-80 w-full"
+              />
+            ) : (
+              <div className="h-64 w-full rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center p-4">
+                <img src={incident.imageUrl} alt="Hiện trường sự cố" className="max-h-full rounded object-contain" />
+              </div>
+            )}
 
-            <div className="p-4 rounded-xl bg-primary-fixed/20 border border-primary/20 flex items-center justify-between">
+            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
               <div>
-                <div className="font-bold text-sm text-primary flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" />
+                <div className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   Sự cố đã được đóng và lưu trữ hoàn tất
                 </div>
-                <div className="text-xs text-on-surface-variant mt-1">
+                <div className="text-xs text-slate-500 mt-0.5">
                   Đánh giá của công dân: {incident.feedback?.rating || 5} Sao • "{incident.feedback?.comments || 'Rất hài lòng'}"
                 </div>
               </div>
-              <span className="font-mono text-xs font-bold text-primary bg-surface-container-lowest px-3 py-1 rounded-full shadow-sm">
+              <span className="font-mono text-xs font-medium text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded shadow-xs">
                 HOÀN TẤT VÒNG ĐỜI
               </span>
             </div>

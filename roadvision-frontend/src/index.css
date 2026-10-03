@@ -6,8 +6,10 @@
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #f8f9ff;
-    color: #0b1c30;
+    background-color: #f8fafc;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
@@ -18,16 +20,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #eff4ff;
+  background: #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c3c6d7;
-  border-radius: 4px;
+  background: #cbd5e1;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #004ac6;
+  background: #94a3b8;
 }
 
 /* Đảm bảo toàn bộ Leaflet Map không bao giờ nổi đè lên Modal / Dialog */
@@ -44,3 +46,8 @@
   z-index: 20 !important;
 }
 
+/* Đảm bảo link và nút bấm bên trong Leaflet Popup hiển thị đúng màu chữ */
+.leaflet-popup-content a {
+  color: inherit;
+  text-decoration: none;
+}
