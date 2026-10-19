@@ -506,8 +506,7 @@ export const PatrolModePage: React.FC = () => {
   };
 
   // Nạp video tuần tra mẫu tích hợp sẵn để kiểm thử nhanh
-  const handleLoadSampleVideo = () => {
-    const samplePath = '/sample-videos/video_tuan_tra_o_ga.mp4';
+  const handleLoadSampleVideo = (samplePath = '/sample-videos/video_tuan_tra_o_ga.mp4', label = 'Tuyến đường có ổ gà') => {
     if (videoUrl && videoUrl.startsWith('blob:')) {
       URL.revokeObjectURL(videoUrl);
     }
@@ -518,7 +517,7 @@ export const PatrolModePage: React.FC = () => {
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
-    toast.success('Đã nạp video tuần tra thực tế: Tuyến đường có ổ gà & hư hại mặt đường!', 'Tuần Tra AI');
+    toast.success(`Đã nạp video tuần tra thực tế: ${label}!`, 'Tuần Tra AI');
   };
 
   const togglePlay = () => {
@@ -601,15 +600,40 @@ export const PatrolModePage: React.FC = () => {
               className="w-full h-full object-contain"
             />
 
-            {/* Bounding Box AI vẽ chính xác theo tỷ lệ frame với hiệu ứng giữ mượt (smoothing & fading) */}
+            {/* Bounding Box AI vẽ chính xác theo tọa độ thực tế của video sau khi đã tính trừ thanh đen (letterbox) */}
             {activeBoxes.map((box, idx) => {
-              const videoW = videoRef.current?.videoWidth || 640;
-              const videoH = videoRef.current?.videoHeight || 360;
+              const video = videoRef.current;
+              const videoW = video?.videoWidth || 640;
+              const videoH = video?.videoHeight || 360;
 
-              const leftPct = (box.x / videoW) * 100;
-              const topPct = (box.y / videoH) * 100;
-              const widthPct = (box.width / videoW) * 100;
-              const heightPct = (box.height / videoH) * 100;
+              // Tính toán vùng hiển thị thực tế của video bên trong container aspect-video
+              const containerW = video?.clientWidth || 640;
+              const containerH = video?.clientHeight || 360;
+
+              const videoAspect = videoW / videoH;
+              const containerAspect = containerW / containerH;
+
+              let renderedW = containerW;
+              let renderedH = containerH;
+              let offsetX = 0;
+              let offsetY = 0;
+
+              if (containerAspect > videoAspect) {
+                // Có 2 cột đen ở 2 bên trái phải
+                renderedH = containerH;
+                renderedW = containerH * videoAspect;
+                offsetX = (containerW - renderedW) / 2;
+              } else {
+                // Có 2 thanh đen trên dưới
+                renderedW = containerW;
+                renderedH = containerW / videoAspect;
+                offsetY = (containerH - renderedH) / 2;
+              }
+
+              const leftPx = offsetX + (box.x / videoW) * renderedW;
+              const topPx = offsetY + (box.y / videoH) * renderedH;
+              const widthPx = (box.width / videoW) * renderedW;
+              const heightPx = (box.height / videoH) * renderedH;
 
               const isCrack = box.className?.includes('CRACK');
               const isFlood = box.className?.includes('FLOOD');
@@ -646,10 +670,10 @@ export const PatrolModePage: React.FC = () => {
                     isBoxFading ? 'opacity-40 scale-[0.99]' : 'opacity-100 scale-100'
                   } ${colorBorder}`}
                   style={{
-                    top: `${topPct}%`,
-                    left: `${leftPct}%`,
-                    width: `${widthPct}%`,
-                    height: `${heightPct}%`,
+                    top: `${topPx}px`,
+                    left: `${leftPx}px`,
+                    width: `${widthPx}px`,
+                    height: `${heightPx}px`,
                   }}
                 >
                   <div
@@ -690,7 +714,7 @@ export const PatrolModePage: React.FC = () => {
                   </label>
                   <button
                     type="button"
-                    onClick={handleLoadSampleVideo}
+                    onClick={() => handleLoadSampleVideo()}
                     className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition-all flex items-center gap-2 shadow-sm"
                   >
                     <Sparkles className="w-4 h-4" />
@@ -733,18 +757,46 @@ export const PatrolModePage: React.FC = () => {
                     <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
                   </label>
 
+                  <div className="relative group">
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSampleVideo('/sample-videos/video_tuan_tra_o_ga.mp4', 'Mẫu 1 - Ổ gà đường phố')}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                        videoUrl?.includes('sample-videos')
+                          ? 'bg-surface-container-lowest text-amber-600 dark:text-amber-400 shadow-xs'
+                          : 'text-amber-600 dark:text-amber-400 hover:text-amber-500'
+                      }`}
+                      title="Nạp video tuần tra thực tế có ổ gà để kiểm thử nhanh"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Video Mẫu #1</span>
+                    </button>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={handleLoadSampleVideo}
+                    onClick={() => handleLoadSampleVideo('/sample-videos/pothole_tracker_test.mp4', 'Mẫu 2 - Tuyến đường ổ gà liên tiếp')}
                     className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
-                      videoUrl === '/sample-videos/video_tuan_tra_o_ga.mp4'
-                        ? 'bg-surface-container-lowest text-amber-600 dark:text-amber-400 shadow-xs'
-                        : 'text-amber-600 dark:text-amber-400 hover:text-amber-500'
+                      videoUrl === '/sample-videos/pothole_tracker_test.mp4'
+                        ? 'bg-surface-container-lowest text-emerald-600 dark:text-emerald-400 shadow-xs'
+                        : 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-500'
                     }`}
-                    title="Nạp video tuần tra thực tế có ổ gà để kiểm thử nhanh"
+                    title="Nạp video tuần tra ô tô qua đoạn đường nhiều ổ gà liên tiếp"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Video Mẫu</span>
+                    <span>Mẫu #2 (Liên tiếp)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLoadSampleVideo('/sample-videos/test_road2.mp4', 'Mẫu 3 - Vết nứt & Ổ gà đan xen')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                      videoUrl === '/sample-videos/test_road2.mp4'
+                        ? 'bg-surface-container-lowest text-cyan-600 dark:text-cyan-400 shadow-xs'
+                        : 'text-cyan-600 dark:text-cyan-400 hover:text-cyan-500'
+                    }`}
+                    title="Nạp video tuần tra mặt đường có cả nứt và ổ gà"
+                  >
+                    <span>Mẫu #3 (Hỗn hợp)</span>
                   </button>
 
                   <button
