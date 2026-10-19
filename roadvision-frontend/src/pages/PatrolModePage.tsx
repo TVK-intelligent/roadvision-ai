@@ -126,7 +126,7 @@ export const PatrolModePage: React.FC = () => {
   const [sourceMode, setSourceMode] = useState<'UPLOAD' | 'WEBCAM'>('UPLOAD');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.35);
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.25);
   const [autoDispatch, setAutoDispatch] = useState<boolean>(false);
 
   // Chế độ trích xuất frame thích ứng (Adaptive Sampling) - Mặc định SIÊU TỐC 0.2s để bám sát video
@@ -357,25 +357,12 @@ export const PatrolModePage: React.FC = () => {
             for (const track of tracks) {
               const timeSinceSeen = now - track.lastSeenTime;
 
-              if (isVideoMoving) {
-                // 1. Cả target và curr cùng trôi theo hướng chuyển động của video
-                track.targetX += track.vx * dt * playRate;
-                track.targetY += track.vy * dt * playRate;
-                track.targetW += track.vw * dt * playRate;
-                track.targetH += track.vh * dt * playRate;
-
-                // 2. Nội suy mềm (LERP) mượt mà để curr bám khít target
-                const lerpFactor = Math.min(1.0, 20 * dt);
-                track.x += (track.targetX - track.x) * lerpFactor;
-                track.y += (track.targetY - track.y) * lerpFactor;
-                track.w += (track.targetW - track.w) * lerpFactor;
-                track.h += (track.targetH - track.h) * lerpFactor;
-              } else {
-                track.x = track.targetX;
-                track.y = track.targetY;
-                track.w = track.targetW;
-                track.h = track.targetH;
-              }
+              // Nội suy mượt mà LERP bám sát 100% tọa độ chuẩn xác của mô hình AI
+              const lerpFactor = Math.min(1.0, 16 * dt);
+              track.x += (track.targetX - track.x) * lerpFactor;
+              track.y += (track.targetY - track.y) * lerpFactor;
+              track.w += (track.targetW - track.w) * lerpFactor;
+              track.h += (track.targetH - track.h) * lerpFactor;
 
               // Quản lý độ trong suốt (Fade In / Fade Out)
               if (timeSinceSeen > 450 || track.y > 0.96) {
@@ -657,24 +644,9 @@ export const PatrolModePage: React.FC = () => {
                 }
 
                 if (bestTrack) {
-                  const dtSec = Math.max(0.04, (vNow - bestTrack.lastSeenTime) / 1000);
-                  const measuredVy = Math.max(-0.4, Math.min(0.8, (box.normY - bestTrack.targetY) / dtSec));
-                  const measuredVx = Math.max(-0.3, Math.min(0.3, (box.normX - bestTrack.targetX) / dtSec));
-
-                  // Lọc mềm vận tốc quán tính (EMA)
-                  bestTrack.vy = bestTrack.vy * 0.40 + measuredVy * 0.60;
-                  bestTrack.vx = bestTrack.vx * 0.40 + measuredVx * 0.60;
-                  bestTrack.vw = 0; // Giữ nguyên kích thước khung đã ôm sát, không tự ý phồng to
-                  bestTrack.vh = 0;
-
-                  // Bù trừ độ trễ mạng và thời gian suy luận (Latency Compensation)
-                  // Đón trước vị trí video hiện tại thay vì bị tụt lùi ở frame quá khứ
-                  const latencySec = (performance.now() - startTime) / 1000;
-                  const compY = box.normY + Math.max(0, bestTrack.vy) * latencySec;
-                  const compX = box.normX + bestTrack.vx * latencySec;
-
-                  bestTrack.targetX = Math.max(0, Math.min(0.98, compX));
-                  bestTrack.targetY = Math.max(0, Math.min(0.98, compY));
+                  // Cập nhật mục tiêu bám sát trực tiếp vào kết quả phát hiện của mô hình AI
+                  bestTrack.targetX = box.normX;
+                  bestTrack.targetY = box.normY;
                   bestTrack.targetW = box.normW;
                   bestTrack.targetH = box.normH;
                   bestTrack.confidence = Math.max(bestTrack.confidence, boxConf);
@@ -682,30 +654,26 @@ export const PatrolModePage: React.FC = () => {
                   bestTrack.hitCount += 1;
                 } else {
                   // Khởi tạo track trực quan mới ôm sát ngay tại vị trí phát hiện
-                  const latencySec = (performance.now() - startTime) / 1000;
-                  const initVy = 0.10;
-                  const compY = box.normY + initVy * latencySec;
-
                   curVisuals.push({
                     id: `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
                     category: boxCat,
                     confidence: boxConf,
                     x: box.normX,
-                    y: compY,
+                    y: box.normY,
                     w: box.normW,
                     h: box.normH,
                     targetX: box.normX,
-                    targetY: compY,
+                    targetY: box.normY,
                     targetW: box.normW,
                     targetH: box.normH,
                     vx: 0,
-                    vy: initVy,
+                    vy: 0,
                     vw: 0,
                     vh: 0,
                     lastSeenTime: vNow,
                     hitCount: 1,
                     committed: false,
-                    alpha: 0.2,
+                    alpha: 0.15,
                   });
                 }
               }

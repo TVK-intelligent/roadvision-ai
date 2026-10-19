@@ -566,10 +566,12 @@ public class PatrolVideoAiService {
             int padX = Math.max(4, (int) (detectedW * 0.08));
             int padY = Math.max(4, (int) (detectedH * 0.08));
 
-            int tightX = Math.max(0, Math.min(rx, minX - padX));
-            int tightY = Math.max(0, Math.min(ry, minY - padY));
-            int tightW = Math.min(imgW - tightX, (maxX - minX) + 2 * padX);
-            int tightH = Math.min(imgH - tightY, (maxY - minY) + 2 * padY);
+            int tightX = Math.max(rx, minX - padX);
+            int tightY = Math.max(ry, minY - padY);
+            int tightRight = Math.min(rx + rw, maxX + padX);
+            int tightBottom = Math.min(ry + rh, maxY + padY);
+            int tightW = tightRight - tightX;
+            int tightH = tightBottom - tightY;
 
             // Kiểm tra tính hợp lệ: đảm bảo box thu gọn ôm sát nhưng không quá bé
             if (tightW >= 12 && tightH >= 10 && tightW <= rw && tightH <= rh) {
