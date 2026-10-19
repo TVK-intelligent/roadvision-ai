@@ -51,6 +51,8 @@ interface ActiveTrack {
   box: { x: number; y: number; width: number; height: number };
   lastSeenTime: number;
   maxConfidence: number;
+  hitCount: number;
+  committed: boolean;
 }
 
 // Hàm tính chỉ số Intersection over Union (IoU) giữa 2 Bounding Box
@@ -99,7 +101,7 @@ export const PatrolModePage: React.FC = () => {
   const [sourceMode, setSourceMode] = useState<'UPLOAD' | 'WEBCAM'>('UPLOAD');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.20);
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.35);
   const [autoDispatch, setAutoDispatch] = useState<boolean>(false);
 
   // Chế độ trích xuất frame thích ứng (Adaptive Sampling)
@@ -290,9 +292,7 @@ export const PatrolModePage: React.FC = () => {
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      ctx.filter = 'contrast(1.18) brightness(1.02)';
       ctx.drawImage(video, 0, 0, w, h);
-      ctx.filter = 'none';
 
       isAnalyzingRef.current = true;
       setIsScanning(true);
@@ -340,33 +340,33 @@ export const PatrolModePage: React.FC = () => {
                 return true;
               });
 
+              // Hiển thị khung Bounding Box bám sát frame hiện tại, loại bỏ hiệu ứng delay gây lag giật
               setActiveBoxes(finalBoxes);
               setIsBoxFading(false);
               if (boxFadeTimeoutRef.current) {
                 clearTimeout(boxFadeTimeoutRef.current);
               }
-              // Giữ hiển thị Bounding Box và mờ dần mượt mà thay vì giật tắt đột ngột
+              // Khung tự xóa sau 800ms nếu frame kế tiếp không có vật thể
               boxFadeTimeoutRef.current = setTimeout(() => {
-                setIsBoxFading(true);
-              }, Math.max(400, intervalTime - 250));
+                setActiveBoxes([]);
+              }, 800);
 
               const now = Date.now();
-              // Dọn sạch các track đã trôi qua quá 3.5 giây không còn xuất hiện
+              // Dọn sạch các track đã trôi qua quá 3.0 giây
               activeTracksRef.current = activeTracksRef.current.filter(
-                (track) => now - track.lastSeenTime <= 3500
+                (track) => now - track.lastSeenTime <= 3000
               );
 
-              // Xử lý các hư hại xuất hiện trong frame (hỗ trợ đa vật thể đồng thời bao gồm vật cản ở xa)
-              const detectedBoxes = finalBoxes.slice(0, 10);
+              // Xử lý các hư hại xuất hiện trong frame với bộ lọc xác nhận 2 lần (Temporal Confirmation Filter)
+              const detectedBoxes = finalBoxes.slice(0, 8);
 
               for (const box of detectedBoxes) {
                 const boxCat = box.className || data.className || 'POTHOLE';
                 const boxConf = box.confidence || data.confidence || 0.85;
 
-                // Đối sánh Spatial IoU & Tâm vật thể để phát hiện trùng lặp theo chuỗi frame:
-                // Vật thể nhỏ ở xa / hậu cảnh di chuyển tương đối nhanh theo phối cảnh dashcam, nới lỏng distRatio
+                // Đối sánh Spatial IoU & Khoảng cách tâm
                 const isSmallFarObject = (box.width * box.height) / (w * h) < 0.04;
-                const maxAllowedDist = isSmallFarObject ? 0.28 : 0.20;
+                const maxAllowedDist = isSmallFarObject ? 0.30 : 0.22;
 
                 const matchedTrack = activeTracksRef.current.find((track) => {
                   if (track.category !== boxCat) return false;
@@ -376,40 +376,49 @@ export const PatrolModePage: React.FC = () => {
                 });
 
                 if (matchedTrack) {
-                  // ĐÃ PHÁT HIỆN TRƯỚC ĐÓ: Cập nhật track, tránh tạo trùng sự cố
                   matchedTrack.lastSeenTime = now;
                   matchedTrack.box = box;
+                  matchedTrack.hitCount = (matchedTrack.hitCount || 1) + 1;
 
-                  // BEST FRAME SELECTION: Nếu frame hiện tại sắc nét/tin cậy hơn (> +2%), lưu frame tốt nhất
-                  if (boxConf > matchedTrack.maxConfidence + 0.02) {
-                    matchedTrack.maxConfidence = boxConf;
-                    const newSnapshotUrl = URL.createObjectURL(blob);
+                  // Khi vật thể xuất hiện đủ 2 frame liên tiếp -> Xác nhận là hư hại thật và đẩy vào danh sách
+                  if (matchedTrack.hitCount >= 2 && !matchedTrack.committed) {
+                    matchedTrack.committed = true;
+                    const snapshotUrl = URL.createObjectURL(blob);
 
+                    const newIncident: CapturedIncident = {
+                      id: matchedTrack.incidentId,
+                      timestamp: new Date().toLocaleTimeString('vi-VN'),
+                      category: boxCat,
+                      confidence: Math.max(boxConf, matchedTrack.maxConfidence),
+                      latitude: patrolLocation.lat,
+                      longitude: patrolLocation.lng,
+                      address: patrolLocation.address,
+                      snapshotUrl,
+                      blob,
+                      status: 'PENDING',
+                      framesCount: matchedTrack.hitCount,
+                      bestFrameOptimized: false,
+                    };
+
+                    setCapturedList((prev) => {
+                      if (prev.length >= 20) {
+                        URL.revokeObjectURL(prev[prev.length - 1].snapshotUrl);
+                      }
+                      return [newIncident, ...prev.slice(0, 19)];
+                    });
+
+                    if (autoDispatch) {
+                      handleDispatchIncident(newIncident, true);
+                    }
+                  } else if (matchedTrack.committed) {
+                    // Cập nhật số frame đã track
                     setCapturedList((prev) =>
                       prev.map((item) => {
                         if (item.id === matchedTrack.incidentId) {
-                          URL.revokeObjectURL(item.snapshotUrl);
                           return {
                             ...item,
-                            confidence: boxConf,
-                            snapshotUrl: newSnapshotUrl,
-                            blob: blob,
-                            framesCount: (item.framesCount || 1) + 1,
-                            bestFrameOptimized: true,
-                            timestamp: new Date().toLocaleTimeString('vi-VN'),
-                          };
-                        }
-                        return item;
-                      })
-                    );
-                  } else {
-                    // Giữ nguyên frame rõ nét trước đó, chỉ cập nhật số lần track thành công
-                    setCapturedList((prev) =>
-                      prev.map((item) => {
-                        if (item.id === matchedTrack.incidentId) {
-                          return {
-                            ...item,
-                            framesCount: (item.framesCount || 1) + 1,
+                            framesCount: matchedTrack.hitCount,
+                            confidence: Math.max(item.confidence, boxConf),
                           };
                         }
                         return item;
@@ -417,57 +426,30 @@ export const PatrolModePage: React.FC = () => {
                     );
                   }
                 } else {
-                  // SỰ CỐ MỚI: Đưa vào hàng đợi và bắt đầu theo dõi
+                  // Track mới xuất hiện ở frame đầu tiên: khởi tạo theo dõi, chưa vội tạo sự cố rác
                   const newId = `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-                  const snapshotUrl = URL.createObjectURL(blob);
-
-                  const newIncident: CapturedIncident = {
-                    id: newId,
-                    timestamp: new Date().toLocaleTimeString('vi-VN'),
-                    category: boxCat,
-                    confidence: boxConf,
-                    latitude: patrolLocation.lat,
-                    longitude: patrolLocation.lng,
-                    address: patrolLocation.address,
-                    snapshotUrl,
-                    blob,
-                    status: 'PENDING',
-                    framesCount: 1,
-                    bestFrameOptimized: false,
-                  };
-
                   activeTracksRef.current.push({
                     incidentId: newId,
                     category: boxCat,
                     box: box,
                     lastSeenTime: now,
                     maxConfidence: boxConf,
+                    hitCount: 1,
+                    committed: false,
                   });
-
-                  setCapturedList((prev) => {
-                    if (prev.length >= 20) {
-                      URL.revokeObjectURL(prev[prev.length - 1].snapshotUrl);
-                    }
-                    return [newIncident, ...prev.slice(0, 19)];
-                  });
-
-                  if (autoDispatch) {
-                    handleDispatchIncident(newIncident, true);
-                  }
                 }
               }
             } else {
-              // Frame hiện tại không có hư hại: fade box mượt mà
+              // Frame hiện tại không có hư hại
               if (boxFadeTimeoutRef.current) {
                 clearTimeout(boxFadeTimeoutRef.current);
               }
               boxFadeTimeoutRef.current = setTimeout(() => {
-                setIsBoxFading(true);
-                setTimeout(() => setActiveBoxes([]), 250);
-              }, 300);
+                setActiveBoxes([]);
+              }, 400);
             }
           } catch (err) {
-            // Bỏ qua lỗi frame gián đoạn
+            // Bỏ qua lỗi gián đoạn frame
           } finally {
             isAnalyzingRef.current = false;
             setIsScanning(false);
