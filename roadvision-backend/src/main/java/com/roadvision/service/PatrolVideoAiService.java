@@ -172,26 +172,23 @@ public class PatrolVideoAiService {
                             ? CLASS_NAMES[bestClassId]
                             : "ROAD_DAMAGE_" + bestClassId;
 
-                    // ĐẶC THÙ VIDEO DASHCAM:
-                    // Vết nứt (ROAD_CRACK) có thể là dải dài hoặc mảng nứt lưới (alligator crack) to cả 2 chiều.
-                    // Tôn trọng phân loại của mô hình YOLOv8, không ép vết nứt to thành Ổ GÀ.
-                    float elongation = (float) Math.max(lw, lh) / Math.max(1, Math.min(lw, lh));
-                    if ("POTHOLE".equals(className) && elongation >= 2.50f) {
-                        className = "ROAD_CRACK";
+                    // Kiểm tra lòng hốc chứa nước bùn / vũng trũng
+                    if (isWaterCavity(image, lx, ly, lw, lh)) {
+                        className = "POTHOLE";
                     }
 
                     // Ngưỡng thu thập gợi ý ban đầu để không bỏ lỡ vết nứt/vật cản trước khi truy vết
                     float minThresh;
                     if ("ROAD_CRACK".equals(className)) {
-                        minThresh = Math.min(0.05f, effectiveThreshold);
-                    } else if ("POTHOLE".equals(className)) {
-                        minThresh = Math.min(0.08f, effectiveThreshold);
-                    } else if ("ROAD_OBSTACLE".equals(className)) {
-                        minThresh = Math.min(0.06f, effectiveThreshold);
-                    } else if ("ROAD_FLOODING".equals(className)) {
                         minThresh = Math.min(0.12f, effectiveThreshold);
-                    } else {
+                    } else if ("POTHOLE".equals(className)) {
                         minThresh = Math.min(0.10f, effectiveThreshold);
+                    } else if ("ROAD_OBSTACLE".equals(className)) {
+                        minThresh = Math.min(0.12f, effectiveThreshold);
+                    } else if ("ROAD_FLOODING".equals(className)) {
+                        minThresh = Math.min(0.15f, effectiveThreshold);
+                    } else {
+                        minThresh = Math.min(0.15f, effectiveThreshold);
                     }
                     if (bestConf < minThresh) continue;
 
@@ -206,11 +203,10 @@ public class PatrolVideoAiService {
                 }
             }
 
-            // Truy vết dải nứt lớn / sụt gãy mặt đường (chỉ kích hoạt khi YOLO có gợi ý hư hại mặt đường thực tế)
+            // Truy vết dải nứt lớn / sụt gãy mặt đường (chỉ kích hoạt khi YOLO có gợi ý nứt thật sự rõ)
             boolean hasPavementDamageHint = false;
             for (ImageTensorUtil.BoundingBox cand : rawCandidates) {
-                if (("ROAD_CRACK".equals(cand.getClassName()) || "POTHOLE".equals(cand.getClassName()))
-                        && cand.getConfidence() >= 0.05f) {
+                if ("ROAD_CRACK".equals(cand.getClassName()) && cand.getConfidence() >= 0.25f) {
                     hasPavementDamageHint = true;
                     break;
                 }
@@ -224,15 +220,31 @@ public class PatrolVideoAiService {
             // 1. Áp dụng NMS
             List<ImageTensorUtil.BoundingBox> nmsBoxes = ImageTensorUtil.applyNms(rawCandidates, iouThreshold);
 
-            // 2. Triệt tiêu vết nứt con lồng sâu trong ổ gà (Nested Crack Suppression)
-            // Chỉ triệt tiêu khi vết nứt nằm lọt sâu >= 75% diện tích bên trong ổ gà, bảo toàn vết nứt to riêng biệt
-            List<ImageTensorUtil.BoundingBox> potholes = new ArrayList<>();
+            // 2. Chuyển đổi và bảo toàn Ổ GÀ: Bất kỳ box nào chứa lòng nước / bùn trũng đều phải là Ổ GÀ (POTHOLE)
+            List<ImageTensorUtil.BoundingBox> convertedBoxes = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : nmsBoxes) {
+                if ("ROAD_CRACK".equals(b.getClassName()) && isWaterCavity(image, b.getX(), b.getY(), b.getWidth(), b.getHeight())) {
+                    convertedBoxes.add(ImageTensorUtil.BoundingBox.builder()
+                            .className("POTHOLE")
+                            .confidence(b.getConfidence())
+                            .x(b.getX())
+                            .y(b.getY())
+                            .width(b.getWidth())
+                            .height(b.getHeight())
+                            .build());
+                } else {
+                    convertedBoxes.add(b);
+                }
+            }
+
+            // 3. Triệt tiêu vết nứt con lồng sâu trong hoặc đè lên ổ gà
+            List<ImageTensorUtil.BoundingBox> potholes = new ArrayList<>();
+            for (ImageTensorUtil.BoundingBox b : convertedBoxes) {
                 if ("POTHOLE".equals(b.getClassName())) potholes.add(b);
             }
 
             List<ImageTensorUtil.BoundingBox> finalVideoBoxes = new ArrayList<>();
-            for (ImageTensorUtil.BoundingBox b : nmsBoxes) {
+            for (ImageTensorUtil.BoundingBox b : convertedBoxes) {
                 if ("ROAD_CRACK".equals(b.getClassName())) {
                     boolean insidePothole = false;
                     for (ImageTensorUtil.BoundingBox p : potholes) {
@@ -244,12 +256,12 @@ public class PatrolVideoAiService {
                         float crackArea = (float) b.getWidth() * b.getHeight();
                         float iou = ImageTensorUtil.computeIoU(p, b);
 
-                        if (interArea / Math.max(1, crackArea) >= 0.75f && iou >= 0.35f) {
+                        if (interArea / Math.max(1, crackArea) >= 0.40f || iou >= 0.20f) {
                             insidePothole = true;
                             break;
                         }
                     }
-                    if (insidePothole) continue; // Bỏ vết nứt nằm hoàn toàn bên trong miệng ổ gà
+                    if (insidePothole) continue;
                 }
                 finalVideoBoxes.add(b);
             }
@@ -465,5 +477,46 @@ public class PatrolVideoAiService {
         double stdDev = Math.sqrt(Math.max(0, variance));
 
         return (mean < 115 && stdDev < 11.5 && extremeDarkCrackPixels < 2);
+    }
+
+    private boolean isWaterCavity(BufferedImage img, int x, int y, int w, int h) {
+        if (img == null || w <= 0 || h <= 0) return false;
+
+        int imgW = img.getWidth();
+        int imgH = img.getHeight();
+        int rx = Math.max(0, Math.min(x, imgW - 1));
+        int ry = Math.max(0, Math.min(y, imgH - 1));
+        int rw = Math.min(w, imgW - rx);
+        int rh = Math.min(h, imgH - ry);
+        if (rw <= 6 || rh <= 6) return false;
+
+        int step = Math.max(1, Math.min(rw, rh) / 20);
+        int totalSampled = 0;
+        int waterSurfacePixels = 0;
+
+        for (int py = ry; py < ry + rh; py += step) {
+            for (int px = rx; px < rx + rw; px += step) {
+                int rgb = img.getRGB(px, py);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int b = rgb & 0xFF;
+
+                int luma = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+                totalSampled++;
+
+                boolean isNeutralDryAsphalt = (Math.abs(r - g) <= 15 && Math.abs(g - b) <= 15 && Math.abs(r - b) <= 15 && luma <= 215);
+                boolean isMirrorWater = !isNeutralDryAsphalt && (luma > 220 && Math.abs(r - b) < 25);
+                boolean isSkyBlueWater = (b > r + 15 && b > g + 8 && luma > 110);
+                boolean isMuddyWater = (r > b + 18 && g > b + 10 && luma >= 65 && luma <= 215);
+
+                if (isMirrorWater || isSkyBlueWater || isMuddyWater) {
+                    waterSurfacePixels++;
+                }
+            }
+        }
+
+        if (totalSampled == 0) return false;
+        float waterRatio = (float) waterSurfacePixels / totalSampled;
+        return (waterRatio >= 0.28f);
     }
 }
