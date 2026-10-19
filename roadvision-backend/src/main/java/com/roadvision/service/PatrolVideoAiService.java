@@ -51,6 +51,7 @@ public class PatrolVideoAiService {
     private OrtEnvironment env;
     private OrtSession session;
     private boolean isModelLoaded = false;
+    private int cachedInputSize = 800;
 
     public PatrolVideoAiService(ResourceLoader resourceLoader) {
         this.resourceLoader = resourceLoader;
@@ -62,6 +63,9 @@ public class PatrolVideoAiService {
             env = OrtEnvironment.getEnvironment();
             OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
             opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
+            // Kích hoạt đa luồng CPU tối đa cho xử lý video thời gian thực
+            int cores = Math.max(2, Runtime.getRuntime().availableProcessors());
+            opts.setIntraOpNumThreads(Math.min(cores, 6));
 
             Resource modelResource = resourceLoader.getResource("classpath:models/yolov8_multiclass_roadcare.onnx");
             if (!modelResource.exists()) {
@@ -72,7 +76,14 @@ public class PatrolVideoAiService {
                     byte[] modelBytes = is.readAllBytes();
                     session = env.createSession(modelBytes, opts);
                     isModelLoaded = true;
-                    log.info("[PatrolVideoAiService] Nạp thành công Session AI chuyên biệt cho Video Tuần Tra từ: {}", modelResource.getFilename());
+                    try {
+                        TensorInfo tInfo = (TensorInfo) session.getInputInfo().get("images").getInfo();
+                        long[] inShape = tInfo.getShape();
+                        if (inShape != null && inShape.length >= 4 && inShape[2] > 0) {
+                            cachedInputSize = (int) inShape[2];
+                        }
+                    } catch (Exception ignored) {}
+                    log.info("[PatrolVideoAiService] Nạp thành công Session AI chuyên biệt cho Video Tuần Tra từ: {} (InputSize: {})", modelResource.getFilename(), cachedInputSize);
                 }
             } else {
                 log.warn("[PatrolVideoAiService] Không tìm thấy file model ONNX tại: {}", modelPath);
@@ -108,14 +119,7 @@ public class PatrolVideoAiService {
 
             if (!isModelLoaded || session == null) return result;
 
-            int modelInputSize = 800;
-            try {
-                TensorInfo tInfo = (TensorInfo) session.getInputInfo().get("images").getInfo();
-                long[] inShape = tInfo.getShape();
-                if (inShape != null && inShape.length >= 4 && inShape[2] > 0) {
-                    modelInputSize = (int) inShape[2];
-                }
-            } catch (Exception ignored) {}
+            int modelInputSize = this.cachedInputSize;
 
             // SUY LUẬN TỐC ĐỘ CAO CHO VIDEO (Single-Pass Full Frame)
             ImageTensorUtil.LetterboxInfo lb = ImageTensorUtil.letterbox(image, modelInputSize);
@@ -201,18 +205,6 @@ public class PatrolVideoAiService {
                             .height(lh)
                             .build());
                 }
-            }
-
-            // Truy vết dải nứt lớn / sụt gãy mặt đường (chỉ kích hoạt khi YOLO có gợi ý nứt thật sự rõ)
-            boolean hasPavementDamageHint = false;
-            for (ImageTensorUtil.BoundingBox cand : rawCandidates) {
-                if ("ROAD_CRACK".equals(cand.getClassName()) && cand.getConfidence() >= 0.25f) {
-                    hasPavementDamageHint = true;
-                    break;
-                }
-            }
-            if (hasPavementDamageHint) {
-                rawCandidates.addAll(detectAndTraceMajorRoadCracks(image, rawCandidates));
             }
 
             if (rawCandidates.isEmpty()) return result;

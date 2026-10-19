@@ -37,12 +37,12 @@ interface CapturedIncident {
   bestFrameOptimized?: boolean;
 }
 
-type SamplingMode = 'ECONOMY' | 'BALANCED' | 'DETAILED';
+type SamplingMode = 'REALTIME' | 'BALANCED' | 'ECONOMY';
 
 const SAMPLING_CONFIG: Record<SamplingMode, { label: string; interval: number; desc: string }> = {
-  ECONOMY: { label: 'Tiết Kiệm (2.0s)', interval: 2000, desc: 'Giảm tải CPU/Mạng' },
-  BALANCED: { label: 'Tiêu Chuẩn (1.0s)', interval: 1000, desc: 'Cân bằng tối ưu' },
-  DETAILED: { label: 'Chi Tiết (0.5s)', interval: 500, desc: 'Độ nhạy cao nhất' },
+  REALTIME: { label: 'Siêu Tốc (0.2s)', interval: 200, desc: 'Tần số quét cao nhất, bám sát từng frame video' },
+  BALANCED: { label: 'Tiêu Chuẩn (0.4s)', interval: 400, desc: 'Cân bằng mượt mà' },
+  ECONOMY: { label: 'Tiết Kiệm (0.8s)', interval: 800, desc: 'Giảm tải CPU' },
 };
 
 interface ActiveTrack {
@@ -104,8 +104,16 @@ export const PatrolModePage: React.FC = () => {
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.35);
   const [autoDispatch, setAutoDispatch] = useState<boolean>(false);
 
-  // Chế độ trích xuất frame thích ứng (Adaptive Sampling)
-  const [samplingMode, setSamplingMode] = useState<SamplingMode>('BALANCED');
+  // Chế độ trích xuất frame thích ứng (Adaptive Sampling) - Mặc định SIÊU TỐC 0.2s để bám sát video
+  const [samplingMode, setSamplingMode] = useState<SamplingMode>('REALTIME');
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
+    }
+  };
 
   // Vị trí tuần tra thực tế (ưu tiên GPS thiết bị)
   const [patrolLocation, setPatrolLocation] = useState<{
@@ -266,7 +274,7 @@ export const PatrolModePage: React.FC = () => {
     }
   }, []);
 
-  // Vòng lặp AI trích xuất frame định kỳ với Adaptive Sampling, Lọc Trùng IoU & Chọn Frame Tối Ưu
+  // Vòng lặp AI trích xuất frame liên tục siêu tốc với Adaptive Sampling, Lọc Trùng IoU & Chọn Frame Tối Ưu
   useEffect(() => {
     if (!isPlaying) {
       setActiveBoxes([]);
@@ -278,40 +286,66 @@ export const PatrolModePage: React.FC = () => {
       return;
     }
 
+    let isCancelled = false;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
     const intervalTime = SAMPLING_CONFIG[samplingMode].interval;
 
-    const scanInterval = setInterval(async () => {
+    const processFrame = async () => {
+      if (isCancelled) return;
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      if (!video || !canvas || video.readyState < 2 || isAnalyzingRef.current) return;
+      if (!video || !canvas || video.readyState < 2 || video.paused) {
+        if (!isCancelled) {
+          timerId = setTimeout(processFrame, 80);
+        }
+        return;
+      }
 
-      const w = video.videoWidth || 640;
-      const h = video.videoHeight || 360;
-      canvas.width = w;
-      canvas.height = h;
+      const vw = video.videoWidth || 640;
+      const vh = video.videoHeight || 360;
 
+      // Giới hạn độ phân giải gửi đi tối đa 800px theo chuẩn YOLOv8 để giảm payload từ 3MB xuống ~35KB
+      const maxDim = 800;
+      let targetW = vw;
+      let targetH = vh;
+      if (vw > maxDim || vh > maxDim) {
+        if (vw >= vh) {
+          targetW = maxDim;
+          targetH = Math.round((vh / vw) * maxDim);
+        } else {
+          targetH = maxDim;
+          targetW = Math.round((vw / vh) * maxDim);
+        }
+      }
+
+      canvas.width = targetW;
+      canvas.height = targetH;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, w, h);
+      if (!ctx) {
+        if (!isCancelled) timerId = setTimeout(processFrame, intervalTime);
+        return;
+      }
+      ctx.drawImage(video, 0, 0, targetW, targetH);
 
-      isAnalyzingRef.current = true;
       setIsScanning(true);
+      const startTime = performance.now();
 
       canvas.toBlob(
         async (blob) => {
+          if (isCancelled) return;
           if (!blob) {
-            isAnalyzingRef.current = false;
             setIsScanning(false);
+            if (!isCancelled) timerId = setTimeout(processFrame, intervalTime);
             return;
           }
-
-          const startTime = performance.now();
 
           try {
             const formData = new FormData();
             formData.append('image', blob, 'patrol_frame.jpg');
 
             const res = await incidentApi.analyzeVideoFrame(formData, confidenceThreshold);
+            if (isCancelled) return;
+
             const data = res.data;
             const latency = Math.round(performance.now() - startTime);
             setInferenceLatency(latency);
@@ -321,7 +355,6 @@ export const PatrolModePage: React.FC = () => {
               const refinedBoxes = data.boxes;
 
               // Khử trùng lặp con (Nested Crack Suppression):
-              // Chỉ triệt tiêu khi vết nứt lọt sâu >= 75% diện tích bên trong lòng ổ gà, bảo toàn vết nứt to riêng biệt
               const potholes = refinedBoxes.filter((b: any) => b.className === 'POTHOLE');
               const finalBoxes = refinedBoxes.filter((b: any) => {
                 if (b.className === 'ROAD_CRACK') {
@@ -340,16 +373,26 @@ export const PatrolModePage: React.FC = () => {
                 return true;
               });
 
+              // Chuẩn hóa tọa độ theo [0, 1] để render khớp 100% vào video hiển thị
+              const normalizedBoxes = finalBoxes.map((b: any) => ({
+                ...b,
+                normX: b.x / targetW,
+                normY: b.y / targetH,
+                normW: b.width / targetW,
+                normH: b.height / targetH,
+              }));
+
               // Hiển thị khung Bounding Box bám sát frame hiện tại, loại bỏ hiệu ứng delay gây lag giật
-              setActiveBoxes(finalBoxes);
+              setActiveBoxes(normalizedBoxes);
               setIsBoxFading(false);
               if (boxFadeTimeoutRef.current) {
                 clearTimeout(boxFadeTimeoutRef.current);
               }
-              // Khung tự xóa sau 800ms nếu frame kế tiếp không có vật thể
+              // Khung tự xóa sau chu kỳ quét + 80ms nếu frame kế tiếp không có vật thể
+              const boxExpireMs = Math.max(260, intervalTime + 80);
               boxFadeTimeoutRef.current = setTimeout(() => {
                 setActiveBoxes([]);
-              }, 800);
+              }, boxExpireMs);
 
               const now = Date.now();
               // Dọn sạch các track đã trôi qua quá 3.0 giây
@@ -358,26 +401,26 @@ export const PatrolModePage: React.FC = () => {
               );
 
               // Xử lý các hư hại xuất hiện trong frame với bộ lọc xác nhận 2 lần (Temporal Confirmation Filter)
-              const detectedBoxes = finalBoxes.slice(0, 8);
+              const detectedBoxes = normalizedBoxes.slice(0, 8);
 
               for (const box of detectedBoxes) {
                 const boxCat = box.className || data.className || 'POTHOLE';
                 const boxConf = box.confidence || data.confidence || 0.85;
 
-                // Đối sánh Spatial IoU & Khoảng cách tâm
-                const isSmallFarObject = (box.width * box.height) / (w * h) < 0.04;
+                const normBoxObj = { x: box.normX, y: box.normY, width: box.normW, height: box.normH };
+                const isSmallFarObject = (box.normW * box.normH) < 0.04;
                 const maxAllowedDist = isSmallFarObject ? 0.30 : 0.22;
 
                 const matchedTrack = activeTracksRef.current.find((track) => {
                   if (track.category !== boxCat) return false;
-                  const iou = calculateIoU(track.box, box);
-                  const distRatio = centerDistanceRatio(track.box, box, w, h);
+                  const iou = calculateIoU(track.box, normBoxObj);
+                  const distRatio = centerDistanceRatio(track.box, normBoxObj, 1, 1);
                   return iou >= 0.15 || distRatio <= maxAllowedDist;
                 });
 
                 if (matchedTrack) {
                   matchedTrack.lastSeenTime = now;
-                  matchedTrack.box = box;
+                  matchedTrack.box = normBoxObj;
                   matchedTrack.hitCount = (matchedTrack.hitCount || 1) + 1;
 
                   // Khi vật thể xuất hiện đủ 2 frame liên tiếp -> Xác nhận là hư hại thật và đẩy vào danh sách
@@ -431,7 +474,7 @@ export const PatrolModePage: React.FC = () => {
                   activeTracksRef.current.push({
                     incidentId: newId,
                     category: boxCat,
-                    box: box,
+                    box: normBoxObj,
                     lastSeenTime: now,
                     maxConfidence: boxConf,
                     hitCount: 1,
@@ -444,24 +487,33 @@ export const PatrolModePage: React.FC = () => {
               if (boxFadeTimeoutRef.current) {
                 clearTimeout(boxFadeTimeoutRef.current);
               }
+              const boxExpireMs = Math.max(200, intervalTime + 40);
               boxFadeTimeoutRef.current = setTimeout(() => {
                 setActiveBoxes([]);
-              }, 400);
+              }, boxExpireMs);
             }
           } catch (err) {
             // Bỏ qua lỗi gián đoạn frame
           } finally {
-            isAnalyzingRef.current = false;
             setIsScanning(false);
+            if (!isCancelled) {
+              const elapsed = performance.now() - startTime;
+              const nextDelay = Math.max(20, intervalTime - elapsed);
+              timerId = setTimeout(processFrame, nextDelay);
+            }
           }
         },
         'image/jpeg',
-        0.85
+        0.75
       );
-    }, intervalTime);
+    };
+
+    // Bắt đầu chu kỳ quét ngay lập tức
+    processFrame();
 
     return () => {
-      clearInterval(scanInterval);
+      isCancelled = true;
+      if (timerId) clearTimeout(timerId);
       if (boxFadeTimeoutRef.current) {
         clearTimeout(boxFadeTimeoutRef.current);
       }
@@ -480,6 +532,7 @@ export const PatrolModePage: React.FC = () => {
       setSourceMode('UPLOAD');
       if (videoRef.current) {
         videoRef.current.src = url;
+        videoRef.current.playbackRate = playbackSpeed;
         videoRef.current.play().catch(() => {});
         setIsPlaying(true);
       }
@@ -496,6 +549,7 @@ export const PatrolModePage: React.FC = () => {
     setSourceMode('UPLOAD');
     if (videoRef.current) {
       videoRef.current.src = samplePath;
+      videoRef.current.playbackRate = playbackSpeed;
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
@@ -508,6 +562,7 @@ export const PatrolModePage: React.FC = () => {
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
+      videoRef.current.playbackRate = playbackSpeed;
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
@@ -612,10 +667,10 @@ export const PatrolModePage: React.FC = () => {
                 offsetY = (containerH - renderedH) / 2;
               }
 
-              const leftPx = offsetX + (box.x / videoW) * renderedW;
-              const topPx = offsetY + (box.y / videoH) * renderedH;
-              const widthPx = (box.width / videoW) * renderedW;
-              const heightPx = (box.height / videoH) * renderedH;
+              const leftPx = offsetX + (box.normX !== undefined ? box.normX : box.x / videoW) * renderedW;
+              const topPx = offsetY + (box.normY !== undefined ? box.normY : box.y / videoH) * renderedH;
+              const widthPx = (box.normW !== undefined ? box.normW : box.width / videoW) * renderedW;
+              const heightPx = (box.normH !== undefined ? box.normH : box.height / videoH) * renderedH;
 
               const isCrack = box.className?.includes('CRACK');
               const isFlood = box.className?.includes('FLOOD');
@@ -648,7 +703,7 @@ export const PatrolModePage: React.FC = () => {
               return (
                 <div
                   key={idx}
-                  className={`absolute border-2 rounded-lg pointer-events-none transition-all duration-300 ease-out shadow-sm ${
+                  className={`absolute border-2 rounded-lg pointer-events-none transition-opacity duration-150 shadow-sm ${
                     isBoxFading ? 'opacity-40 scale-[0.99]' : 'opacity-100 scale-100'
                   } ${colorBorder}`}
                   style={{
@@ -819,7 +874,7 @@ export const PatrolModePage: React.FC = () => {
                 </span>
               </div>
               <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
-                {(['ECONOMY', 'BALANCED', 'DETAILED'] as SamplingMode[]).map((mode) => (
+                {(['REALTIME', 'BALANCED', 'ECONOMY'] as SamplingMode[]).map((mode) => (
                   <button
                     key={mode}
                     type="button"
@@ -832,6 +887,33 @@ export const PatrolModePage: React.FC = () => {
                     }`}
                   >
                     {SAMPLING_CONFIG[mode].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tốc Độ Phát Video (Playback Speed) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-outline-variant/20 text-xs">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-emerald-500" />
+                <span className="font-semibold text-on-surface">Tốc Độ Video:</span>
+                <span className="text-[11px] text-on-surface-variant font-mono">
+                  ({playbackSpeed}x - Tinh chỉnh để quan sát kỹ)
+                </span>
+              </div>
+              <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
+                {[0.5, 0.75, 1.0].map((speed) => (
+                  <button
+                    key={speed}
+                    type="button"
+                    onClick={() => handleSpeedChange(speed)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      playbackSpeed === speed
+                        ? 'bg-surface-container-lowest text-emerald-600 dark:text-emerald-400 shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    {speed}x
                   </button>
                 ))}
               </div>
