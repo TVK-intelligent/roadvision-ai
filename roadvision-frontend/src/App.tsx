@@ -6,6 +6,7 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { PageLoader } from './components/PageLoader';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AiChatWidget } from './components/AiChatWidget';
 
 // Tách nhỏ Bundle và nạp trang theo nhu cầu (Code-Splitting / Lazy Loading)
 const HomePage = lazy(() =>
@@ -114,6 +115,9 @@ export function App() {
 
             {/* Chân trang hiện đại */}
             <Footer />
+
+            {/* Trợ lý AI Thông Minh RoadVision (Gemini Multimodal Floating Assistant) */}
+            <AiChatWidget />
           </div>
         </BrowserRouter>
       </ToastProvider>

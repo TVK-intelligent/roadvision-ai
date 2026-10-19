@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/incidents/check-nearby").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/incidents/analyze").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/incidents/analyze-video-frame").permitAll()
+                .requestMatchers("/api/v1/ai/chat/**").permitAll()
 
                 // Phân quyền theo tiền tố đường dẫn
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

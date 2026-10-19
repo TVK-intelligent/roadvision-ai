@@ -200,5 +200,26 @@ export const incidentApi = {
   getAiTelemetry: () => {
     return axiosClient.get<Record<string, any>>('/ai/telemetry');
   },
+
+  // Trợ lý AI RoadVision (Gemini Multimodal RAG Assistant)
+  chatWithAi: (data: {
+    message: string;
+    history?: Array<{ role: string; content: string }>;
+  }) => {
+    return axiosClient.post<{
+      reply: string;
+      timestamp: string;
+      suggestions: string[];
+      referencedIncidents?: Array<{
+        id: number;
+        trackingCode: string;
+        title: string;
+        status: string;
+        address: string;
+        category: string;
+      }>;
+    }>('/ai/chat', data);
+  },
 };
+
 

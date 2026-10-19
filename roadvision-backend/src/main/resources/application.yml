@@ -38,6 +38,9 @@ roadvision:
     model-path: classpath:models/yolov8_multiclass_roadcare.onnx
     confidence-threshold: 0.20
     iou-threshold: 0.45
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: gemini-2.5-flash
 
 logging:
   charset:
