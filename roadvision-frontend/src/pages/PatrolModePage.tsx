@@ -55,6 +55,29 @@ interface ActiveTrack {
   committed: boolean;
 }
 
+// Đối tượng theo dõi trực quan mượt mà 60 FPS (Quán tính chuyển động & nội suy mềm)
+interface TrackedVisualObject {
+  id: string;
+  category: string;
+  confidence: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  targetX: number;
+  targetY: number;
+  targetW: number;
+  targetH: number;
+  vx: number;
+  vy: number;
+  vw: number;
+  vh: number;
+  lastSeenTime: number;
+  hitCount: number;
+  committed: boolean;
+  alpha: number;
+}
+
 // Hàm tính chỉ số Intersection over Union (IoU) giữa 2 Bounding Box
 const calculateIoU = (
   b1: { x: number; y: number; width: number; height: number },
@@ -95,6 +118,8 @@ export const PatrolModePage: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const visualTracksRef = useRef<TrackedVisualObject[]>([]);
   const isAnalyzingRef = useRef<boolean>(false);
 
   // Chế độ nguồn video: 'UPLOAD' (Tệp video hành trình) | 'WEBCAM' (Camera trực tiếp)
@@ -274,6 +299,218 @@ export const PatrolModePage: React.FC = () => {
     }
   }, []);
 
+  // Vòng lặp Render 60 FPS GPU-accelerated Overlay Canvas với thuật toán nội suy & ngoại suy quán tính
+  useEffect(() => {
+    let animId: number;
+    let lastTime = performance.now();
+
+    const renderOverlay = (now: number) => {
+      const dt = Math.min(0.08, Math.max(0.001, (now - lastTime) / 1000));
+      lastTime = now;
+
+      const canvas = overlayCanvasRef.current;
+      const video = videoRef.current;
+      if (canvas && video) {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        const displayW = Math.round(rect.width);
+        const displayH = Math.round(rect.height);
+
+        if (displayW > 0 && displayH > 0) {
+          if (canvas.width !== Math.round(displayW * dpr) || canvas.height !== Math.round(displayH * dpr)) {
+            canvas.width = Math.round(displayW * dpr);
+            canvas.height = Math.round(displayH * dpr);
+          }
+
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, displayW, displayH);
+
+            const videoW = video.videoWidth || 640;
+            const videoH = video.videoHeight || 360;
+            const videoAspect = videoW / videoH;
+            const containerAspect = displayW / displayH;
+
+            let renderedW = displayW;
+            let renderedH = displayH;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (containerAspect > videoAspect) {
+              renderedH = displayH;
+              renderedW = displayH * videoAspect;
+              offsetX = (displayW - renderedW) / 2;
+            } else {
+              renderedW = displayW;
+              renderedH = displayW / videoAspect;
+              offsetY = (displayH - renderedH) / 2;
+            }
+
+            const isVideoMoving = isPlaying && !video.paused;
+            const playRate = video.playbackRate || 1.0;
+
+            const tracks = visualTracksRef.current;
+            const updatedTracks: TrackedVisualObject[] = [];
+
+            for (const track of tracks) {
+              const timeSinceSeen = now - track.lastSeenTime;
+
+              if (isVideoMoving) {
+                // 1. Ngoại suy quán tính tiến về phía trước theo chiều chuyển động của xe
+                track.x += track.vx * dt * playRate;
+                track.y += track.vy * dt * playRate;
+                track.w += track.vw * dt * playRate;
+                track.h += track.vh * dt * playRate;
+
+                // 2. Nội suy mềm (LERP) mượt mà về target từ frame AI mới nhất
+                const lerpFactor = Math.min(1.0, 16 * dt);
+                track.x += (track.targetX - track.x) * lerpFactor;
+                track.y += (track.targetY - track.y) * lerpFactor;
+                track.w += (track.targetW - track.w) * lerpFactor;
+                track.h += (track.targetH - track.h) * lerpFactor;
+              }
+
+              // Quản lý độ trong suốt (Fade In / Fade Out)
+              if (timeSinceSeen > 450 || track.y > 0.96) {
+                track.alpha = Math.max(0, track.alpha - dt * 4.0);
+              } else {
+                track.alpha = Math.min(1.0, track.alpha + dt * 6.0);
+              }
+
+              if (track.alpha > 0.02 && timeSinceSeen < 1200) {
+                updatedTracks.push(track);
+
+                // Vẽ Bounding Box trực tiếp lên Canvas với tọa độ letterbox chuẩn xác
+                const bx = offsetX + track.x * renderedW;
+                const by = offsetY + track.y * renderedH;
+                const bw = track.w * renderedW;
+                const bh = track.h * renderedH;
+
+                if (bw > 6 && bh > 6 && track.alpha > 0.05) {
+                  const isCrack = track.category.includes('CRACK');
+                  const isFlood = track.category.includes('FLOOD');
+                  const isObstacle = track.category.includes('OBSTACLE');
+
+                  const strokeColor = isCrack
+                    ? `rgba(245, 158, 11, ${track.alpha})`
+                    : isFlood
+                    ? `rgba(6, 182, 212, ${track.alpha})`
+                    : isObstacle
+                    ? `rgba(244, 63, 94, ${track.alpha})`
+                    : `rgba(59, 130, 246, ${track.alpha})`;
+
+                  const fillColor = isCrack
+                    ? `rgba(245, 158, 11, ${track.alpha * 0.16})`
+                    : isFlood
+                    ? `rgba(6, 182, 212, ${track.alpha * 0.16})`
+                    : isObstacle
+                    ? `rgba(244, 63, 94, ${track.alpha * 0.16})`
+                    : `rgba(59, 130, 246, ${track.alpha * 0.16})`;
+
+                  const badgeBg = isCrack
+                    ? `rgba(217, 119, 6, ${track.alpha * 0.95})`
+                    : isFlood
+                    ? `rgba(8, 145, 178, ${track.alpha * 0.95})`
+                    : isObstacle
+                    ? `rgba(225, 29, 72, ${track.alpha * 0.95})`
+                    : `rgba(37, 99, 235, ${track.alpha * 0.95})`;
+
+                  const labelTitle = isCrack
+                    ? 'Vết nứt'
+                    : isFlood
+                    ? 'Ngập úng'
+                    : isObstacle
+                    ? 'Vật cản'
+                    : 'Ổ gà';
+
+                  // Nền bán trong suốt và khung viền bo góc
+                  ctx.fillStyle = fillColor;
+                  ctx.strokeStyle = strokeColor;
+                  ctx.lineWidth = 2.5;
+                  const radius = Math.min(8, bw / 4, bh / 4);
+
+                  ctx.beginPath();
+                  if (ctx.roundRect) {
+                    ctx.roundRect(bx, by, bw, bh, radius);
+                  } else {
+                    ctx.rect(bx, by, bw, bh);
+                  }
+                  ctx.fill();
+                  ctx.stroke();
+
+                  // 4 góc định vị Reticle Corners phong cách xe tuần tra AI
+                  const cornerLen = Math.min(12, bw / 3, bh / 3);
+                  ctx.lineWidth = 3.5;
+                  ctx.strokeStyle = strokeColor;
+
+                  // Góc trên trái
+                  ctx.beginPath();
+                  ctx.moveTo(bx, by + cornerLen);
+                  ctx.lineTo(bx, by);
+                  ctx.lineTo(bx + cornerLen, by);
+                  ctx.stroke();
+
+                  // Góc trên phải
+                  ctx.beginPath();
+                  ctx.moveTo(bx + bw - cornerLen, by);
+                  ctx.lineTo(bx + bw, by);
+                  ctx.lineTo(bx + bw, by + cornerLen);
+                  ctx.stroke();
+
+                  // Góc dưới trái
+                  ctx.beginPath();
+                  ctx.moveTo(bx, by + bh - cornerLen);
+                  ctx.lineTo(bx, by + bh);
+                  ctx.lineTo(bx + cornerLen, by + bh);
+                  ctx.stroke();
+
+                  // Góc dưới phải
+                  ctx.beginPath();
+                  ctx.moveTo(bx + bw - cornerLen, by + bh);
+                  ctx.lineTo(bx + bw, by + bh);
+                  ctx.lineTo(bx + bw, by + bh - cornerLen);
+                  ctx.stroke();
+
+                  // Nhãn Badge nổi bật trên đỉnh
+                  const labelText = `${labelTitle} (${(track.confidence * 100).toFixed(0)}%)`;
+                  ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+                  const textMetrics = ctx.measureText(labelText);
+                  const badgeWidth = textMetrics.width + 16;
+                  const badgeHeight = 22;
+                  const badgeX = bx;
+                  const badgeY = Math.max(2, by - badgeHeight - 4);
+
+                  ctx.fillStyle = badgeBg;
+                  ctx.beginPath();
+                  if (ctx.roundRect) {
+                    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 5);
+                  } else {
+                    ctx.rect(badgeX, badgeY, badgeWidth, badgeHeight);
+                  }
+                  ctx.fill();
+
+                  ctx.fillStyle = '#ffffff';
+                  ctx.textBaseline = 'middle';
+                  ctx.fillText(labelText, badgeX + 8, badgeY + badgeHeight / 2);
+                }
+              }
+            }
+
+            visualTracksRef.current = updatedTracks;
+            ctx.restore();
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(renderOverlay);
+    };
+
+    animId = requestAnimationFrame(renderOverlay);
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying]);
+
   // Vòng lặp AI trích xuất frame liên tục siêu tốc với Adaptive Sampling, Lọc Trùng IoU & Chọn Frame Tối Ưu
   useEffect(() => {
     if (!isPlaying) {
@@ -283,6 +520,7 @@ export const PatrolModePage: React.FC = () => {
         clearTimeout(boxFadeTimeoutRef.current);
       }
       activeTracksRef.current = [];
+      visualTracksRef.current = [];
       return;
     }
 
@@ -382,13 +620,94 @@ export const PatrolModePage: React.FC = () => {
                 normH: b.height / targetH,
               }));
 
-              // Hiển thị khung Bounding Box bám sát frame hiện tại, loại bỏ hiệu ứng delay gây lag giật
+              // Đồng bộ ngay lập tức vào Bộ Theo Dõi Trực Quan 60 FPS (Visual Motion Tracker)
+              const vNow = performance.now();
+              const curVisuals = visualTracksRef.current;
+
+              for (const box of normalizedBoxes) {
+                const boxCat = box.className || data.className || 'POTHOLE';
+                const boxConf = box.confidence || data.confidence || 0.85;
+
+                let bestTrack: TrackedVisualObject | null = null;
+                let bestScore = 0;
+
+                for (const tr of curVisuals) {
+                  if (tr.category !== boxCat) continue;
+                  const iou = calculateIoU(
+                    { x: tr.targetX, y: tr.targetY, width: tr.targetW, height: tr.targetH },
+                    { x: box.normX, y: box.normY, width: box.normW, height: box.normH }
+                  );
+                  const distRatio = centerDistanceRatio(
+                    { x: tr.targetX, y: tr.targetY, width: tr.targetW, height: tr.targetH },
+                    { x: box.normX, y: box.normY, width: box.normW, height: box.normH },
+                    1, 1
+                  );
+                  if (iou >= 0.12 || distRatio <= 0.25) {
+                    const score = iou * 2.0 + (1.0 - distRatio);
+                    if (score > bestScore) {
+                      bestScore = score;
+                      bestTrack = tr;
+                    }
+                  }
+                }
+
+                if (bestTrack) {
+                  const dtSec = Math.max(0.04, (vNow - bestTrack.lastSeenTime) / 1000);
+                  const measuredVy = (box.normY - bestTrack.targetY) / dtSec;
+                  const measuredVx = (box.normX - bestTrack.targetX) / dtSec;
+                  const measuredVw = (box.normW - bestTrack.targetW) / dtSec;
+                  const measuredVh = (box.normH - bestTrack.targetH) / dtSec;
+
+                  // Lọc mềm vận tốc quán tính (EMA)
+                  bestTrack.vy = bestTrack.vy * 0.35 + measuredVy * 0.65;
+                  bestTrack.vx = bestTrack.vx * 0.35 + measuredVx * 0.65;
+                  bestTrack.vw = bestTrack.vw * 0.35 + measuredVw * 0.65;
+                  bestTrack.vh = bestTrack.vh * 0.35 + measuredVh * 0.65;
+
+                  bestTrack.targetX = box.normX;
+                  bestTrack.targetY = box.normY;
+                  bestTrack.targetW = box.normW;
+                  bestTrack.targetH = box.normH;
+                  bestTrack.confidence = Math.max(bestTrack.confidence, boxConf);
+                  bestTrack.lastSeenTime = vNow;
+                  bestTrack.hitCount += 1;
+                } else {
+                  // Khởi tạo track trực quan mới với vận tốc quán tính ban đầu
+                  const initVy = 0.14;
+                  const initVw = 0.05;
+                  const initVh = 0.03;
+                  const initVx = (box.normX - 0.5) * 0.08;
+
+                  curVisuals.push({
+                    id: `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                    category: boxCat,
+                    confidence: boxConf,
+                    x: box.normX,
+                    y: box.normY,
+                    w: box.normW,
+                    h: box.normH,
+                    targetX: box.normX,
+                    targetY: box.normY,
+                    targetW: box.normW,
+                    targetH: box.normH,
+                    vx: initVx,
+                    vy: initVy,
+                    vw: initVw,
+                    vh: initVh,
+                    lastSeenTime: vNow,
+                    hitCount: 1,
+                    committed: false,
+                    alpha: 0.1,
+                  });
+                }
+              }
+
+              // Cập nhật trạng thái telemetry
               setActiveBoxes(normalizedBoxes);
               setIsBoxFading(false);
               if (boxFadeTimeoutRef.current) {
                 clearTimeout(boxFadeTimeoutRef.current);
               }
-              // Khung tự xóa sau chu kỳ quét + 80ms nếu frame kế tiếp không có vật thể
               const boxExpireMs = Math.max(260, intervalTime + 80);
               boxFadeTimeoutRef.current = setTimeout(() => {
                 setActiveBoxes([]);
@@ -637,93 +956,11 @@ export const PatrolModePage: React.FC = () => {
               className="w-full h-full object-contain"
             />
 
-            {/* Bounding Box AI vẽ chính xác theo tọa độ thực tế của video sau khi đã tính trừ thanh đen (letterbox) */}
-            {activeBoxes.map((box, idx) => {
-              const video = videoRef.current;
-              const videoW = video?.videoWidth || 640;
-              const videoH = video?.videoHeight || 360;
-
-              // Tính toán vùng hiển thị thực tế của video bên trong container aspect-video
-              const containerW = video?.clientWidth || 640;
-              const containerH = video?.clientHeight || 360;
-
-              const videoAspect = videoW / videoH;
-              const containerAspect = containerW / containerH;
-
-              let renderedW = containerW;
-              let renderedH = containerH;
-              let offsetX = 0;
-              let offsetY = 0;
-
-              if (containerAspect > videoAspect) {
-                // Có 2 cột đen ở 2 bên trái phải
-                renderedH = containerH;
-                renderedW = containerH * videoAspect;
-                offsetX = (containerW - renderedW) / 2;
-              } else {
-                // Có 2 thanh đen trên dưới
-                renderedW = containerW;
-                renderedH = containerW / videoAspect;
-                offsetY = (containerH - renderedH) / 2;
-              }
-
-              const leftPx = offsetX + (box.normX !== undefined ? box.normX : box.x / videoW) * renderedW;
-              const topPx = offsetY + (box.normY !== undefined ? box.normY : box.y / videoH) * renderedH;
-              const widthPx = (box.normW !== undefined ? box.normW : box.width / videoW) * renderedW;
-              const heightPx = (box.normH !== undefined ? box.normH : box.height / videoH) * renderedH;
-
-              const isCrack = box.className?.includes('CRACK');
-              const isFlood = box.className?.includes('FLOOD');
-              const isObstacle = box.className?.includes('OBSTACLE');
-
-              const colorBorder = isCrack
-                ? 'border-amber-400 bg-amber-500/15'
-                : isFlood
-                ? 'border-cyan-400 bg-cyan-500/15'
-                : isObstacle
-                ? 'border-rose-400 bg-rose-500/15'
-                : 'border-blue-400 bg-blue-500/15';
-
-              const badgeStyle = isCrack
-                ? 'bg-amber-600 border-amber-300 text-white'
-                : isFlood
-                ? 'bg-cyan-600 border-cyan-300 text-white'
-                : isObstacle
-                ? 'bg-rose-600 border-rose-300 text-white'
-                : 'bg-blue-600 border-blue-300 text-white';
-
-              const labelTitle = isCrack
-                ? 'Vết nứt'
-                : isFlood
-                ? 'Ngập úng'
-                : isObstacle
-                ? 'Vật cản'
-                : 'Ổ gà';
-
-              return (
-                <div
-                  key={idx}
-                  className={`absolute border-2 rounded-lg pointer-events-none transition-opacity duration-150 shadow-sm ${
-                    isBoxFading ? 'opacity-40 scale-[0.99]' : 'opacity-100 scale-100'
-                  } ${colorBorder}`}
-                  style={{
-                    top: `${topPx}px`,
-                    left: `${leftPx}px`,
-                    width: `${widthPx}px`,
-                    height: `${heightPx}px`,
-                  }}
-                >
-                  <div
-                    className={`absolute -top-7 left-0 px-2 py-0.5 rounded-md font-sans text-xs font-bold border shadow-md flex items-center gap-1.5 whitespace-nowrap backdrop-blur-xs ${badgeStyle}`}
-                  >
-                    <span>{labelTitle}</span>
-                    <span className="font-mono text-[11px] font-semibold opacity-95">
-                      ({((box.confidence || 0.85) * 100).toFixed(0)}%)
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+            {/* Canvas Lớp Phủ Bắt Dính Bounding Box Thời Gian Thực (60 FPS Motion Interpolation & Reticle) */}
+            <canvas
+              ref={overlayCanvasRef}
+              className="absolute inset-0 w-full h-full pointer-events-none z-10"
+            />
 
             {/* Trạng thái quét frame hiển thị góc dưới màn hình */}
             {isPlaying && (
