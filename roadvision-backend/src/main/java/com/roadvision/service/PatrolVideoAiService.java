@@ -212,18 +212,21 @@ public class PatrolVideoAiService {
             // 1. Áp dụng NMS
             List<ImageTensorUtil.BoundingBox> nmsBoxes = ImageTensorUtil.applyNms(rawCandidates, iouThreshold);
 
-            // 2. Chuyển đổi và bảo toàn Ổ GÀ: Bất kỳ box nào chứa lòng nước / bùn trũng đều phải là Ổ GÀ (POTHOLE)
+            // 2. Chuyển đổi, bảo toàn và tinh chỉnh ôm sát lòng ổ gà (Contour Snapping)
             List<ImageTensorUtil.BoundingBox> convertedBoxes = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : nmsBoxes) {
                 if ("ROAD_CRACK".equals(b.getClassName()) && isWaterCavity(image, b.getX(), b.getY(), b.getWidth(), b.getHeight())) {
-                    convertedBoxes.add(ImageTensorUtil.BoundingBox.builder()
+                    ImageTensorUtil.BoundingBox pot = ImageTensorUtil.BoundingBox.builder()
                             .className("POTHOLE")
                             .confidence(b.getConfidence())
                             .x(b.getX())
                             .y(b.getY())
                             .width(b.getWidth())
                             .height(b.getHeight())
-                            .build());
+                            .build();
+                    convertedBoxes.add(tightenPotholeBox(image, pot));
+                } else if ("POTHOLE".equals(b.getClassName())) {
+                    convertedBoxes.add(tightenPotholeBox(image, b));
                 } else {
                     convertedBoxes.add(b);
                 }
@@ -510,5 +513,77 @@ public class PatrolVideoAiService {
         if (totalSampled == 0) return false;
         float waterRatio = (float) waterSurfacePixels / totalSampled;
         return (waterRatio >= 0.28f);
+    }
+
+    /**
+     * Tinh chỉnh thu gọn Bounding Box ôm sát lòng hốc / mặt nước thực tế của ổ gà
+     * Loại bỏ các phần đường nhựa khô hoặc khoảng trống không liên quan ở xung quanh.
+     */
+    private ImageTensorUtil.BoundingBox tightenPotholeBox(BufferedImage img, ImageTensorUtil.BoundingBox b) {
+        if (img == null || b == null) return b;
+        int imgW = img.getWidth();
+        int imgH = img.getHeight();
+
+        int rx = Math.max(0, Math.min(b.getX(), imgW - 1));
+        int ry = Math.max(0, Math.min(b.getY(), imgH - 1));
+        int rw = Math.min(b.getWidth(), imgW - rx);
+        int rh = Math.min(b.getHeight(), imgH - ry);
+        if (rw <= 16 || rh <= 16) return b;
+
+        int minX = rx + rw, maxX = rx, minY = ry + rh, maxY = ry;
+        int cavityPixelCount = 0;
+        int step = Math.max(1, Math.min(rw, rh) / 30);
+
+        for (int py = ry; py < ry + rh; py += step) {
+            for (int px = rx; px < rx + rw; px += step) {
+                int rgb = img.getRGB(px, py);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int bVal = rgb & 0xFF;
+                int luma = (int) (0.299 * r + 0.587 * g + 0.114 * bVal);
+
+                boolean isNeutralDryAsphalt = (Math.abs(r - g) <= 15 && Math.abs(g - bVal) <= 15 && Math.abs(r - bVal) <= 15 && luma <= 215);
+                boolean isMirrorWater = !isNeutralDryAsphalt && (luma > 220 && Math.abs(r - bVal) < 25);
+                boolean isSkyBlueWater = (bVal > r + 15 && bVal > g + 8 && luma > 110);
+                boolean isMuddyWater = (r > bVal + 18 && g > bVal + 10 && luma >= 65 && luma <= 215);
+                boolean isDarkDepression = (luma < 65);
+
+                if (isMirrorWater || isSkyBlueWater || isMuddyWater || isDarkDepression) {
+                    cavityPixelCount++;
+                    if (px < minX) minX = px;
+                    if (px > maxX) maxX = px;
+                    if (py < minY) minY = py;
+                    if (py > maxY) maxY = py;
+                }
+            }
+        }
+
+        // Nếu tìm thấy vùng lõm/nước thực tế tập trung bên trong box
+        if (cavityPixelCount >= 8 && minX < maxX && minY < maxY) {
+            int detectedW = maxX - minX;
+            int detectedH = maxY - minY;
+
+            int padX = Math.max(4, (int) (detectedW * 0.08));
+            int padY = Math.max(4, (int) (detectedH * 0.08));
+
+            int tightX = Math.max(0, Math.min(rx, minX - padX));
+            int tightY = Math.max(0, Math.min(ry, minY - padY));
+            int tightW = Math.min(imgW - tightX, (maxX - minX) + 2 * padX);
+            int tightH = Math.min(imgH - tightY, (maxY - minY) + 2 * padY);
+
+            // Kiểm tra tính hợp lệ: đảm bảo box thu gọn ôm sát nhưng không quá bé
+            if (tightW >= 12 && tightH >= 10 && tightW <= rw && tightH <= rh) {
+                return ImageTensorUtil.BoundingBox.builder()
+                        .className("POTHOLE")
+                        .confidence(b.getConfidence())
+                        .x(tightX)
+                        .y(tightY)
+                        .width(tightW)
+                        .height(tightH)
+                        .build();
+            }
+        }
+
+        return b;
     }
 }
