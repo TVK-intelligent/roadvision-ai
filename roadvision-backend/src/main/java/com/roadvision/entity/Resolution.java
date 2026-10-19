@@ -10,8 +10,6 @@ import java.time.LocalDateTime;
 @Table(name = "resolutions")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class Resolution {
 
@@ -48,4 +46,20 @@ public class Resolution {
     @CreationTimestamp
     @Column(name = "resolved_at", nullable = false)
     private LocalDateTime resolvedAt;
+
+    public Resolution() {
+    }
+
+    public Resolution(Long id, Incident incident, User staff, String proofImageUrl, String notes, String aiVerificationStatus, java.math.BigDecimal aiVerificationConfidence, String aiVerificationDetectionsJson, String aiVerificationNotes, LocalDateTime resolvedAt) {
+        this.id = id;
+        this.incident = incident;
+        this.staff = staff;
+        this.proofImageUrl = proofImageUrl;
+        this.notes = notes;
+        this.aiVerificationStatus = aiVerificationStatus;
+        this.aiVerificationConfidence = aiVerificationConfidence;
+        this.aiVerificationDetectionsJson = aiVerificationDetectionsJson;
+        this.aiVerificationNotes = aiVerificationNotes;
+        this.resolvedAt = resolvedAt;
+    }
 }

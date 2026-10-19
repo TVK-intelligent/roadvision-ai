@@ -9,5 +9,5 @@ if not exist "target\roadvision-backend-0.0.1-SNAPSHOT.jar" (
     call .\mvnw.cmd package -DskipTests
 )
 echo [INFO] Khoi dong RoadVision Backend (Port 8080)...
-java -Dfile.encoding=UTF-8 -jar target\roadvision-backend-0.0.1-SNAPSHOT.jar
+java "-Dfile.encoding=UTF-8" -jar target\roadvision-backend-0.0.1-SNAPSHOT.jar
 pause

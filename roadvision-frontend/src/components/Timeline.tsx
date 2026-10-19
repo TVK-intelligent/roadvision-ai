@@ -1,6 +1,6 @@
 import React from 'react';
 import { IncidentStatus } from '../types';
-import { Check, Layers, UserCheck, Hammer, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { Check, Layers, UserCheck, Hammer, CheckCircle2, AlertTriangle, XCircle, ShieldCheck, FileCheck, Archive } from 'lucide-react';
 
 interface TimelineProps {
   status: IncidentStatus;
@@ -21,28 +21,35 @@ const STEPS: StepDef[] = [
   {
     key: 'SUBMITTED',
     stepNum: 1,
-    label: 'Tiếp nhận phản ánh',
+    label: 'Tiếp nhận',
     subLabel: () => 'Đã tiếp nhận',
     icon: <Check className="w-3.5 h-3.5" />,
   },
   {
     key: 'AI_ANALYZED',
     stepNum: 2,
-    label: 'Phân tích hiện trường',
-    subLabel: () => 'Đã phân tích',
+    label: 'AI phân tích',
+    subLabel: () => 'YOLO đề xuất',
     icon: <Layers className="w-3.5 h-3.5" />,
   },
   {
-    key: 'ASSIGNED',
+    key: 'VERIFIED',
     stepNum: 3,
-    label: 'Thẩm định & điều phối',
-    subLabel: () => 'Đã phân công',
+    label: 'Thẩm định',
+    subLabel: () => 'Xác nhận hợp lệ',
+    icon: <FileCheck className="w-3.5 h-3.5" />,
+  },
+  {
+    key: 'ASSIGNED',
+    stepNum: 4,
+    label: 'Phân công',
+    subLabel: () => 'Đã giao thợ',
     icon: <UserCheck className="w-3.5 h-3.5" />,
   },
   {
     key: 'IN_PROGRESS',
-    stepNum: 4,
-    label: 'Thi công hiện trường',
+    stepNum: 5,
+    label: 'Thi công',
     subLabel: (_, isRework, reworkCount) => {
       if (isRework) {
         return reworkCount ? `Tái thi công (#${reworkCount})` : 'Tái thi công';
@@ -52,15 +59,25 @@ const STEPS: StepDef[] = [
     icon: <Hammer className="w-3.5 h-3.5" />,
   },
   {
-    key: 'RESOLVED_OR_CLOSED',
-    stepNum: 5,
-    label: 'Nghiệm thu & đóng phiếu',
-    subLabel: (status) => {
-      if (status === 'CLOSED') return 'Đã đóng hồ sơ';
-      if (status === 'RESOLVED') return 'Đã nghiệm thu (Chờ đóng)';
-      return 'Chờ nghiệm thu';
-    },
+    key: 'PENDING_INSPECTION',
+    stepNum: 6,
+    label: 'Nghiệm thu',
+    subLabel: (status) => (status === 'PENDING_INSPECTION' ? 'Đang kiểm tra' : 'Đã nộp ảnh'),
+    icon: <ShieldCheck className="w-3.5 h-3.5" />,
+  },
+  {
+    key: 'RESOLVED',
+    stepNum: 7,
+    label: 'Hoàn thành',
+    subLabel: () => 'Đạt chuẩn',
     icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+  },
+  {
+    key: 'CLOSED',
+    stepNum: 8,
+    label: 'Đóng hồ sơ',
+    subLabel: () => 'Đã lưu trữ',
+    icon: <Archive className="w-3.5 h-3.5" />,
   },
 ];
 
@@ -71,13 +88,18 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
         return 0;
       case 'AI_ANALYZED':
         return 1;
-      case 'ASSIGNED':
+      case 'VERIFIED':
         return 2;
-      case 'IN_PROGRESS':
+      case 'ASSIGNED':
         return 3;
-      case 'RESOLVED':
-      case 'CLOSED':
+      case 'IN_PROGRESS':
         return 4;
+      case 'PENDING_INSPECTION':
+        return 5;
+      case 'RESOLVED':
+        return 6;
+      case 'CLOSED':
+        return 7;
       case 'REJECTED':
         return 0;
       default:
@@ -94,8 +116,8 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
         <div className="flex items-center gap-2.5">
           <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <div>
-            <span className="font-semibold uppercase tracking-wide text-rose-800">Hồ sơ đã bị từ chối tiếp nhận</span>
-            <p className="text-slate-600 text-xs mt-0.5">Sự cố không nằm trong thẩm quyền bảo trì hoặc ảnh chụp không hợp lệ.</p>
+            <span className="font-semibold uppercase tracking-wide text-rose-800">Hồ sơ đã bị từ chối tiếp nhận (REJECTED)</span>
+            <p className="text-slate-600 text-xs mt-0.5">Sự cố không thuộc phạm vi xử lý, ảnh không liên quan hoặc báo cáo không hợp lệ.</p>
           </div>
         </div>
         <span className="font-mono font-medium px-2 py-0.5 bg-rose-100 rounded text-rose-700 text-xs">
@@ -110,7 +132,7 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-700">
-            Tiến độ xử lý 5 pha
+            Tiến độ xử lý 8 giai đoạn chuẩn
           </span>
           {isDisputed && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-medium border border-rose-200">
@@ -124,16 +146,16 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
           )}
         </div>
         <span className="font-mono text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-          Pha {currentIndex + 1} / 5
+          Giai đoạn {currentIndex + 1} / 8
         </span>
       </div>
 
-      {/* Dải Stepper 5 bước với đường nối */}
+      {/* Dải Stepper 8 bước với đường nối */}
       <div className="relative">
-        <div className="grid grid-cols-5 gap-1 sm:gap-2">
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
           {STEPS.map((step, idx) => {
-            const isCompleted = idx < currentIndex || (idx === 4 && status === 'CLOSED');
-            const isCurrent = idx === currentIndex && !(idx === 4 && status === 'CLOSED');
+            const isCompleted = idx < currentIndex || (idx === 7 && status === 'CLOSED');
+            const isCurrent = idx === currentIndex;
 
             return (
               <div key={step.key} className="flex flex-col items-center text-center relative group">

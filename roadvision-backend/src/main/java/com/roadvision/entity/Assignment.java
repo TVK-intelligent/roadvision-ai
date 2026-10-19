@@ -11,8 +11,6 @@ import java.time.LocalDateTime;
 @Table(name = "assignments")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class Assignment {
 
@@ -46,4 +44,18 @@ public class Assignment {
     @CreationTimestamp
     @Column(name = "assigned_at", nullable = false)
     private LocalDateTime assignedAt;
+
+    public Assignment() {
+    }
+
+    public Assignment(Long id, Incident incident, User assignedByAdmin, User assignedToStaff, String verifiedCategory, Priority priority, String notes, LocalDateTime assignedAt) {
+        this.id = id;
+        this.incident = incident;
+        this.assignedByAdmin = assignedByAdmin;
+        this.assignedToStaff = assignedToStaff;
+        this.verifiedCategory = verifiedCategory;
+        this.priority = priority != null ? priority : Priority.NORMAL;
+        this.notes = notes;
+        this.assignedAt = assignedAt;
+    }
 }

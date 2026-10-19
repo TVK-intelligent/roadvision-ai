@@ -12,8 +12,6 @@ import java.time.LocalDateTime;
 @Table(name = "users")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class User {
 
@@ -44,6 +42,20 @@ public class User {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "reputation_score", nullable = false)
+    @Builder.Default
+    private Integer reputationScore = 50;
+
+    @Column(name = "spam_strikes", nullable = false)
+    @Builder.Default
+    private Integer spamStrikes = 0;
+
+    @Column(name = "suspended_until")
+    private LocalDateTime suspendedUntil;
+
+    @Column(name = "suspend_reason", length = 255)
+    private String suspendReason;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -51,4 +63,24 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public User() {
+    }
+
+    public User(Long id, String email, String password, String fullName, String phone, Role role, String avatarUrl, Boolean isActive, Integer reputationScore, Integer spamStrikes, LocalDateTime suspendedUntil, String suspendReason, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
+        this.email = email;
+        this.password = password;
+        this.fullName = fullName;
+        this.phone = phone;
+        this.role = role;
+        this.avatarUrl = avatarUrl;
+        this.isActive = isActive != null ? isActive : true;
+        this.reputationScore = reputationScore != null ? reputationScore : 50;
+        this.spamStrikes = spamStrikes != null ? spamStrikes : 0;
+        this.suspendedUntil = suspendedUntil;
+        this.suspendReason = suspendReason;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
 }

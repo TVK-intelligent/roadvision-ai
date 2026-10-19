@@ -9,7 +9,7 @@ import com.roadvision.security.JwtTokenProvider;
 import com.roadvision.service.IncidentService;
 import com.roadvision.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +40,7 @@ public class IncidentController {
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final com.roadvision.service.AiInferenceService aiInferenceService;
+    private final com.roadvision.service.PatrolVideoAiService patrolVideoAiService;
 
     /**
      * PHA 1 & 2: Tiếp nhận phản ánh từ người dân & AI tự động phân tích
@@ -161,6 +162,65 @@ public class IncidentController {
     }
 
     /**
+     * PHA 1.5 - KÊNH VIDEO TUẦN TRA: Quét frame video hành trình xe tuần tra (Tách biệt hoàn toàn với upload ảnh tĩnh)
+     */
+    @PostMapping(value = "/analyze-video-frame", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Quét frame video hành trình tuần tra qua PatrolVideoAiService chuyên biệt")
+    public ResponseEntity<Map<String, Object>> analyzeVideoFrame(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(value = "threshold", required = false, defaultValue = "0.20") float threshold) {
+        long start = System.currentTimeMillis();
+        List<com.roadvision.util.ImageTensorUtil.BoundingBox> boxes = new ArrayList<>();
+        int imgWidth = 0;
+        int imgHeight = 0;
+        try {
+            byte[] bytes = image.getBytes();
+            java.awt.image.BufferedImage bimg = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes));
+            if (bimg != null) {
+                imgWidth = bimg.getWidth();
+                imgHeight = bimg.getHeight();
+            }
+            boxes = patrolVideoAiService.runVideoFrameInference(new java.io.ByteArrayInputStream(bytes), threshold);
+        } catch (Exception e) {
+            // empty boxes
+        }
+
+        com.roadvision.util.ImageTensorUtil.BoundingBox best = boxes.isEmpty()
+                ? patrolVideoAiService.emptyDetection()
+                : boxes.get(0);
+
+        String estimatedSeverity = patrolVideoAiService.calculateSeverity(boxes, imgWidth, imgHeight);
+
+        long totalArea = 0;
+        java.util.Map<String, Integer> classCounts = new java.util.LinkedHashMap<>();
+        for (com.roadvision.util.ImageTensorUtil.BoundingBox b : boxes) {
+            totalArea += (long) b.getWidth() * b.getHeight();
+            classCounts.put(b.getClassName(), classCounts.getOrDefault(b.getClassName(), 0) + 1);
+        }
+        double footprintPercent = (imgWidth > 0 && imgHeight > 0)
+                ? ((double) totalArea / (imgWidth * imgHeight)) * 100.0
+                : 0.0;
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("className", best.getClassName());
+        res.put("confidence", best.getConfidence());
+        res.put("bboxX", best.getX());
+        res.put("bboxY", best.getY());
+        res.put("bboxWidth", best.getWidth());
+        res.put("bboxHeight", best.getHeight());
+        res.put("count", boxes.size());
+        res.put("boxes", boxes);
+        res.put("classCounts", classCounts);
+        res.put("estimatedSeverity", estimatedSeverity);
+        res.put("footprintPercent", Math.round(footprintPercent * 10.0) / 10.0);
+        res.put("activeThreshold", threshold);
+        res.put("imageWidth", imgWidth);
+        res.put("imageHeight", imgHeight);
+        res.put("inferenceMs", System.currentTimeMillis() - start);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
      * PHA 3: Quản trị viên lấy danh sách hàng đợi điều phối (Dispatch Queue)
      */
     @GetMapping
@@ -217,6 +277,36 @@ public class IncidentController {
         Long staffId = getUserIdFromHeader(authHeader);
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return ResponseEntity.ok(incidentService.getAssignedToStaff(staffId, pageable));
+    }
+
+    /**
+     * PHA 2.5: Quản trị viên thẩm định và xác nhận sự cố hợp lệ (VERIFIED)
+     */
+    @PostMapping("/{id}/verify")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Pha 2.5: Quản trị viên thẩm định và xác nhận sự cố hợp lệ (VERIFIED)")
+    public ResponseEntity<IncidentResponse> verifyIncident(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id) {
+
+        Long adminId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.verifyIncident(id, adminId));
+    }
+
+    /**
+     * PHA 4.5: Quản trị viên phê duyệt nghiệm thu mặt đường (RESOLVED)
+     */
+    @PostMapping("/{id}/approve-inspection")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Pha 4.5: Quản trị viên kiểm tra đối chiếu Before/After và phê duyệt nghiệm thu (RESOLVED)")
+    public ResponseEntity<IncidentResponse> approveInspection(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+
+        Long adminId = getUserIdFromHeader(authHeader);
+        String notes = body != null ? body.get("notes") : null;
+        return ResponseEntity.ok(incidentService.approveInspection(id, notes, adminId));
     }
 
     /**
@@ -280,19 +370,36 @@ public class IncidentController {
     }
 
     /**
-     * PHA 5: Người dân đánh giá sao chất lượng và xác nhận đóng sự cố
+     * PHA 5: Đóng hồ sơ sự cố (Admin hoặc Citizen sau khi đã nghiệm thu đạt chuẩn RESOLVED)
+     * Đánh giá chất lượng (Feedback) là tùy chọn, không bắt buộc để đóng phiếu.
      */
     @PostMapping("/{id}/close")
     @PreAuthorize("hasAnyRole('CITIZEN', 'ADMIN')")
-    @Operation(summary = "Pha 5: Người dân nghiệm thu đối chiếu Before/After, chấm 1-5 sao và đóng sự cố")
+    @Operation(summary = "Pha 5: Đóng hồ sơ sự cố sau khi đã nghiệm thu đạt chuẩn (RESOLVED -> CLOSED)")
     public ResponseEntity<IncidentResponse> closeIncident(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) FeedbackRequest request) {
+
+        Long userId = getUserIdFromHeader(authHeader);
+        Role userRole = Role.valueOf(jwtTokenProvider.extractRole(authHeader.substring(7)));
+        return ResponseEntity.ok(incidentService.closeIncident(id, request, userId, userRole));
+    }
+
+    /**
+     * Đánh giá chất lượng phục vụ của người dân (Citizen Feedback & Rating)
+     * Độc lập với Incident Status: Người dân có thể đánh giá bất kỳ lúc nào sau khi sự cố RESOLVED hoặc CLOSED
+     */
+    @PostMapping("/{id}/feedback")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Người dân đánh giá 1-5 sao và để lại nhận xét (sau khi sự cố đã RESOLVED hoặc CLOSED)")
+    public ResponseEntity<IncidentResponse> submitFeedback(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable("id") Long id,
             @Valid @RequestBody FeedbackRequest request) {
 
         Long userId = getUserIdFromHeader(authHeader);
-        Role userRole = Role.valueOf(jwtTokenProvider.extractRole(authHeader.substring(7)));
-        return ResponseEntity.ok(incidentService.closeIncident(id, request, userId, userRole));
+        return ResponseEntity.ok(incidentService.submitFeedback(id, request, userId));
     }
 
     /**

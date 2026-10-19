@@ -55,6 +55,36 @@ export const incidentApi = {
     });
   },
 
+  // Pha 1.5 - Kênh Video: Quét frame video hành trình tuần tra qua PatrolVideoAiService riêng biệt
+  analyzeVideoFrame: (formData: FormData, threshold?: number) => {
+    return axiosClient.post<{
+      className: string;
+      confidence: number;
+      bboxX: number;
+      bboxY: number;
+      bboxWidth: number;
+      bboxHeight: number;
+      count?: number;
+      classCounts?: Record<string, number>;
+      boxes?: Array<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        confidence: number;
+        className: string;
+      }>;
+      estimatedSeverity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      footprintPercent?: number;
+      activeThreshold?: number;
+      imageWidth?: number;
+      imageHeight?: number;
+      inferenceMs: number;
+    }>(`/incidents/analyze-video-frame${threshold !== undefined ? `?threshold=${threshold}` : ''}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
   // Pha 3: Danh sách sự cố cho Dispatch Queue
   getIncidents: (params?: IncidentFilterParams) => {
     return axiosClient.get<PageResponse<Incident>>('/incidents', { params });
@@ -79,6 +109,11 @@ export const incidentApi = {
     });
   },
 
+  // Pha 2.5: Quản trị viên xác nhận sự cố hợp lệ (VERIFIED)
+  verifyIncident: (id: number | string) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/verify`);
+  },
+
   // Pha 3: Phân công kỹ thuật viên
   assignIncident: (id: number | string, data: { staffId: number; verifiedCategory?: string; priority?: string; notes?: string }) => {
     return axiosClient.patch<Incident>(`/incidents/${id}/assign`, data);
@@ -94,16 +129,26 @@ export const incidentApi = {
     return axiosClient.patch<Incident>(`/incidents/${id}/status`, { status });
   },
 
-  // Pha 4: Nộp ảnh bằng chứng nghiệm thu (Proof of Work)
+  // Pha 4: Nộp ảnh bằng chứng nghiệm thu (Proof of Work) -> PENDING_INSPECTION
   resolveIncident: (id: number | string, formData: FormData) => {
     return axiosClient.post<Incident>(`/incidents/${id}/resolve`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
 
-  // Pha 5: Đánh giá sao và đóng sự cố
-  closeIncident: (id: number | string, data: { rating: number; comments?: string }) => {
-    return axiosClient.post<Incident>(`/incidents/${id}/close`, data);
+  // Pha 4.5: Quản trị viên phê duyệt nghiệm thu mặt đường (RESOLVED)
+  approveInspection: (id: number | string, data?: { notes?: string }) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/approve-inspection`, data || {});
+  },
+
+  // Pha 5: Đóng hồ sơ sự cố (Admin hoặc Citizen sau khi đã RESOLVED)
+  closeIncident: (id: number | string, data?: { rating?: number; comments?: string }) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/close`, data || {});
+  },
+
+  // Đánh giá của người dân (tùy chọn sau khi sự cố RESOLVED hoặc CLOSED)
+  submitFeedback: (id: number | string, data: { rating: number; comments?: string }) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/feedback`, data);
   },
 
   // Pha 5: Người dân khiếu nại nghiệm thu chưa đạt (Dispute)

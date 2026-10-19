@@ -3,29 +3,31 @@ package com.roadvision.config;
 import com.roadvision.entity.User;
 import com.roadvision.enums.Role;
 import com.roadvision.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.math.BigDecimal;
 import java.util.Optional;
 
 @Slf4j
 @Configuration
-@RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+
+    public DataInitializer(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     @Override
     public void run(String... args) {
         log.info("Khởi tạo / Cập nhật tài khoản mẫu với mật khẩu chuẩn '12345678'...");
 
         // 1. Tài khoản Quản trị viên (Admin)
-        User admin = createOrUpdateUser(
+        createOrUpdateUser(
                 "admin@roadcare.gov.vn",
                 "KS. Nguyễn Thị Phương Mai (Trưởng Ban Quản Lý Điều Hành)",
                 "0909000001",
@@ -70,7 +72,7 @@ public class DataInitializer implements CommandLineRunner {
         );
 
         // 3. Tài khoản Công dân (Citizen)
-        User citizen = createOrUpdateUser(
+        createOrUpdateUser(
                 "citizen.an@gmail.com",
                 "Lê Hoàng An",
                 "0912345678",

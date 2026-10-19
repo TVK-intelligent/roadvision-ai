@@ -70,12 +70,12 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
               const isObstacle = box.className?.includes('OBSTACLE');
 
               const borderColor = isCrack
-                ? 'border-amber-500 bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                ? 'border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]'
                 : isFlood
-                ? 'border-cyan-500 bg-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                ? 'border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]'
                 : isObstacle
-                ? 'border-rose-500 bg-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.4)]'
-                : 'border-primary bg-primary/20 shadow-[0_0_15px_rgba(37,99,235,0.4)]';
+                ? 'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]'
+                : 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]';
 
               const badgeColor = isCrack
                 ? 'bg-amber-500 text-slate-950'
@@ -83,12 +83,12 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
                 ? 'bg-cyan-500 text-slate-950'
                 : isObstacle
                 ? 'bg-rose-500 text-white'
-                : 'bg-primary text-on-primary';
+                : 'bg-blue-600 text-white';
 
               return (
                 <div
                   key={idx}
-                  className={`absolute border-2 backdrop-blur-[1px] rounded transition-all duration-300 pointer-events-none ${borderColor}`}
+                  className={`absolute border-2 rounded transition-all duration-300 pointer-events-none ${borderColor}`}
                   style={{
                     top: `${Math.max(0, bTop)}%`,
                     left: `${Math.max(0, bLeft)}%`,
@@ -96,8 +96,12 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
                     height: `${Math.min(100 - bTop, bH)}%`,
                   }}
                 >
-                  {/* Nhãn loại hư hại và độ tin cậy */}
-                  <div className={`absolute -top-6 left-0 font-mono text-xs font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 whitespace-nowrap ${badgeColor}`}>
+                  {/* Nhãn loại hư hại và độ tin cậy - tự động tránh tràn cạnh trên */}
+                  <div
+                    className={`absolute font-mono text-xs font-bold px-2 py-0.5 rounded shadow-md flex items-center gap-1 whitespace-nowrap z-10 ${
+                      bTop < 8 ? 'top-1 left-1' : '-top-6 left-0'
+                    } ${badgeColor}`}
+                  >
                     <span>⚠️ #{idx + 1}</span>
                     <span>
                       {box.className?.includes('DEFECT')
@@ -121,7 +125,7 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
             })
           ) : hasValidBox ? (
             <div
-              className="absolute border-2 border-primary bg-primary/20 backdrop-blur-[1px] rounded transition-all duration-300 shadow-[0_0_15px_rgba(37,99,235,0.4)] pointer-events-none"
+              className="absolute border-2 border-blue-500 rounded transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)] pointer-events-none"
               style={{
                 top: `${Math.max(0, topPct)}%`,
                 left: `${Math.max(0, leftPct)}%`,
@@ -129,7 +133,11 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
                 height: `${Math.min(100 - topPct, heightPct)}%`,
               }}
             >
-              <div className="absolute -top-6 left-0 bg-primary text-on-primary font-mono text-xs font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 whitespace-nowrap">
+              <div
+                className={`absolute font-mono text-xs font-bold px-2 py-0.5 rounded shadow-md flex items-center gap-1 whitespace-nowrap z-10 bg-blue-600 text-white ${
+                  topPct < 8 ? 'top-1 left-1' : '-top-6 left-0'
+                }`}
+              >
                 <span>⚠️</span>
                 <span>
                   {aiDetection?.className?.includes('DEFECT')

@@ -19,6 +19,17 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
 
     Optional<Incident> findByTicketCode(String ticketCode);
 
+    boolean existsByImageSha256(String imageSha256);
+
+    @Query("SELECT COUNT(i) FROM Incident i WHERE i.citizen.id = :citizenId AND i.createdAt >= :since")
+    long countRecentReportsByCitizen(@Param("citizenId") Long citizenId, @Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(i) FROM Incident i WHERE i.citizen.id = :citizenId AND i.createdAt >= :since AND i.status = :status")
+    long countRecentReportsByCitizenAndStatus(@Param("citizenId") Long citizenId, @Param("since") LocalDateTime since, @Param("status") IncidentStatus status);
+
+    @Query("SELECT COUNT(i) FROM Incident i WHERE i.citizen.id = :citizenId AND i.status IN ('VERIFIED', 'RESOLVED', 'CLOSED')")
+    long countVerifiedReportsByCitizen(@Param("citizenId") Long citizenId);
+
     Page<Incident> findByCitizenId(Long citizenId, Pageable pageable);
 
     @Query("SELECT i FROM Incident i JOIN i.assignment a WHERE a.assignedToStaff.id = :staffId")

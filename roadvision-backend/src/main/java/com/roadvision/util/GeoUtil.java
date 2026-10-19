@@ -88,7 +88,6 @@ public class GeoUtil {
      */
     public static RouteCorridorInfo resolveCorridor(BigDecimal lat, BigDecimal lng, String address) {
         double dLat = lat != null ? lat.doubleValue() : 21.0285;
-        double dLng = lng != null ? lng.doubleValue() : 105.8542;
         String addr = address != null ? address.toLowerCase() : "";
 
         // 1. Phân giải ưu tiên theo tên Tỉnh/Thành trong chuỗi địa chỉ

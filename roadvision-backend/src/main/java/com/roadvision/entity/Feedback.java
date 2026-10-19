@@ -10,8 +10,6 @@ import java.time.LocalDateTime;
 @Table(name = "feedbacks")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class Feedback {
 
@@ -36,4 +34,16 @@ public class Feedback {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    public Feedback() {
+    }
+
+    public Feedback(Long id, Incident incident, User citizen, Short rating, String comments, LocalDateTime createdAt) {
+        this.id = id;
+        this.incident = incident;
+        this.citizen = citizen;
+        this.rating = rating;
+        this.comments = comments;
+        this.createdAt = createdAt;
+    }
 }

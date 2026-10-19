@@ -90,16 +90,16 @@ export const StaffTasksPage: React.FC = () => {
       const updated = res.data;
       if (updated.resolution?.aiVerificationStatus === 'AI_VERIFIED_CLEAN') {
         toast.success(
-          `AI đã thẩm định đạt chuẩn: Mặt đường đã được hoàn trả phẳng phiu!`,
-          'Nghiệm thu đạt chuẩn'
+          `AI đã đối chiếu đạt chuẩn! Hồ sơ đã chuyển sang Chờ Ban Quản trị duyệt nghiệm thu.`,
+          'Đã nộp nghiệm thu'
         );
       } else if (updated.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS') {
         toast.warning(
-          updated.resolution.aiVerificationNotes || 'Cảnh báo: Phát hiện dấu hiệu hư hỏng còn sót lại!',
-          'Cảnh báo kiểm định'
+          (updated.resolution.aiVerificationNotes || 'Cảnh báo: Phát hiện dấu hiệu hư hỏng còn sót lại!') + ' (Đang chờ Ban Quản trị xem xét)',
+          'Cảnh báo kiểm định AI'
         );
       } else {
-        toast.success(`Đã nộp báo cáo nghiệm thu cho sự cố #${selectedTask.ticketCode}!`, 'Thành công');
+        toast.success(`Đã nộp báo cáo nghiệm thu cho sự cố #${selectedTask.ticketCode}! Chờ Ban Quản trị phê duyệt.`, 'Thành công');
       }
 
       fetchTasks(page, pageSize);
@@ -116,6 +116,7 @@ export const StaffTasksPage: React.FC = () => {
   const filteredTasks = tasks.filter((t) => {
     if (filter === 'ASSIGNED') return t.status === 'ASSIGNED';
     if (filter === 'IN_PROGRESS') return t.status === 'IN_PROGRESS';
+    if (filter === 'PENDING_INSPECTION') return t.status === 'PENDING_INSPECTION';
     if (filter === 'DONE') return t.status === 'RESOLVED' || t.status === 'CLOSED';
     return true;
   });
@@ -151,6 +152,7 @@ export const StaffTasksPage: React.FC = () => {
           { id: 'ALL', label: 'Tất cả nhiệm vụ', count: tasks.length },
           { id: 'ASSIGNED', label: 'Được giao mới', count: tasks.filter((t) => t.status === 'ASSIGNED').length },
           { id: 'IN_PROGRESS', label: 'Đang thi công', count: tasks.filter((t) => t.status === 'IN_PROGRESS').length },
+          { id: 'PENDING_INSPECTION', label: 'Chờ duyệt nghiệm thu', count: tasks.filter((t) => t.status === 'PENDING_INSPECTION').length },
           { id: 'DONE', label: 'Đã hoàn thành', count: tasks.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length },
         ].map((tab) => (
           <button

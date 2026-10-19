@@ -22,6 +22,8 @@ import {
   ThumbsUp,
   MapPin,
   X,
+  Check,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const DispatchQueuePage: React.FC = () => {
@@ -146,6 +148,16 @@ export const DispatchQueuePage: React.FC = () => {
       )
     );
     setIsAssignModalOpen(false);
+  };
+
+  const handleVerifyIncident = async (incidentId: number) => {
+    try {
+      await incidentApi.verifyIncident(incidentId);
+      toast.success('Đã thẩm định và xác nhận sự cố hợp lệ!', 'Xác nhận hồ sơ');
+      fetchIncidents(page, pageSize);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể xác nhận sự cố', 'Lỗi');
+    }
   };
 
   const handleRejectSubmit = async (e: React.FormEvent) => {
@@ -362,9 +374,11 @@ export const DispatchQueuePage: React.FC = () => {
             >
               <option value="ALL">Tất cả trạng thái xử lý</option>
               <option value="AI_ANALYZED">Chờ thẩm định (Đã phân tích)</option>
+              <option value="VERIFIED">Đã thẩm định (Chờ giao việc)</option>
               <option value="SUBMITTED">Mới tiếp nhận</option>
               <option value="ASSIGNED">Đã phân công</option>
               <option value="IN_PROGRESS">Đang thi công</option>
+              <option value="PENDING_INSPECTION">Chờ duyệt nghiệm thu</option>
               <option value="RESOLVED">Đã hoàn thành</option>
               <option value="CLOSED">Đã đóng hồ sơ</option>
               <option value="REJECTED">Đã từ chối</option>
@@ -471,6 +485,11 @@ export const DispatchQueuePage: React.FC = () => {
                                   {incident.routeCorridor.replace('KHU_', 'Khu ')}
                                 </span>
                               )}
+                              {incident.flag === 'POTENTIAL_DUPLICATE' && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-semibold" title="Phát hiện có sự cố khác cùng vị trí lân cận (<25m)">
+                                  <AlertCircle className="w-2.5 h-2.5 text-amber-600" /> Trùng lặp vị trí
+                                </span>
+                              )}
                               {incident.upvoteCount != null && incident.upvoteCount > 1 && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-medium" title="Lượt công dân đồng tình">
                                   <ThumbsUp className="w-2.5 h-2.5" /> {incident.upvoteCount}
@@ -532,10 +551,35 @@ export const DispatchQueuePage: React.FC = () => {
                             </Link>
                           ) : (
                             <>
+                              {/* Cổng 1: AI_ANALYZED / SUBMITTED -> Chỉ được Xác nhận (VERIFIED) hoặc Từ chối (REJECTED) */}
                               {['SUBMITTED', 'AI_ANALYZED'].includes(incident.status) && (
                                 <>
                                   <button
+                                    onClick={() => handleVerifyIncident(incident.id)}
+                                    title="Thẩm định kết quả AI và xác nhận Incident hợp lệ"
+                                    className="px-2.5 py-1 rounded-md bg-teal-600 hover:bg-teal-700 text-white font-medium transition-colors text-xs flex items-center gap-1"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Xác nhận</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedIncident(incident);
+                                      setIsRejectModalOpen(true);
+                                    }}
+                                    className="px-2 py-1 rounded-md border border-slate-200 text-rose-600 font-medium hover:bg-rose-50 transition-colors text-xs"
+                                  >
+                                    Từ chối
+                                  </button>
+                                </>
+                              )}
+
+                              {/* Cổng 2: Chỉ khi đã VERIFIED mới cho phép Giao việc (ASSIGNED) */}
+                              {incident.status === 'VERIFIED' && (
+                                <>
+                                  <button
                                     onClick={() => handleOpenAssignModal(incident)}
+                                    title="Phân công kỹ thuật viên xử lý sự cố đã xác nhận"
                                     className="px-2.5 py-1 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors text-xs flex items-center gap-1"
                                   >
                                     <UserCheck className="w-3.5 h-3.5" />
@@ -551,6 +595,17 @@ export const DispatchQueuePage: React.FC = () => {
                                     Từ chối
                                   </button>
                                 </>
+                              )}
+
+                              {/* Cổng 3: PENDING_INSPECTION -> Duyệt nghiệm thu */}
+                              {incident.status === 'PENDING_INSPECTION' && (
+                                <Link
+                                  to={`/incidents/${incident.id}`}
+                                  className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs flex items-center gap-1 transition-colors"
+                                >
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                  <span>Duyệt nghiệm thu</span>
+                                </Link>
                               )}
                               <Link
                                 to={`/incidents/${incident.id}`}

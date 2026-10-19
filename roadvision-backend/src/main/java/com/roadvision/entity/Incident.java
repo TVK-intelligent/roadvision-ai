@@ -15,8 +15,6 @@ import java.time.LocalDateTime;
 @Table(name = "incidents")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class Incident {
 
@@ -40,6 +38,9 @@ public class Incident {
 
     @Column(name = "image_url", nullable = false, length = 500)
     private String imageUrl;
+
+    @Column(name = "image_sha256", length = 64)
+    private String imageSha256;
 
     @Column(nullable = false, precision = 10, scale = 8)
     private BigDecimal latitude;
@@ -114,4 +115,38 @@ public class Incident {
 
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
+
+    public Incident() {
+    }
+
+    public Incident(Long id, String ticketCode, User citizen, String title, String description, String imageUrl, String imageSha256, BigDecimal latitude, BigDecimal longitude, String address, String routeCorridor, String zoneName, Category category, IncidentStatus status, Severity severity, String flag, String rejectionReason, String reworkReason, Integer reworkCount, Integer upvoteCount, AiDetection aiDetection, Assignment assignment, Resolution resolution, Feedback feedback, LocalDateTime createdAt, LocalDateTime updatedAt, LocalDateTime resolvedAt, LocalDateTime closedAt) {
+        this.id = id;
+        this.ticketCode = ticketCode;
+        this.citizen = citizen;
+        this.title = title != null ? title : "Sự cố mặt đường";
+        this.description = description;
+        this.imageUrl = imageUrl;
+        this.imageSha256 = imageSha256;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.address = address;
+        this.routeCorridor = routeCorridor;
+        this.zoneName = zoneName;
+        this.category = category != null ? category : Category.POTHOLE;
+        this.status = status != null ? status : IncidentStatus.SUBMITTED;
+        this.severity = severity != null ? severity : Severity.MEDIUM;
+        this.flag = flag;
+        this.rejectionReason = rejectionReason;
+        this.reworkReason = reworkReason;
+        this.reworkCount = reworkCount != null ? reworkCount : 0;
+        this.upvoteCount = upvoteCount != null ? upvoteCount : 1;
+        this.aiDetection = aiDetection;
+        this.assignment = assignment;
+        this.resolution = resolution;
+        this.feedback = feedback;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.resolvedAt = resolvedAt;
+        this.closedAt = closedAt;
+    }
 }

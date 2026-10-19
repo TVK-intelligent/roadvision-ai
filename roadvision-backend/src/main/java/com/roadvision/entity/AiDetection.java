@@ -11,8 +11,6 @@ import java.time.LocalDateTime;
 @Table(name = "ai_detections")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class AiDetection {
 
@@ -51,4 +49,21 @@ public class AiDetection {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public AiDetection() {
+    }
+
+    public AiDetection(Long id, Incident incident, String className, BigDecimal confidence, Integer bboxX, Integer bboxY, Integer bboxWidth, Integer bboxHeight, Integer inferenceMs, String rawPredictionsJson, LocalDateTime createdAt) {
+        this.id = id;
+        this.incident = incident;
+        this.className = className;
+        this.confidence = confidence;
+        this.bboxX = bboxX;
+        this.bboxY = bboxY;
+        this.bboxWidth = bboxWidth;
+        this.bboxHeight = bboxHeight;
+        this.inferenceMs = inferenceMs;
+        this.rawPredictionsJson = rawPredictionsJson;
+        this.createdAt = createdAt;
+    }
 }

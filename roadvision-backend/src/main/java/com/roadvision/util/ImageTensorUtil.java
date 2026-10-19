@@ -42,22 +42,16 @@ public class ImageTensorUtil {
     }
 
     /**
-     * Tiền xử lý ảnh theo chuẩn YOLOv8 Letterbox:
-     * - Giữ nguyên tỷ lệ khung hình (aspect ratio) của ảnh gốc.
-     * - Co kích thước tối đa vừa với khung 640x640.
-     * - Bù viền xám RGB (114, 114, 114) vào 2 bên hoặc trên dưới.
-     * - Trả về FloatBuffer NCHW và thông số pad/scale để quy đổi tọa độ ngược lại ảnh gốc.
+     * Tiền xử lý ảnh theo chuẩn YOLOv8 Letterbox (mặc định 640x640).
      */
     public static LetterboxInfo letterbox(BufferedImage originalImage) {
         return letterbox(originalImage, INPUT_SIZE);
     }
 
     /**
-     * Tiền xử lý ảnh theo chuẩn YOLOv8 Letterbox với kích thước đầu vào linh hoạt (640, 800, 1024):
-     * - Giữ nguyên tỷ lệ khung hình (aspect ratio) của ảnh gốc.
-     * - Co kích thước tối đa vừa với khung targetSize x targetSize.
-     * - Bù viền xám RGB (114, 114, 114) vào 2 bên hoặc trên dưới.
-     * - Trả về FloatBuffer NCHW và thông số pad/scale để quy đổi tọa độ ngược lại ảnh gốc.
+     * Tiền xử lý ảnh theo chuẩn YOLOv8 Letterbox với kích thước đầu vào linh hoạt:
+     * - Giữ nguyên tỷ lệ khung hình, bù viền xám 114, trả về FloatBuffer NCHW + scale/pad.
+     * - Đọc pixel một lần bằng getRGB(bulk) thay vì từng pixel (kết quả giống hệt, nhanh hơn).
      */
     public static LetterboxInfo letterbox(BufferedImage originalImage, int targetSize) {
         int target = targetSize > 0 ? targetSize : INPUT_SIZE;
@@ -73,34 +67,28 @@ public class ImageTensorUtil {
 
         BufferedImage letterboxed = new BufferedImage(target, target, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = letterboxed.createGraphics();
-        // Điền nền xám 114 (chuẩn YOLO)
         g.setColor(new java.awt.Color(114, 114, 114));
         g.fillRect(0, 0, target, target);
 
-        // Vẽ ảnh đã co giãn vào giữa
         Image scaled = originalImage.getScaledInstance(newW, newH, Image.SCALE_SMOOTH);
         g.drawImage(scaled, padLeft, padTop, null);
         g.dispose();
 
-        FloatBuffer floatBuffer = FloatBuffer.allocate(1 * 3 * target * target);
-        float[] rChannel = new float[target * target];
-        float[] gChannel = new float[target * target];
-        float[] bChannel = new float[target * target];
+        int plane = target * target;
+        int[] pixels = letterboxed.getRGB(0, 0, target, target, null, 0, target);
 
-        for (int y = 0; y < target; y++) {
-            for (int x = 0; x < target; x++) {
-                int rgb = letterboxed.getRGB(x, y);
-                int r = (rgb >> 16) & 0xFF;
-                int gVal = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
+        float[] rChannel = new float[plane];
+        float[] gChannel = new float[plane];
+        float[] bChannel = new float[plane];
 
-                int index = y * target + x;
-                rChannel[index] = r / 255.0f;
-                gChannel[index] = gVal / 255.0f;
-                bChannel[index] = b / 255.0f;
-            }
+        for (int i = 0; i < plane; i++) {
+            int rgb = pixels[i];
+            rChannel[i] = ((rgb >> 16) & 0xFF) / 255.0f;
+            gChannel[i] = ((rgb >> 8) & 0xFF) / 255.0f;
+            bChannel[i] = (rgb & 0xFF) / 255.0f;
         }
 
+        FloatBuffer floatBuffer = FloatBuffer.allocate(3 * plane);
         floatBuffer.put(rChannel);
         floatBuffer.put(gChannel);
         floatBuffer.put(bChannel);
@@ -114,19 +102,17 @@ public class ImageTensorUtil {
                 .build();
     }
 
-    /**
-     * Resize ảnh về 640x640 và chuyển đổi ma trận điểm ảnh thành NCHW FloatBuffer
-     */
     public static FloatBuffer createFloatBufferFromImage(BufferedImage originalImage) {
         return letterbox(originalImage).getBuffer();
     }
 
     /**
-     * Thuật toán Non-Maximum Suppression (NMS) để loại bỏ các hộp bao dư thừa
+     * Class-aware NMS.
+     * ĐÃ SỬA: ngưỡng ioMin của ROAD_OBSTACLE hạ từ 0.80 xuống 0.60 để khử khung trùng do full-image + tile,
+     * nhưng vẫn giữ riêng các vật cản đứng cạnh nhau (thùng hàng, cọc tiêu).
      */
     public static List<BoundingBox> applyNms(List<BoundingBox> boxes, float iouThreshold) {
         List<BoundingBox> selectedBoxes = new ArrayList<>();
-        // Sắp xếp các box theo độ tin cậy giảm dần
         boxes.sort(Comparator.comparing(BoundingBox::getConfidence).reversed());
 
         boolean[] isSuppressed = new boolean[boxes.size()];
@@ -141,12 +127,18 @@ public class ImageTensorUtil {
                 if (isSuppressed[j]) continue;
 
                 BoundingBox other = boxes.get(j);
-                // Class-aware NMS: Chỉ triệt tiêu các box của cùng 1 loại hư hại
                 if (java.util.Objects.equals(current.getClassName(), other.getClassName())) {
                     float iou = computeIoU(current, other);
                     float ioMin = computeIoMin(current, other);
-                    if (iou >= iouThreshold || ioMin >= 0.65f) {
-                        isSuppressed[j] = true;
+
+                    if ("ROAD_OBSTACLE".equals(current.getClassName())) {
+                        if (iou >= 0.45f || ioMin >= 0.60f) {
+                            isSuppressed[j] = true;
+                        }
+                    } else {
+                        if (iou >= iouThreshold || ioMin >= 0.65f) {
+                            isSuppressed[j] = true;
+                        }
                     }
                 }
             }
@@ -161,13 +153,13 @@ public class ImageTensorUtil {
         int x2 = Math.min(a.getX() + a.getWidth(), b.getX() + b.getWidth());
         int y2 = Math.min(a.getY() + a.getHeight(), b.getY() + b.getHeight());
 
-        int intersectionWidth = Math.max(0, x2 - x1);
-        int intersectionHeight = Math.max(0, y2 - y1);
-        int intersectionArea = intersectionWidth * intersectionHeight;
+        long intersectionWidth = Math.max(0, x2 - x1);
+        long intersectionHeight = Math.max(0, y2 - y1);
+        long intersectionArea = intersectionWidth * intersectionHeight;
 
-        int areaA = a.getWidth() * a.getHeight();
-        int areaB = b.getWidth() * b.getHeight();
-        int unionArea = areaA + areaB - intersectionArea;
+        long areaA = (long) a.getWidth() * a.getHeight();
+        long areaB = (long) b.getWidth() * b.getHeight();
+        long unionArea = areaA + areaB - intersectionArea;
 
         return unionArea <= 0 ? 0.0f : (float) intersectionArea / unionArea;
     }
@@ -178,11 +170,11 @@ public class ImageTensorUtil {
         int x2 = Math.min(a.getX() + a.getWidth(), b.getX() + b.getWidth());
         int y2 = Math.min(a.getY() + a.getHeight(), b.getY() + b.getHeight());
 
-        int intersectionWidth = Math.max(0, x2 - x1);
-        int intersectionHeight = Math.max(0, y2 - y1);
-        int intersectionArea = intersectionWidth * intersectionHeight;
+        long intersectionWidth = Math.max(0, x2 - x1);
+        long intersectionHeight = Math.max(0, y2 - y1);
+        long intersectionArea = intersectionWidth * intersectionHeight;
 
-        int minArea = Math.min(a.getWidth() * a.getHeight(), b.getWidth() * b.getHeight());
+        long minArea = Math.min((long) a.getWidth() * a.getHeight(), (long) b.getWidth() * b.getHeight());
         return minArea <= 0 ? 0.0f : (float) intersectionArea / minArea;
     }
 }

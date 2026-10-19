@@ -12,8 +12,6 @@ import java.time.LocalDateTime;
 })
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class IncidentUpvote {
 
@@ -32,4 +30,14 @@ public class IncidentUpvote {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public IncidentUpvote() {
+    }
+
+    public IncidentUpvote(Long id, Incident incident, User user, LocalDateTime createdAt) {
+        this.id = id;
+        this.incident = incident;
+        this.user = user;
+        this.createdAt = createdAt;
+    }
 }

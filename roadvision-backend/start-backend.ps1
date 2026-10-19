@@ -11,4 +11,4 @@ if (-not (Test-Path "target\roadvision-backend-0.0.1-SNAPSHOT.jar")) {
 }
 
 Write-Host "[INFO] Dang chay RoadVision Backend (Port 8080)..." -ForegroundColor Green
-java -Dfile.encoding=UTF-8 -jar target\roadvision-backend-0.0.1-SNAPSHOT.jar
+java "-Dfile.encoding=UTF-8" -jar target\roadvision-backend-0.0.1-SNAPSHOT.jar

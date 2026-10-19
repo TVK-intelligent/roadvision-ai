@@ -53,9 +53,60 @@ public class IncidentService {
             throw new BadRequestException("Tọa độ GPS phản ánh nằm ngoài phạm vi phụ trách bảo trì của hệ thống");
         }
 
-        // 2. Tìm thông tin Citizen
+        // 2. Tìm thông tin Citizen & Kiểm tra đình chỉ tài khoản (Spam Enforcement)
         User citizen = userRepository.findById(citizenId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + citizenId));
+
+        if (citizen.getSuspendedUntil() != null && citizen.getSuspendedUntil().isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("Tài khoản của bạn đang bị tạm khóa quyền gửi báo cáo đến " 
+                    + citizen.getSuspendedUntil() + ". Lý do: " + (citizen.getSuspendReason() != null ? citizen.getSuspendReason() : "Vi phạm quy định gửi tin"));
+        }
+
+        // 2.1 Giới hạn tần suất: tối đa 5 báo cáo trong 10 phút (Rate Limit)
+        LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
+        long recentReportsCount = incidentRepository.countRecentReportsByCitizen(citizenId, tenMinutesAgo);
+        if (recentReportsCount >= 5) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
+                    "Bạn đã gửi quá 5 báo cáo trong 10 phút qua. Vui lòng chờ trước khi tiếp tục gửi phản ánh mới.");
+        }
+
+        // 2.2 Tính mã băm SHA-256 của ảnh để chống trùng lặp file (Image Hash Check)
+        byte[] imgBytes;
+        try {
+            imgBytes = image.getBytes();
+        } catch (IOException e) {
+            throw new BadRequestException("Không thể đọc dữ liệu ảnh tải lên");
+        }
+        String imageSha256 = org.springframework.util.DigestUtils.md5DigestAsHex(imgBytes);
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(imgBytes);
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            imageSha256 = hexString.toString();
+        } catch (Exception ignored) {}
+
+        boolean isDuplicateImage = incidentRepository.existsByImageSha256(imageSha256);
+
+        // 2.3 Đánh giá mức độ ưu tiên/kiểm duyệt dựa trên lịch sử tài khoản (Reputation Analysis)
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        long reportsLast30Days = incidentRepository.countRecentReportsByCitizen(citizenId, thirtyDaysAgo);
+        long rejectedLast30Days = incidentRepository.countRecentReportsByCitizenAndStatus(citizenId, thirtyDaysAgo, IncidentStatus.REJECTED);
+        long verifiedTotal = incidentRepository.countVerifiedReportsByCitizen(citizenId);
+
+        String initialModerationFlag = null;
+        if (isDuplicateImage) {
+            initialModerationFlag = "SUSPECTED_DUPLICATE_IMAGE";
+        } else if (reportsLast30Days >= 5 && ((double) rejectedLast30Days / reportsLast30Days) > 0.5) {
+            initialModerationFlag = "LOW_PRIORITY_REVIEW";
+        } else if (citizen.getReputationScore() >= 80 && verifiedTotal >= 3) {
+            initialModerationFlag = "TRUSTED_REPORT";
+        }
 
         // 3. Lưu trữ ảnh vào thư mục upload
         String imageUrl = fileStorageService.storeFile(image, "incidents");
@@ -74,11 +125,13 @@ public class IncidentService {
                 .title(request.getTitle() != null && !request.getTitle().isBlank() ? request.getTitle() : "Phát hiện hư hại mặt đường tại " + ticketCode)
                 .description(request.getDescription())
                 .imageUrl(imageUrl)
+                .imageSha256(imageSha256)
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .address(request.getAddress() != null ? request.getAddress() : "Khu vực đô thị")
                 .routeCorridor(corridor.getCode())
                 .zoneName(corridor.getName())
+                .flag(initialModerationFlag)
                 .status(IncidentStatus.SUBMITTED)
                 .build();
 
@@ -92,7 +145,6 @@ public class IncidentService {
 
         long inferStart = System.currentTimeMillis();
         try {
-            byte[] imgBytes = image.getBytes();
             java.awt.image.BufferedImage bimg = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(imgBytes));
             if (bimg != null) {
                 imgW = bimg.getWidth();
@@ -134,7 +186,7 @@ public class IncidentService {
             incident.setStatus(IncidentStatus.AI_ANALYZED);
             if (isUserMulti || isAiMulti) {
                 incident.setCategory(Category.COMPLEX_DAMAGE);
-                incident.setFlag("MULTI_DEFECT");
+                if (incident.getFlag() == null) incident.setFlag("MULTI_DEFECT");
             } else {
                 try {
                     incident.setCategory(Category.valueOf(detectionResult.getClassName()));
@@ -144,12 +196,23 @@ public class IncidentService {
             }
         } else {
             incident.setStatus(IncidentStatus.SUBMITTED);
-            incident.setFlag("NEEDS_MANUAL_REVIEW");
+            if (incident.getFlag() == null) incident.setFlag("NEEDS_MANUAL_REVIEW");
             if (isUserMulti) {
                 incident.setCategory(Category.COMPLEX_DAMAGE);
             } else {
                 incident.setCategory(request.getCategory() != null ? request.getCategory() : Category.ROAD_OBSTACLE);
             }
+        }
+
+        // Tự động kiểm tra phát hiện sự cố trùng lặp trong bán kính 25m (Spatial Deduplication)
+        try {
+            NearbyIncidentCheckResponse nearbyCheck = checkNearbyDuplicate(
+                    incident.getLatitude(), incident.getLongitude(), incident.getCategory(), 25.0);
+            if (nearbyCheck.isHasNearbyDuplicate() && (incident.getFlag() == null || "TRUSTED_REPORT".equals(incident.getFlag()))) {
+                incident.setFlag("POTENTIAL_DUPLICATE");
+            }
+        } catch (Exception e) {
+            log.warn("Không thể kiểm tra trùng lặp sự cố khi tạo mới: {}", e.getMessage());
         }
 
         Incident savedIncident = incidentRepository.save(incident);
@@ -186,6 +249,11 @@ public class IncidentService {
     @Transactional
     public IncidentResponse assignIncident(Long incidentId, AssignmentRequest request, Long adminId) {
         Incident incident = getIncidentEntity(incidentId);
+
+        // Bắt buộc tuân thủ Incident Lifecycle: AI_ANALYZED -> VERIFIED -> ASSIGNED
+        if (incident.getStatus() != IncidentStatus.VERIFIED) {
+            throw new BadRequestException("Chỉ có thể giao việc cho sự cố đã được điều phối viên xác minh (VERIFIED). Hiện tại: " + incident.getStatus());
+        }
 
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Quản trị viên"));
@@ -225,6 +293,33 @@ public class IncidentService {
     }
 
     /**
+     * PHA 2.5: QUẢN TRỊ VIÊN XÁC NHẬN SỰ CỐ HỢP LỆ (ADMIN)
+     */
+    @Transactional
+    public IncidentResponse verifyIncident(Long incidentId, Long adminId) {
+        Incident incident = getIncidentEntity(incidentId);
+
+        if (incident.getStatus() != IncidentStatus.AI_ANALYZED && incident.getStatus() != IncidentStatus.SUBMITTED) {
+            throw new BadRequestException("Chỉ có thể xác nhận sự cố khi đang ở trạng thái AI_ANALYZED hoặc SUBMITTED");
+        }
+
+        incident.setStatus(IncidentStatus.VERIFIED);
+        incident.setFlag(null);
+
+        // Cộng điểm uy tín cho người dân (+5 điểm, tối đa 100)
+        User citizen = incident.getCitizen();
+        if (citizen != null) {
+            int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
+            citizen.setReputationScore(Math.min(100, currentScore + 5));
+            userRepository.save(citizen);
+            log.info("Cộng +5 điểm uy tín cho người dùng ID {}. Điểm mới: {}", citizen.getId(), citizen.getReputationScore());
+        }
+
+        log.info("Quản trị viên ID {} đã thẩm định xác nhận sự cố #{}", adminId, incident.getTicketCode());
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
      * PHA 3: TỪ CHỐI TIẾP NHẬN SỰ CỐ (ADMIN)
      */
     @Transactional
@@ -232,6 +327,33 @@ public class IncidentService {
         Incident incident = getIncidentEntity(incidentId);
         incident.setStatus(IncidentStatus.REJECTED);
         incident.setRejectionReason(request.getRejectionReason());
+
+        // Xử lý trừ điểm uy tín & phạt vi phạm nếu bị từ chối do vi phạm rõ ràng
+        User citizen = incident.getCitizen();
+        if (citizen != null) {
+            int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
+            citizen.setReputationScore(Math.max(0, currentScore - 10));
+
+            // Chỉ tính strike nếu lý do vi phạm không phải do lỗi trùng lặp khách quan
+            String reason = request.getRejectionReason() != null ? request.getRejectionReason().toLowerCase() : "";
+            boolean isObjectiveDuplicate = reason.contains("trùng") || reason.contains("duplicate");
+            
+            if (!isObjectiveDuplicate) {
+                int strikes = (citizen.getSpamStrikes() != null ? citizen.getSpamStrikes() : 0) + 1;
+                citizen.setSpamStrikes(strikes);
+
+                // Khóa tài khoản tạm thời 7 ngày nếu tái phạm >= 5 lần
+                if (strikes >= 5) {
+                    citizen.setSuspendedUntil(LocalDateTime.now().plusDays(7));
+                    citizen.setSuspendReason("Tài khoản đã có từ 5 báo cáo bị từ chối do vi phạm quy định gửi tin.");
+                    log.warn("Tài khoản ID {} đã bị tạm khóa 7 ngày do đạt 5 vi phạm spam!", citizen.getId());
+                }
+            }
+            userRepository.save(citizen);
+            log.info("Trừ -10 điểm uy tín cho người dùng ID {}. Điểm mới: {}, Số strike vi phạm: {}", 
+                    citizen.getId(), citizen.getReputationScore(), citizen.getSpamStrikes());
+        }
+
         return mapToResponse(incidentRepository.save(incident));
     }
 
@@ -242,9 +364,12 @@ public class IncidentService {
     public IncidentResponse updateStatus(Long incidentId, IncidentStatus newStatus, Long userId) {
         Incident incident = getIncidentEntity(incidentId);
 
-        // Kiểm tra hợp lệ chuyển trạng thái (cho phép chuyển IN_PROGRESS từ ASSIGNED hoặc khi làm lại từ RESOLVED)
-        if (newStatus == IncidentStatus.IN_PROGRESS && incident.getStatus() != IncidentStatus.ASSIGNED && incident.getStatus() != IncidentStatus.RESOLVED) {
-            throw new BadRequestException("Chỉ có thể chuyển sang IN_PROGRESS từ trạng thái ASSIGNED hoặc RESOLVED");
+        // Kiểm tra hợp lệ chuyển trạng thái (cho phép chuyển IN_PROGRESS từ ASSIGNED, PENDING_INSPECTION hoặc khi làm lại từ RESOLVED)
+        if (newStatus == IncidentStatus.IN_PROGRESS && 
+            incident.getStatus() != IncidentStatus.ASSIGNED && 
+            incident.getStatus() != IncidentStatus.RESOLVED &&
+            incident.getStatus() != IncidentStatus.PENDING_INSPECTION) {
+            throw new BadRequestException("Chỉ có thể chuyển sang IN_PROGRESS từ trạng thái ASSIGNED, PENDING_INSPECTION hoặc RESOLVED");
         }
 
         incident.setStatus(newStatus);
@@ -296,8 +421,8 @@ public class IncidentService {
             aiVerificationNotes = "Nghiệm thu thủ công (Không thể khởi chạy AI thẩm định)";
         }
 
-        incident.setStatus(IncidentStatus.RESOLVED);
-        incident.setResolvedAt(LocalDateTime.now());
+        // Chuyển sang PENDING_INSPECTION để Chờ Quản trị viên thẩm định & nghiệm thu
+        incident.setStatus(IncidentStatus.PENDING_INSPECTION);
 
         Resolution resolution = incident.getResolution();
         if (resolution == null) {
@@ -321,7 +446,33 @@ public class IncidentService {
     }
 
     /**
-     * PHA 5: NGHIỆM THU, CHẤM ĐIỂM SAO VÀ ĐÓNG LUỒNG (CITIZEN / ADMIN)
+     * PHA 4.5: QUẢN TRỊ VIÊN DUYỆT NGHIỆM THU HIỆN TRƯỜNG (ADMIN)
+     */
+    @Transactional
+    public IncidentResponse approveInspection(Long incidentId, String notes, Long adminId) {
+        Incident incident = getIncidentEntity(incidentId);
+
+        if (incident.getStatus() != IncidentStatus.PENDING_INSPECTION) {
+            throw new BadRequestException("Chỉ có thể phê duyệt nghiệm thu khi sự cố ở trạng thái chờ nghiệm thu (PENDING_INSPECTION)");
+        }
+
+        incident.setStatus(IncidentStatus.RESOLVED);
+        incident.setResolvedAt(LocalDateTime.now());
+        if (notes != null && !notes.isBlank() && incident.getResolution() != null) {
+            incident.getResolution().setNotes(
+                (incident.getResolution().getNotes() != null ? incident.getResolution().getNotes() + "\n" : "") +
+                "[Admin duyệt nghiệm thu]: " + notes
+            );
+            resolutionRepository.save(incident.getResolution());
+        }
+
+        log.info("Quản trị viên ID {} đã phê duyệt nghiệm thu sự cố #{}", adminId, incident.getTicketCode());
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * PHA 5: ĐÓNG HỒ SƠ SỰ CỐ (ADMIN HOẶC CITIZEN SAU KHI ĐÃ RESOLVED)
+     * Chuẩn workflow: RESOLVED -> CLOSED. Đánh giá (Feedback/Rating) là tùy chọn, không cản trở việc đóng phiếu.
      */
     @Transactional
     public IncidentResponse closeIncident(Long incidentId, FeedbackRequest request, Long userId, Role userRole) {
@@ -329,11 +480,15 @@ public class IncidentService {
 
         // Chỉ công dân tạo phiếu hoặc Admin mới có quyền đóng
         if (userRole != Role.ROLE_ADMIN && !incident.getCitizen().getId().equals(userId)) {
-            throw new AccessDeniedException("Bạn không có quyền đánh giá hoặc đóng sự cố này");
+            throw new AccessDeniedException("Bạn không có quyền đóng sự cố này");
         }
 
         if (incident.getStatus() != IncidentStatus.RESOLVED) {
-            throw new BadRequestException("Chỉ có thể đóng sự cố khi đã được kỹ thuật viên hoàn thành (RESOLVED)");
+            throw new BadRequestException("Chỉ có thể đóng sự cố khi đã được hoàn thành nghiệm thu (RESOLVED)");
+        }
+
+        if (incident.getResolvedAt() == null) {
+            incident.setResolvedAt(LocalDateTime.now());
         }
 
         User citizen = incident.getCitizen();
@@ -341,11 +496,52 @@ public class IncidentService {
         incident.setStatus(IncidentStatus.CLOSED);
         incident.setClosedAt(LocalDateTime.now());
 
+        // Nếu có gửi kèm feedback rating thì lưu, nếu không thì vẫn CLOSED bình thường
+        if (request != null && request.getRating() != null && request.getRating() > 0) {
+            Feedback feedback = incident.getFeedback();
+            if (feedback == null) {
+                feedback = Feedback.builder()
+                        .incident(incident)
+                        .citizen(citizen)
+                        .build();
+            }
+            feedback.setRating(request.getRating());
+            feedback.setComments(request.getComments());
+            feedback.setCreatedAt(LocalDateTime.now());
+
+            feedbackRepository.save(feedback);
+            incident.setFeedback(feedback);
+        }
+
+        log.info("Sự cố #{} đã được đóng hồ sơ (CLOSED) thành công bởi user ID {}", incident.getTicketCode(), userId);
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * ĐÁNH GIÁ CỦA NGƯỜI DÂN (CITIZEN FEEDBACK & RATING)
+     * Độc lập với Incident Status: Người dân có thể đánh giá bất kỳ lúc nào sau khi sự cố RESOLVED hoặc CLOSED
+     */
+    @Transactional
+    public IncidentResponse submitFeedback(Long incidentId, FeedbackRequest request, Long citizenId) {
+        Incident incident = getIncidentEntity(incidentId);
+
+        if (!incident.getCitizen().getId().equals(citizenId)) {
+            throw new AccessDeniedException("Chỉ người dân gửi phản ánh này mới có quyền đánh giá chất lượng phục vụ");
+        }
+
+        if (incident.getStatus() != IncidentStatus.RESOLVED && incident.getStatus() != IncidentStatus.CLOSED) {
+            throw new BadRequestException("Chỉ có thể gửi đánh giá khi sự cố đã được nghiệm thu (RESOLVED) hoặc đã đóng (CLOSED)");
+        }
+
+        if (request == null || request.getRating() == null || request.getRating() < 1 || request.getRating() > 5) {
+            throw new BadRequestException("Vui lòng đánh giá từ 1 đến 5 sao");
+        }
+
         Feedback feedback = incident.getFeedback();
         if (feedback == null) {
             feedback = Feedback.builder()
                     .incident(incident)
-                    .citizen(citizen)
+                    .citizen(incident.getCitizen())
                     .build();
         }
         feedback.setRating(request.getRating());
@@ -355,6 +551,7 @@ public class IncidentService {
         feedbackRepository.save(feedback);
         incident.setFeedback(feedback);
 
+        log.info("Người dân ID {} đã gửi đánh giá {} sao cho sự cố #{}", citizenId, request.getRating(), incident.getTicketCode());
         return mapToResponse(incidentRepository.save(incident));
     }
 
@@ -369,8 +566,8 @@ public class IncidentService {
             throw new AccessDeniedException("Bạn không có quyền gửi khiếu nại sự cố này");
         }
 
-        if (incident.getStatus() != IncidentStatus.RESOLVED) {
-            throw new BadRequestException("Chỉ có thể khiếu nại khi sự cố đang ở trạng thái đã nghiệm thu (RESOLVED)");
+        if (incident.getStatus() != IncidentStatus.RESOLVED && incident.getStatus() != IncidentStatus.PENDING_INSPECTION) {
+            throw new BadRequestException("Chỉ có thể khiếu nại khi sự cố đang ở trạng thái PENDING_INSPECTION hoặc RESOLVED");
         }
 
         incident.setFlag("DISPUTED");
@@ -387,8 +584,10 @@ public class IncidentService {
     public IncidentResponse reworkIncident(Long incidentId, ReworkRequest request, Long adminId) {
         Incident incident = getIncidentEntity(incidentId);
 
-        if (incident.getStatus() != IncidentStatus.RESOLVED && incident.getStatus() != IncidentStatus.IN_PROGRESS) {
-            throw new BadRequestException("Chỉ có thể yêu cầu làm lại với sự cố đã nghiệm thu (RESOLVED) hoặc đang thi công");
+        if (incident.getStatus() != IncidentStatus.RESOLVED && 
+            incident.getStatus() != IncidentStatus.PENDING_INSPECTION && 
+            incident.getStatus() != IncidentStatus.IN_PROGRESS) {
+            throw new BadRequestException("Chỉ có thể yêu cầu làm lại với sự cố ở trạng thái PENDING_INSPECTION, RESOLVED hoặc IN_PROGRESS");
         }
 
         incident.setStatus(IncidentStatus.IN_PROGRESS);
@@ -507,6 +706,8 @@ public class IncidentService {
                 .citizenId(i.getCitizen().getId())
                 .reporterName(i.getCitizen().getFullName())
                 .reporterPhone(i.getCitizen().getPhone())
+                .reporterReputationScore(i.getCitizen().getReputationScore())
+                .imageSha256(i.getImageSha256())
                 .createdAt(i.getCreatedAt())
                 .updatedAt(i.getUpdatedAt())
                 .resolvedAt(i.getResolvedAt())
@@ -550,9 +751,9 @@ public class IncidentService {
 
         if (i.getAssignment() != null) {
             builder.assignment(IncidentResponse.AssignmentInfo.builder()
-                    .assignedByAdminName(i.getAssignment().getAssignedByAdmin().getFullName())
-                    .assignedToStaffId(i.getAssignment().getAssignedToStaff().getId())
-                    .assignedToStaffName(i.getAssignment().getAssignedToStaff().getFullName())
+                    .assignedByAdminName(i.getAssignment().getAssignedByAdmin() != null ? i.getAssignment().getAssignedByAdmin().getFullName() : null)
+                    .assignedToStaffId(i.getAssignment().getAssignedToStaff() != null ? i.getAssignment().getAssignedToStaff().getId() : null)
+                    .assignedToStaffName(i.getAssignment().getAssignedToStaff() != null ? i.getAssignment().getAssignedToStaff().getFullName() : null)
                     .verifiedCategory(i.getAssignment().getVerifiedCategory())
                     .priority(i.getAssignment().getPriority())
                     .notes(i.getAssignment().getNotes())
@@ -572,7 +773,7 @@ public class IncidentService {
             }
 
             builder.resolution(IncidentResponse.ResolutionInfo.builder()
-                    .staffName(i.getResolution().getStaff().getFullName())
+                    .staffName(i.getResolution().getStaff() != null ? i.getResolution().getStaff().getFullName() : null)
                     .proofImageUrl(i.getResolution().getProofImageUrl())
                     .notes(i.getResolution().getNotes())
                     .aiVerificationStatus(i.getResolution().getAiVerificationStatus())
@@ -737,10 +938,10 @@ public class IncidentService {
 
         long total = allIncidents.size();
         long triagePending = allIncidents.stream()
-                .filter(i -> i.getStatus() == IncidentStatus.SUBMITTED || "NEEDS_MANUAL_REVIEW".equals(i.getFlag()))
+                .filter(i -> i.getStatus() == IncidentStatus.SUBMITTED || i.getStatus() == IncidentStatus.AI_ANALYZED || i.getStatus() == IncidentStatus.VERIFIED || "NEEDS_MANUAL_REVIEW".equals(i.getFlag()))
                 .count();
         long inProgress = allIncidents.stream()
-                .filter(i -> i.getStatus() == IncidentStatus.IN_PROGRESS || i.getStatus() == IncidentStatus.ASSIGNED)
+                .filter(i -> i.getStatus() == IncidentStatus.IN_PROGRESS || i.getStatus() == IncidentStatus.ASSIGNED || i.getStatus() == IncidentStatus.PENDING_INSPECTION)
                 .count();
         long resolved = allIncidents.stream()
                 .filter(i -> i.getStatus() == IncidentStatus.RESOLVED || i.getStatus() == IncidentStatus.CLOSED)
@@ -901,7 +1102,7 @@ public class IncidentService {
         long total = all.size();
 
         long inProgress = all.stream()
-                .filter(i -> i.getStatus() == IncidentStatus.IN_PROGRESS || i.getStatus() == IncidentStatus.ASSIGNED)
+                .filter(i -> i.getStatus() == IncidentStatus.IN_PROGRESS || i.getStatus() == IncidentStatus.ASSIGNED || i.getStatus() == IncidentStatus.PENDING_INSPECTION)
                 .count();
 
         long resolved = all.stream()

@@ -3,8 +3,10 @@ export type Role = 'ROLE_CITIZEN' | 'ROLE_ADMIN' | 'ROLE_STAFF';
 export type IncidentStatus = 
   | 'SUBMITTED' 
   | 'AI_ANALYZED' 
+  | 'VERIFIED'
   | 'ASSIGNED' 
   | 'IN_PROGRESS' 
+  | 'PENDING_INSPECTION'
   | 'RESOLVED' 
   | 'CLOSED' 
   | 'REJECTED';
@@ -27,6 +29,10 @@ export interface User {
   phone?: string;
   role: Role;
   avatarUrl?: string;
+  reputationScore?: number;
+  spamStrikes?: number;
+  suspendedUntil?: string;
+  suspendReason?: string;
 }
 
 export interface AiDetection {
@@ -91,6 +97,7 @@ export interface Incident {
   title: string;
   description?: string;
   imageUrl: string;
+  imageSha256?: string;
   latitude: number;
   longitude: number;
   address?: string;
@@ -108,6 +115,7 @@ export interface Incident {
   citizenId: number;
   reporterName: string;
   reporterPhone?: string;
+  reporterReputationScore?: number;
   aiDetection?: AiDetection;
   assignment?: Assignment;
   resolution?: Resolution;

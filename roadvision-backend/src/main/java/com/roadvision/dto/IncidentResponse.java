@@ -40,6 +40,8 @@ public class IncidentResponse {
     private Long citizenId;
     private String reporterName;
     private String reporterPhone;
+    private Integer reporterReputationScore;
+    private String imageSha256;
 
     private AiDetectionResponse aiDetection;
 

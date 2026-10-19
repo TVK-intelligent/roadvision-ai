@@ -346,16 +346,20 @@ export const ReportIncidentPage: React.FC = () => {
     try {
       const res = await incidentApi.analyzeImage(scanFormData, thresh);
       const data = res.data;
+      // Giữ nguyên nhãn phân loại chuẩn xác từ AI backend (đã qua kiểm định lòng hốc trắc địa)
+      if (data.boxes && data.boxes.length > 0) {
+        const counts: Record<string, number> = {};
+        for (const b of data.boxes) {
+          counts[b.className] = (counts[b.className] || 0) + 1;
+        }
+        data.classCounts = counts;
+      }
+
       setAiResult(data);
 
       // Tự động gợi ý loại sự cố & tiêu đề dựa trên kết quả phát hiện AI
       if (data.boxes && data.boxes.length > 0) {
         const counts: Record<string, number> = data.classCounts || {};
-        if (!data.classCounts) {
-          for (const b of data.boxes) {
-            counts[b.className] = (counts[b.className] || 0) + 1;
-          }
-        }
         const detectedCats: Category[] = [];
         if (counts['POTHOLE']) detectedCats.push('POTHOLE');
         if (counts['ROAD_CRACK']) detectedCats.push('ROAD_CRACK');

@@ -19,6 +19,7 @@ import {
   Layers,
   FileVideo,
   Trash2,
+  Zap,
 } from 'lucide-react';
 
 interface CapturedIncident {
@@ -32,7 +33,59 @@ interface CapturedIncident {
   snapshotUrl: string;
   blob: Blob;
   status: 'PENDING' | 'DISPATCHED';
+  framesCount?: number;
+  bestFrameOptimized?: boolean;
 }
+
+type SamplingMode = 'ECONOMY' | 'BALANCED' | 'DETAILED';
+
+const SAMPLING_CONFIG: Record<SamplingMode, { label: string; interval: number; desc: string }> = {
+  ECONOMY: { label: 'Tiết Kiệm (2.0s)', interval: 2000, desc: 'Giảm tải CPU/Mạng' },
+  BALANCED: { label: 'Tiêu Chuẩn (1.0s)', interval: 1000, desc: 'Cân bằng tối ưu' },
+  DETAILED: { label: 'Chi Tiết (0.5s)', interval: 500, desc: 'Độ nhạy cao nhất' },
+};
+
+interface ActiveTrack {
+  incidentId: string;
+  category: string;
+  box: { x: number; y: number; width: number; height: number };
+  lastSeenTime: number;
+  maxConfidence: number;
+}
+
+// Hàm tính chỉ số Intersection over Union (IoU) giữa 2 Bounding Box
+const calculateIoU = (
+  b1: { x: number; y: number; width: number; height: number },
+  b2: { x: number; y: number; width: number; height: number }
+): number => {
+  const xA = Math.max(b1.x, b2.x);
+  const yA = Math.max(b1.y, b2.y);
+  const xB = Math.min(b1.x + b1.width, b2.x + b2.width);
+  const yB = Math.min(b1.y + b1.height, b2.y + b2.height);
+
+  const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+  const b1Area = Math.max(0, b1.width * b1.height);
+  const b2Area = Math.max(0, b2.width * b2.height);
+  const unionArea = b1Area + b2Area - interArea;
+
+  return unionArea > 0 ? interArea / unionArea : 0;
+};
+
+// Hàm tính khoảng cách tương đối giữa tâm 2 Bounding Box theo kích thước khung hình
+const centerDistanceRatio = (
+  b1: { x: number; y: number; width: number; height: number },
+  b2: { x: number; y: number; width: number; height: number },
+  videoW: number,
+  videoH: number
+): number => {
+  const c1x = b1.x + b1.width / 2;
+  const c1y = b1.y + b1.height / 2;
+  const c2x = b2.x + b2.width / 2;
+  const c2y = b2.y + b2.height / 2;
+  const dist = Math.hypot(c1x - c2x, c1y - c2y);
+  const diag = Math.hypot(videoW, videoH) || 1;
+  return dist / diag;
+};
 
 export const PatrolModePage: React.FC = () => {
   const toast = useToast();
@@ -49,6 +102,9 @@ export const PatrolModePage: React.FC = () => {
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.20);
   const [autoDispatch, setAutoDispatch] = useState<boolean>(false);
 
+  // Chế độ trích xuất frame thích ứng (Adaptive Sampling)
+  const [samplingMode, setSamplingMode] = useState<SamplingMode>('BALANCED');
+
   // Vị trí tuần tra thực tế (ưu tiên GPS thiết bị)
   const [patrolLocation, setPatrolLocation] = useState<{
     lat: number;
@@ -63,6 +119,10 @@ export const PatrolModePage: React.FC = () => {
 
   // Telemetry thực tế từ mô hình AI
   const [activeBoxes, setActiveBoxes] = useState<any[]>([]);
+  const [isBoxFading, setIsBoxFading] = useState<boolean>(false);
+  const boxFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeTracksRef = useRef<ActiveTrack[]>([]);
+
   const [inferenceLatency, setInferenceLatency] = useState<number>(0);
   const [processedFrames, setProcessedFrames] = useState<number>(0);
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -204,12 +264,19 @@ export const PatrolModePage: React.FC = () => {
     }
   }, []);
 
-  // Vòng lặp AI trích xuất frame định kỳ (mỗi 1000ms có lock chống chồng lấn)
+  // Vòng lặp AI trích xuất frame định kỳ với Adaptive Sampling, Lọc Trùng IoU & Chọn Frame Tối Ưu
   useEffect(() => {
     if (!isPlaying) {
       setActiveBoxes([]);
+      setIsBoxFading(false);
+      if (boxFadeTimeoutRef.current) {
+        clearTimeout(boxFadeTimeoutRef.current);
+      }
+      activeTracksRef.current = [];
       return;
     }
+
+    const intervalTime = SAMPLING_CONFIG[samplingMode].interval;
 
     const scanInterval = setInterval(async () => {
       const video = videoRef.current;
@@ -244,46 +311,163 @@ export const PatrolModePage: React.FC = () => {
             const formData = new FormData();
             formData.append('image', blob, 'patrol_frame.jpg');
 
-            const res = await incidentApi.analyzeImage(formData, confidenceThreshold);
+            const res = await incidentApi.analyzeVideoFrame(formData, confidenceThreshold);
             const data = res.data;
             const latency = Math.round(performance.now() - startTime);
             setInferenceLatency(latency);
             setProcessedFrames((prev) => prev + 1);
 
             if (data.boxes && data.boxes.length > 0) {
-              setActiveBoxes(data.boxes);
+              const refinedBoxes = data.boxes;
 
-              const topBox = data.boxes[0];
-              const snapshotUrl = URL.createObjectURL(blob);
-
-              const newIncident: CapturedIncident = {
-                id: `${Date.now()}`,
-                timestamp: new Date().toLocaleTimeString('vi-VN'),
-                category: topBox.className || data.className || 'POTHOLE',
-                confidence: topBox.confidence || data.confidence,
-                latitude: patrolLocation.lat,
-                longitude: patrolLocation.lng,
-                address: patrolLocation.address,
-                snapshotUrl,
-                blob,
-                status: 'PENDING',
-              };
-
-              setCapturedList((prev) => {
-                if (prev.length >= 15) {
-                  URL.revokeObjectURL(prev[prev.length - 1].snapshotUrl);
+              // Khử trùng lặp con (Nested Crack Suppression):
+              // Chỉ triệt tiêu khi vết nứt lọt sâu >= 75% diện tích bên trong lòng ổ gà, bảo toàn vết nứt to riêng biệt
+              const potholes = refinedBoxes.filter((b: any) => b.className === 'POTHOLE');
+              const finalBoxes = refinedBoxes.filter((b: any) => {
+                if (b.className === 'ROAD_CRACK') {
+                  const isInsidePothole = potholes.some((p: any) => {
+                    const xA = Math.max(p.x, b.x);
+                    const yA = Math.max(p.y, b.y);
+                    const xB = Math.min(p.x + p.width, b.x + b.width);
+                    const yB = Math.min(p.y + p.height, b.y + b.height);
+                    const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+                    const crackArea = b.width * b.height;
+                    const iou = calculateIoU(p, b);
+                    return (interArea / Math.max(1, crackArea) >= 0.75) && iou >= 0.35;
+                  });
+                  return !isInsidePothole;
                 }
-                return [newIncident, ...prev.slice(0, 14)];
+                return true;
               });
 
-              if (autoDispatch) {
-                handleDispatchIncident(newIncident, true);
+              setActiveBoxes(finalBoxes);
+              setIsBoxFading(false);
+              if (boxFadeTimeoutRef.current) {
+                clearTimeout(boxFadeTimeoutRef.current);
+              }
+              // Giữ hiển thị Bounding Box và mờ dần mượt mà thay vì giật tắt đột ngột
+              boxFadeTimeoutRef.current = setTimeout(() => {
+                setIsBoxFading(true);
+              }, Math.max(400, intervalTime - 250));
+
+              const now = Date.now();
+              // Dọn sạch các track đã trôi qua quá 3.5 giây không còn xuất hiện
+              activeTracksRef.current = activeTracksRef.current.filter(
+                (track) => now - track.lastSeenTime <= 3500
+              );
+
+              // Xử lý các hư hại xuất hiện trong frame (hỗ trợ đa vật thể đồng thời bao gồm vật cản ở xa)
+              const detectedBoxes = finalBoxes.slice(0, 10);
+
+              for (const box of detectedBoxes) {
+                const boxCat = box.className || data.className || 'POTHOLE';
+                const boxConf = box.confidence || data.confidence || 0.85;
+
+                // Đối sánh Spatial IoU & Tâm vật thể để phát hiện trùng lặp theo chuỗi frame:
+                // Vật thể nhỏ ở xa / hậu cảnh di chuyển tương đối nhanh theo phối cảnh dashcam, nới lỏng distRatio
+                const isSmallFarObject = (box.width * box.height) / (w * h) < 0.04;
+                const maxAllowedDist = isSmallFarObject ? 0.28 : 0.20;
+
+                const matchedTrack = activeTracksRef.current.find((track) => {
+                  if (track.category !== boxCat) return false;
+                  const iou = calculateIoU(track.box, box);
+                  const distRatio = centerDistanceRatio(track.box, box, w, h);
+                  return iou >= 0.15 || distRatio <= maxAllowedDist;
+                });
+
+                if (matchedTrack) {
+                  // ĐÃ PHÁT HIỆN TRƯỚC ĐÓ: Cập nhật track, tránh tạo trùng sự cố
+                  matchedTrack.lastSeenTime = now;
+                  matchedTrack.box = box;
+
+                  // BEST FRAME SELECTION: Nếu frame hiện tại sắc nét/tin cậy hơn (> +2%), lưu frame tốt nhất
+                  if (boxConf > matchedTrack.maxConfidence + 0.02) {
+                    matchedTrack.maxConfidence = boxConf;
+                    const newSnapshotUrl = URL.createObjectURL(blob);
+
+                    setCapturedList((prev) =>
+                      prev.map((item) => {
+                        if (item.id === matchedTrack.incidentId) {
+                          URL.revokeObjectURL(item.snapshotUrl);
+                          return {
+                            ...item,
+                            confidence: boxConf,
+                            snapshotUrl: newSnapshotUrl,
+                            blob: blob,
+                            framesCount: (item.framesCount || 1) + 1,
+                            bestFrameOptimized: true,
+                            timestamp: new Date().toLocaleTimeString('vi-VN'),
+                          };
+                        }
+                        return item;
+                      })
+                    );
+                  } else {
+                    // Giữ nguyên frame rõ nét trước đó, chỉ cập nhật số lần track thành công
+                    setCapturedList((prev) =>
+                      prev.map((item) => {
+                        if (item.id === matchedTrack.incidentId) {
+                          return {
+                            ...item,
+                            framesCount: (item.framesCount || 1) + 1,
+                          };
+                        }
+                        return item;
+                      })
+                    );
+                  }
+                } else {
+                  // SỰ CỐ MỚI: Đưa vào hàng đợi và bắt đầu theo dõi
+                  const newId = `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+                  const snapshotUrl = URL.createObjectURL(blob);
+
+                  const newIncident: CapturedIncident = {
+                    id: newId,
+                    timestamp: new Date().toLocaleTimeString('vi-VN'),
+                    category: boxCat,
+                    confidence: boxConf,
+                    latitude: patrolLocation.lat,
+                    longitude: patrolLocation.lng,
+                    address: patrolLocation.address,
+                    snapshotUrl,
+                    blob,
+                    status: 'PENDING',
+                    framesCount: 1,
+                    bestFrameOptimized: false,
+                  };
+
+                  activeTracksRef.current.push({
+                    incidentId: newId,
+                    category: boxCat,
+                    box: box,
+                    lastSeenTime: now,
+                    maxConfidence: boxConf,
+                  });
+
+                  setCapturedList((prev) => {
+                    if (prev.length >= 20) {
+                      URL.revokeObjectURL(prev[prev.length - 1].snapshotUrl);
+                    }
+                    return [newIncident, ...prev.slice(0, 19)];
+                  });
+
+                  if (autoDispatch) {
+                    handleDispatchIncident(newIncident, true);
+                  }
+                }
               }
             } else {
-              setActiveBoxes([]);
+              // Frame hiện tại không có hư hại: fade box mượt mà
+              if (boxFadeTimeoutRef.current) {
+                clearTimeout(boxFadeTimeoutRef.current);
+              }
+              boxFadeTimeoutRef.current = setTimeout(() => {
+                setIsBoxFading(true);
+                setTimeout(() => setActiveBoxes([]), 250);
+              }, 300);
             }
           } catch (err) {
-            // Lỗi quét frame
+            // Bỏ qua lỗi frame gián đoạn
           } finally {
             isAnalyzingRef.current = false;
             setIsScanning(false);
@@ -292,16 +476,21 @@ export const PatrolModePage: React.FC = () => {
         'image/jpeg',
         0.85
       );
-    }, 1000);
+    }, intervalTime);
 
-    return () => clearInterval(scanInterval);
-  }, [isPlaying, confidenceThreshold, patrolLocation, autoDispatch, handleDispatchIncident]);
+    return () => {
+      clearInterval(scanInterval);
+      if (boxFadeTimeoutRef.current) {
+        clearTimeout(boxFadeTimeoutRef.current);
+      }
+    };
+  }, [isPlaying, samplingMode, confidenceThreshold, patrolLocation, autoDispatch, handleDispatchIncident]);
 
   // Xử lý nạp tệp video hành trình
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (videoUrl) {
+      if (videoUrl && videoUrl.startsWith('blob:')) {
         URL.revokeObjectURL(videoUrl);
       }
       const url = URL.createObjectURL(file);
@@ -314,6 +503,22 @@ export const PatrolModePage: React.FC = () => {
       }
       toast.info(`Đã nạp video hành trình: ${file.name}`, 'Tuần Tra AI');
     }
+  };
+
+  // Nạp video tuần tra mẫu tích hợp sẵn để kiểm thử nhanh
+  const handleLoadSampleVideo = () => {
+    const samplePath = '/sample-videos/video_tuan_tra_o_ga.mp4';
+    if (videoUrl && videoUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(videoUrl);
+    }
+    setVideoUrl(samplePath);
+    setSourceMode('UPLOAD');
+    if (videoRef.current) {
+      videoRef.current.src = samplePath;
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
+    }
+    toast.success('Đã nạp video tuần tra thực tế: Tuyến đường có ổ gà & hư hại mặt đường!', 'Tuần Tra AI');
   };
 
   const togglePlay = () => {
@@ -363,7 +568,12 @@ export const PatrolModePage: React.FC = () => {
         </div>
 
         {/* Chỉ số Telemetry thực tế từ hệ thống AI */}
-        <div className="flex items-center gap-2.5 font-mono text-xs">
+        <div className="flex items-center gap-2.5 font-mono text-xs flex-wrap">
+          <div className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-500" />
+            <span className="text-on-surface-variant text-[11px]">TẦN SUẤT:</span>
+            <strong className="text-amber-500 font-bold">{SAMPLING_CONFIG[samplingMode].label.split(' ')[0]} ({SAMPLING_CONFIG[samplingMode].interval / 1000}s)</strong>
+          </div>
           <div className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="text-on-surface-variant text-[11px]">ĐỘ TRỄ AI:</span>
@@ -391,7 +601,7 @@ export const PatrolModePage: React.FC = () => {
               className="w-full h-full object-contain"
             />
 
-            {/* Bounding Box AI vẽ chính xác theo tỷ lệ frame */}
+            {/* Bounding Box AI vẽ chính xác theo tỷ lệ frame với hiệu ứng giữ mượt (smoothing & fading) */}
             {activeBoxes.map((box, idx) => {
               const videoW = videoRef.current?.videoWidth || 640;
               const videoH = videoRef.current?.videoHeight || 360;
@@ -406,17 +616,35 @@ export const PatrolModePage: React.FC = () => {
               const isObstacle = box.className?.includes('OBSTACLE');
 
               const colorBorder = isCrack
-                ? 'border-amber-400 bg-amber-500/20 text-amber-300'
+                ? 'border-amber-400 bg-amber-500/15'
                 : isFlood
-                ? 'border-cyan-400 bg-cyan-500/20 text-cyan-300'
+                ? 'border-cyan-400 bg-cyan-500/15'
                 : isObstacle
-                ? 'border-rose-400 bg-rose-500/20 text-rose-300'
-                : 'border-blue-400 bg-blue-500/20 text-blue-300';
+                ? 'border-rose-400 bg-rose-500/15'
+                : 'border-blue-400 bg-blue-500/15';
+
+              const badgeStyle = isCrack
+                ? 'bg-amber-600 border-amber-300 text-white'
+                : isFlood
+                ? 'bg-cyan-600 border-cyan-300 text-white'
+                : isObstacle
+                ? 'bg-rose-600 border-rose-300 text-white'
+                : 'bg-blue-600 border-blue-300 text-white';
+
+              const labelTitle = isCrack
+                ? 'Vết nứt'
+                : isFlood
+                ? 'Ngập úng'
+                : isObstacle
+                ? 'Vật cản'
+                : 'Ổ gà';
 
               return (
                 <div
                   key={idx}
-                  className={`absolute border-2 rounded pointer-events-none transition-all ${colorBorder}`}
+                  className={`absolute border-2 rounded-lg pointer-events-none transition-all duration-300 ease-out shadow-sm ${
+                    isBoxFading ? 'opacity-40 scale-[0.99]' : 'opacity-100 scale-100'
+                  } ${colorBorder}`}
                   style={{
                     top: `${topPct}%`,
                     left: `${leftPct}%`,
@@ -424,11 +652,13 @@ export const PatrolModePage: React.FC = () => {
                     height: `${heightPct}%`,
                   }}
                 >
-                  <div className="absolute -top-6 left-0 px-2 py-0.5 rounded bg-slate-900/90 font-mono text-[10px] font-bold border border-current flex items-center gap-1 shadow-sm whitespace-nowrap">
-                    <span>
-                      {isCrack ? '⚡ Vết nứt' : isFlood ? '🌊 Ngập úng' : isObstacle ? '🚧 Vật cản' : '🕳️ Ổ gà'}
+                  <div
+                    className={`absolute -top-7 left-0 px-2 py-0.5 rounded-md font-sans text-xs font-bold border shadow-md flex items-center gap-1.5 whitespace-nowrap backdrop-blur-xs ${badgeStyle}`}
+                  >
+                    <span>{labelTitle}</span>
+                    <span className="font-mono text-[11px] font-semibold opacity-95">
+                      ({((box.confidence || 0.85) * 100).toFixed(0)}%)
                     </span>
-                    <span>({((box.confidence || 0.85) * 100).toFixed(0)}%)</span>
                   </div>
                 </div>
               );
@@ -452,11 +682,21 @@ export const PatrolModePage: React.FC = () => {
                     Vui lòng tải lên tệp video (.mp4, .mov, .webm) hoặc chuyển sang Camera trực tiếp để AI bắt đầu kiểm định mặt đường.
                   </p>
                 </div>
-                <label className="mt-2 px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs cursor-pointer hover:bg-primary/90 transition-all flex items-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  <span>Chọn Tệp Video Hành Trình</span>
-                  <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
-                </label>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                  <label className="px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs cursor-pointer hover:bg-primary/90 transition-all flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    <span>Chọn Tệp Video Của Bạn</span>
+                    <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleLoadSampleVideo}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition-all flex items-center gap-2 shadow-sm"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Nạp Video Mẫu (Ổ Gà)</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -479,11 +719,11 @@ export const PatrolModePage: React.FC = () => {
                   <span>{isPlaying ? 'Tạm Dừng Tuần Tra' : 'Bắt Đầu Tuần Tra'}</span>
                 </button>
 
-                {/* Chọn Nguồn: Tải Video vs Camera */}
+                {/* Chọn Nguồn: Tải Video vs Camera vs Video Mẫu */}
                 <div className="flex items-center bg-surface-container-low p-1 rounded-xl border border-outline-variant/30 text-xs">
                   <label
                     className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                      sourceMode === 'UPLOAD'
+                      sourceMode === 'UPLOAD' && videoUrl !== '/sample-videos/video_tuan_tra_o_ga.mp4'
                         ? 'bg-surface-container-lowest text-primary shadow-xs'
                         : 'text-on-surface-variant hover:text-on-surface'
                     }`}
@@ -492,6 +732,20 @@ export const PatrolModePage: React.FC = () => {
                     <span>Tải Video</span>
                     <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
                   </label>
+
+                  <button
+                    type="button"
+                    onClick={handleLoadSampleVideo}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                      videoUrl === '/sample-videos/video_tuan_tra_o_ga.mp4'
+                        ? 'bg-surface-container-lowest text-amber-600 dark:text-amber-400 shadow-xs'
+                        : 'text-amber-600 dark:text-amber-400 hover:text-amber-500'
+                    }`}
+                    title="Nạp video tuần tra thực tế có ổ gà để kiểm thử nhanh"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Video Mẫu</span>
+                  </button>
 
                   <button
                     onClick={() => setSourceMode('WEBCAM')}
@@ -518,6 +772,34 @@ export const PatrolModePage: React.FC = () => {
                   />
                   <span>Tự động đẩy sự cố lên máy chủ (Auto-Dispatch)</span>
                 </label>
+              </div>
+            </div>
+
+            {/* Bộ Chọn Tần Suất Trích Xuất Frame (Adaptive Sampling) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-outline-variant/20 text-xs">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span className="font-semibold text-on-surface">Tần Suất Quét (Adaptive Sampling):</span>
+                <span className="text-[11px] text-on-surface-variant font-mono">
+                  ({SAMPLING_CONFIG[samplingMode].interval}ms / frame)
+                </span>
+              </div>
+              <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
+                {(['ECONOMY', 'BALANCED', 'DETAILED'] as SamplingMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setSamplingMode(mode)}
+                    title={SAMPLING_CONFIG[mode].desc}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      samplingMode === mode
+                        ? 'bg-surface-container-lowest text-primary shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    {SAMPLING_CONFIG[mode].label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -626,7 +908,7 @@ export const PatrolModePage: React.FC = () => {
                     />
 
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-bold text-xs text-on-surface truncate">
                           {item.category === 'POTHOLE'
                             ? '🕳️ Ổ Gà Mặt Đường'
@@ -639,6 +921,17 @@ export const PatrolModePage: React.FC = () => {
                         <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-primary/10 text-primary shrink-0">
                           {(item.confidence * 100).toFixed(0)}%
                         </span>
+                        {item.bestFrameOptimized && (
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0 flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" />
+                            <span>Frame tối ưu</span>
+                          </span>
+                        )}
+                        {item.framesCount && item.framesCount > 1 ? (
+                          <span className="font-mono text-[9px] font-medium px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant shrink-0">
+                            Theo dõi {item.framesCount}f
+                          </span>
+                        ) : null}
                       </div>
                       <span className="text-[11px] text-on-surface-variant truncate">
                         {item.address}

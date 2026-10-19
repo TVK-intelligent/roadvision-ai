@@ -10,7 +10,7 @@ import { ImageCanvasWithBBox } from '../components/ImageCanvasWithBBox';
 import { LeafletMap } from '../components/LeafletMap';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, CheckCircle2, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Check, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock } from 'lucide-react';
 
 export const IncidentDossierPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -110,17 +110,31 @@ export const IncidentDossierPage: React.FC = () => {
     }
   };
 
-  // Citizen / Admin chấm điểm và đóng phiếu
-  const handleCloseSubmit = async (e: React.FormEvent) => {
+  // Citizen / Admin đóng phiếu (RESOLVED -> CLOSED)
+  const handleCloseSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!incident) return;
+
+    try {
+      const res = await incidentApi.closeIncident(incident.id, feedbackComments ? { rating, comments: feedbackComments } : undefined);
+      toast.success('Hồ sơ sự cố đã được chính thức đóng và lưu trữ (CLOSED).', 'Hoàn Tất');
+      setIncident(res.data);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Lỗi khi đóng sự cố', 'Lỗi');
+    }
+  };
+
+  // Citizen gửi đánh giá độc lập sau khi sự cố hoàn thành/đóng
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!incident) return;
 
     try {
-      const res = await incidentApi.closeIncident(incident.id, { rating, comments: feedbackComments });
-      toast.success('Cảm ơn bạn đã đánh giá! Hồ sơ sự cố đã được đóng và lưu trữ hoàn tất.', 'Hoàn Tất');
+      const res = await incidentApi.submitFeedback(incident.id, { rating, comments: feedbackComments });
+      toast.success('Cảm ơn bạn đã gửi đánh giá chất lượng phục vụ!', 'Đánh Giá Thành Công');
       setIncident(res.data);
     } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Lỗi khi gửi đánh giá hoặc bạn không có quyền đóng sự cố này', 'Lỗi');
+      toast.error(e.response?.data?.message || 'Lỗi khi gửi đánh giá', 'Lỗi');
     }
   };
 
@@ -163,6 +177,30 @@ export const IncidentDossierPage: React.FC = () => {
       toast.error(e.response?.data?.message || 'Lỗi khi phát lệnh thi công lại', 'Lỗi');
     } finally {
       setIsSubmittingRework(false);
+    }
+  };
+
+  // Admin duyệt nghiệm thu (chuyển PENDING_INSPECTION -> RESOLVED)
+  const handleApproveInspection = async () => {
+    if (!incident) return;
+    try {
+      const res = await incidentApi.approveInspection(incident.id, { notes: feedbackComments });
+      toast.success('Đã phê duyệt nghiệm thu mặt đường đạt chuẩn!', 'Nghiệm Thu Thành Công');
+      setIncident(res.data);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Lỗi khi phê duyệt nghiệm thu', 'Lỗi');
+    }
+  };
+
+  // Admin thẩm định xác nhận sự cố hợp lệ (chuyển AI_ANALYZED -> VERIFIED)
+  const handleVerifyIncident = async () => {
+    if (!incident) return;
+    try {
+      const res = await incidentApi.verifyIncident(incident.id);
+      toast.success('Đã thẩm định và xác nhận sự cố hợp lệ!', 'Xác nhận hồ sơ');
+      setIncident(res.data);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Lỗi khi xác nhận sự cố', 'Lỗi');
     }
   };
 
@@ -218,8 +256,26 @@ export const IncidentDossierPage: React.FC = () => {
           <p className="text-xs text-slate-600">{incident.address}</p>
         </div>
 
-        {/* Nút & Huy Hiệu Đồng Tình (Upvote) */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Nút & Huy Hiệu Đồng Tình (Upvote) & Quick Actions */}
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          {user?.role === 'ROLE_ADMIN' && ['SUBMITTED', 'AI_ANALYZED'].includes(incident.status) && (
+            <button
+              onClick={handleVerifyIncident}
+              className="px-3 py-1.5 rounded-md bg-teal-600 hover:bg-teal-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Xác nhận hợp lệ (VERIFIED)</span>
+            </button>
+          )}
+          {user?.role === 'ROLE_ADMIN' && incident.status === 'PENDING_INSPECTION' && (
+            <button
+              onClick={handleApproveInspection}
+              className="px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Duyệt nghiệm thu (RESOLVED)</span>
+            </button>
+          )}
           <button
             onClick={handleUpvote}
             disabled={isUpvoting || incident.status === 'RESOLVED' || incident.status === 'CLOSED'}
@@ -515,9 +571,22 @@ export const IncidentDossierPage: React.FC = () => {
           </div>
         )}
 
-        {/* Người dân (Citizen) đối chiếu ảnh Trước/Sau & Đóng sự cố hoặc Khiếu nại */}
-        {incident.status === 'RESOLVED' && (
+        {/* Người dân (Citizen) & Quản trị viên đối chiếu ảnh Trước/Sau & Đóng sự cố hoặc Khiếu nại */}
+        {['PENDING_INSPECTION', 'RESOLVED', 'CLOSED'].includes(incident.status) && incident.resolution && (
           <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+            {incident.status === 'PENDING_INSPECTION' && (
+              <div className="p-3.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-950 flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-semibold text-xs uppercase tracking-wide text-purple-800">
+                    Hồ sơ đang chờ Ban Quản trị nghiệm thu hiện trường
+                  </div>
+                  <p className="text-xs text-purple-900 mt-1">
+                    Kỹ thuật viên đã nộp ảnh bằng chứng thi công. AI đã đối chiếu sơ bộ và đưa ra đánh giá bên dưới. Quản trị viên vui lòng xác nhận đạt chuẩn hoặc chỉ đạo khắc phục lại.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -740,15 +809,27 @@ export const IncidentDossierPage: React.FC = () => {
                         <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-slate-100">
                           <span className="text-xs text-slate-500 flex items-center gap-1.5">
                             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                            Mặt đường hoàn trả đạt chuẩn kỹ thuật. Xác nhận lưu trữ hồ sơ.
+                            Mặt đường hoàn trả đạt chuẩn kỹ thuật.
                           </span>
-                          <button
-                            type="submit"
-                            className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors shrink-0"
-                          >
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>Xác nhận nghiệm thu và đóng sự cố</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {incident.status === 'PENDING_INSPECTION' && (
+                              <button
+                                type="button"
+                                onClick={handleApproveInspection}
+                                className="px-3 py-2 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors"
+                              >
+                                <ShieldCheck className="w-4 h-4" />
+                                <span>Phê duyệt nghiệm thu (RESOLVED)</span>
+                              </button>
+                            )}
+                            <button
+                              type="submit"
+                              className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors shrink-0"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>Xác nhận đóng sự cố (CLOSED)</span>
+                            </button>
+                          </div>
                         </div>
                       </form>
                     ) : (
@@ -860,14 +941,28 @@ export const IncidentDossierPage: React.FC = () => {
                         <>
                           <div className="text-xs text-emerald-700 flex items-center gap-1.5 font-medium">
                             <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                            <span>Mặt đường hoàn thiện đạt chuẩn. Bạn có hài lòng để đóng hồ sơ sự cố?</span>
+                            <span>Mặt đường hoàn thiện đạt chuẩn. Bạn có thể đóng hồ sơ ngay hoặc gửi kèm đánh giá.</span>
                           </div>
-                          <button
-                            type="submit"
-                            className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-xs transition-colors self-end"
-                          >
-                            Đánh giá và đóng sự cố
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {incident.status === 'RESOLVED' && (
+                              <button
+                                type="button"
+                                onClick={() => handleCloseSubmit()}
+                                className="px-3.5 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-xs transition-colors"
+                              >
+                                Đóng hồ sơ (CLOSED)
+                              </button>
+                            )}
+                            {incident.status === 'CLOSED' && (
+                              <button
+                                type="button"
+                                onClick={handleFeedbackSubmit}
+                                className="px-3.5 py-2 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs shadow-xs transition-colors"
+                              >
+                                Gửi đánh giá dịch vụ
+                              </button>
+                            )}
+                          </div>
                         </>
                       )}
                     </div>
