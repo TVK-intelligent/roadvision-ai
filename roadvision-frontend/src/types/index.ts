@@ -341,4 +341,17 @@ export interface StaffUpdateRequest {
   password?: string;
 }
 
+export interface NotificationItem {
+  id: number;
+  title: string;
+  message: string;
+  type: 'INFO' | 'WARNING' | 'SUCCESS' | 'URGENT';
+  incidentId?: number;
+  ticketCode?: string;
+  targetRole?: string;
+  targetUserId?: number;
+  read: boolean;
+  createdAt: string;
+}
+
 

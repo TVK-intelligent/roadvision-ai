@@ -45,7 +45,8 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
-                    "/uploads/**"
+                    "/uploads/**",
+                    "/ws/**"
                 ).permitAll()
 
                 // API xác thực

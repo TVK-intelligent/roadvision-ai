@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
+import { NotificationProvider } from './context/NotificationContext';
 import { MainLayout } from './components/MainLayout';
 import { PageLoader } from './components/PageLoader';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -46,10 +47,11 @@ export function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <BrowserRouter>
-          <MainLayout>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
+        <NotificationProvider>
+          <BrowserRouter>
+            <MainLayout>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
                   {/* Tuyến công khai (Public Routes) */}
                   <Route path="/" element={<HomePage />} />
                   <Route path="/map" element={<SpatialMapPage />} />
@@ -142,6 +144,7 @@ export function App() {
               </Suspense>
           </MainLayout>
         </BrowserRouter>
+        </NotificationProvider>
       </ToastProvider>
     </AuthProvider>
   );

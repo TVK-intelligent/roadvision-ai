@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
-import { Incident } from '../types';
+import { Incident, Team, Priority } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { AuthModal } from '../components/AuthModal';
 import { Timeline } from '../components/Timeline';
@@ -10,7 +10,7 @@ import { ImageCanvasWithBBox } from '../components/ImageCanvasWithBBox';
 import { LeafletMap } from '../components/LeafletMap';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, CheckCircle2, Check, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock, Compass, HardHat, Camera, FileCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Check, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock, Compass, HardHat, Camera, FileCheck, X, Send, ClipboardList } from 'lucide-react';
 
 export const IncidentDossierPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +33,28 @@ export const IncidentDossierPage: React.FC = () => {
   const [reworkInstructions, setReworkInstructions] = useState<string>('');
   const [isSubmittingRework, setIsSubmittingRework] = useState<boolean>(false);
   const [showDefectBoxes, setShowDefectBoxes] = useState<boolean>(false);
+
+  // Modals Điều phối & Từ chối dành cho Admin (Bỏ bước xác nhận trung gian)
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [isAssignInspectionOpen, setIsAssignInspectionOpen] = useState<boolean>(false);
+  const [isAssignConstructionOpen, setIsAssignConstructionOpen] = useState<boolean>(false);
+  const [isRejectOpen, setIsRejectOpen] = useState<boolean>(false);
+  const [isSubmittingDispatch, setIsSubmittingDispatch] = useState<boolean>(false);
+
+  // Form giao khảo sát
+  const [inspectionTeamId, setInspectionTeamId] = useState<number>(1);
+  const [inspectionPriority, setInspectionPriority] = useState<Priority>('NORMAL');
+  const [inspectionNotes, setInspectionNotes] = useState<string>('Khẩn trương đến hiện trường kiểm tra độ sụt lún và đo đạc kích thước thực tế.');
+
+  // Form giao thi công
+  const [constructionTeamId, setConstructionTeamId] = useState<number>(2);
+  const [constructionPriority, setConstructionPriority] = useState<Priority>('HIGH');
+  const [workPlan, setWorkPlan] = useState<string>('Tiến hành cào bóc, tưới nhựa dính bám và thảm bù BTN hoàn trả mặt đường an toàn.');
+  const [plannedDeadline, setPlannedDeadline] = useState<string>('');
+  const [safetyNotes, setSafetyNotes] = useState<string>('Bố trí cọc tiêu, biển báo công trường và đèn chớp cảnh báo phương tiện.');
+
+  // Form từ chối
+  const [rejectionReason, setRejectionReason] = useState<string>('');
 
   const fetchDossier = () => {
     if (!id) return;
@@ -192,6 +214,95 @@ export const IncidentDossierPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (user?.role === 'ROLE_ADMIN') {
+      incidentApi.getTeams().then((res) => {
+        setTeams(res.data || []);
+        const inspectTeam = res.data?.find((t: any) => t.teamType === 'INSPECTION' || t.teamType === 'EMERGENCY');
+        if (inspectTeam) setInspectionTeamId(inspectTeam.id);
+        const constrTeam = res.data?.find((t: any) => t.teamType === 'CONSTRUCTION' || t.teamType === 'EMERGENCY');
+        if (constrTeam) setConstructionTeamId(constrTeam.id);
+      }).catch(() => {});
+    }
+  }, [user]);
+
+  const handleAssignInspectionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!incident) return;
+    setIsSubmittingDispatch(true);
+    try {
+      await incidentApi.assignInspection(incident.id, {
+        teamId: inspectionTeamId,
+        priority: inspectionPriority,
+        notes: inspectionNotes.trim(),
+      });
+      toast.success(`Đã giao nhiệm vụ khảo sát ${incident.ticketCode} cho Tổ Khảo sát!`, 'Giao việc thành công');
+      setIsAssignInspectionOpen(false);
+      fetchDossier();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể giao khảo sát', 'Lỗi điều phối');
+    } finally {
+      setIsSubmittingDispatch(false);
+    }
+  };
+
+  const handleAssignConstructionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!incident) return;
+    if (!constructionTeamId) {
+      toast.warning('Vui lòng chọn Tổ Thi Công phụ trách!', 'Thiếu tổ đội');
+      return;
+    }
+    if (!workPlan || workPlan.trim().length < 10) {
+      toast.warning('Phương án thi công phải chi tiết tối thiểu 10 ký tự!', 'Phương án chưa đủ chi tiết');
+      return;
+    }
+    if (plannedDeadline) {
+      const deadlineDate = new Date(plannedDeadline);
+      if (deadlineDate <= new Date()) {
+        toast.warning('Hạn hoàn thành thi công (Deadline) phải ở thời điểm tương lai!', 'Hạn hoàn thành không hợp lệ');
+        return;
+      }
+    }
+    setIsSubmittingDispatch(true);
+    try {
+      await incidentApi.assignConstruction(incident.id, {
+        teamId: constructionTeamId,
+        priority: constructionPriority,
+        workPlan: workPlan.trim(),
+        plannedDeadline: plannedDeadline ? new Date(plannedDeadline).toISOString() : undefined,
+        safetyNotes: safetyNotes ? safetyNotes.trim() : undefined,
+      });
+      toast.success(`Đã giao nhiệm vụ thi công ${incident.ticketCode} cho Tổ Thi công!`, 'Giao việc thành công');
+      setIsAssignConstructionOpen(false);
+      fetchDossier();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể giao thi công', 'Lỗi điều phối');
+    } finally {
+      setIsSubmittingDispatch(false);
+    }
+  };
+
+  const handleRejectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!incident) return;
+    if (!rejectionReason || rejectionReason.trim().length < 10) {
+      toast.warning('Lý do từ chối phản ánh phải cụ thể tối thiểu 10 ký tự!', 'Lý do chưa đủ');
+      return;
+    }
+    setIsSubmittingDispatch(true);
+    try {
+      await incidentApi.rejectIncident(incident.id, { rejectionReason: rejectionReason.trim() });
+      toast.warning(`Đã từ chối tiếp nhận sự cố ${incident.ticketCode}`, 'Từ chối tiếp nhận');
+      setIsRejectOpen(false);
+      fetchDossier();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Không thể từ chối sự cố', 'Lỗi');
+    } finally {
+      setIsSubmittingDispatch(false);
+    }
+  };
+
   // Admin thẩm định xác nhận sự cố hợp lệ (chuyển AI_ANALYZED -> VERIFIED)
   const handleVerifyIncident = async () => {
     if (!incident) return;
@@ -258,14 +369,59 @@ export const IncidentDossierPage: React.FC = () => {
 
         {/* Nút & Huy Hiệu Đồng Tình (Upvote) & Quick Actions */}
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-          {user?.role === 'ROLE_ADMIN' && ['SUBMITTED', 'AI_ANALYZED'].includes(incident.status) && (
+          {/* GIAI ĐOẠN 2 & 3: SUBMITTED / AI_ANALYZED / VERIFIED -> Admin Giao Khảo Sát hoặc Từ Chối */}
+          {user?.role === 'ROLE_ADMIN' && ['SUBMITTED', 'AI_ANALYZED', 'VERIFIED'].includes(incident.status) && (
+            <>
+              <button
+                onClick={() => setIsAssignInspectionOpen(true)}
+                className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                title="Chỉ định Tổ Khảo Sát đến đo đạc hiện trường (Giai đoạn 4)"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>Giao Khảo sát</span>
+              </button>
+
+              <button
+                onClick={() => setIsRejectOpen(true)}
+                className="px-2.5 py-1.5 rounded-md bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                title="Từ chối tiếp nhận nếu là ảnh rác/spam"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Từ chối</span>
+              </button>
+            </>
+          )}
+
+          {/* GIAI ĐOẠN 4: Đang trong quá trình khảo sát */}
+          {user?.role === 'ROLE_ADMIN' && ['INSPECTION_ASSIGNED', 'INSPECTING'].includes(incident.status) && (
+            <div className="px-2.5 py-1.5 rounded-md bg-sky-50 border border-sky-200 text-sky-700 text-xs font-medium flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5" />
+              <span>Đang khảo sát hiện trường</span>
+            </div>
+          )}
+
+          {/* GIAI ĐOẠN 5: Đã khảo sát xong (INSPECTED) -> Admin duyệt kết quả và Giao thi công */}
+          {user?.role === 'ROLE_ADMIN' && incident.status === 'INSPECTED' && (
             <button
-              onClick={handleVerifyIncident}
-              className="px-3 py-1.5 rounded-md bg-teal-600 hover:bg-teal-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+              onClick={() => {
+                const date = new Date(Date.now() + 48 * 3600 * 1000);
+                setPlannedDeadline(date.toISOString().slice(0, 16));
+                setIsAssignConstructionOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+              title="Đã khảo sát xong, bấm để chỉ định Tổ Thi Công (Giai đoạn 5)"
             >
-              <Check className="w-3.5 h-3.5" />
-              <span>Xác nhận hợp lệ (VERIFIED)</span>
+              <HardHat className="w-3.5 h-3.5" />
+              <span>Giao Thi công</span>
             </button>
+          )}
+
+          {/* GIAI ĐOẠN 6: Đang trong quá trình thi công */}
+          {user?.role === 'ROLE_ADMIN' && ['ASSIGNED', 'IN_PROGRESS'].includes(incident.status) && (
+            <div className="px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium flex items-center gap-1.5">
+              <HardHat className="w-3.5 h-3.5" />
+              <span>Đang thi công sửa chữa</span>
+            </div>
           )}
           {user?.role === 'ROLE_ADMIN' && (incident.status === 'PENDING_ACCEPTANCE' || incident.status === 'PENDING_INSPECTION') && (
             <button
@@ -1079,6 +1235,290 @@ export const IncidentDossierPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 1. Modal Giao Khảo Sát Hiện Trường */}
+      {isAssignInspectionOpen && incident && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-lg border border-slate-200 shadow-xl p-6 flex flex-col gap-4 animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+                  <Compass className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Giao nhiệm vụ khảo sát</h3>
+                  <span className="font-mono text-xs text-blue-700 font-medium">{incident.ticketCode}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAssignInspectionOpen(false)}
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignInspectionSubmit} className="flex flex-col gap-3.5 text-xs">
+              <div className="p-3 rounded-md bg-slate-50 border border-slate-200 flex flex-col gap-1 text-xs">
+                <span className="font-semibold text-slate-800">{incident.title}</span>
+                <span className="text-slate-500 line-clamp-1">{incident.address || 'Không rõ địa chỉ'}</span>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Chọn Tổ Khảo Sát phụ trách *</label>
+                <select
+                  value={inspectionTeamId}
+                  onChange={(e) => setInspectionTeamId(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
+                >
+                  {teams.filter(t => t.teamType === 'INSPECTION' || t.teamType === 'EMERGENCY').length > 0 ? (
+                    teams.filter(t => t.teamType === 'INSPECTION' || t.teamType === 'EMERGENCY').map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.teamType}) - {t.zoneName || 'Khu QLĐB'}
+                      </option>
+                    ))
+                  ) : teams.length > 0 ? (
+                    teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} - {t.zoneName || 'Khu QLĐB'}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={1}>Tổ Khảo Sát Hiện Trường Miền Bắc</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Mức độ ưu tiên</label>
+                <select
+                  value={inspectionPriority}
+                  onChange={(e) => setInspectionPriority(e.target.value as Priority)}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
+                >
+                  <option value="LOW">Thấp (Xử lý trong tuần)</option>
+                  <option value="NORMAL">Bình thường (Trong 48 giờ)</option>
+                  <option value="HIGH">Cao (Trong 24 giờ)</option>
+                  <option value="CRITICAL">Khẩn cấp (Đi ngay trong ca trực)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Chỉ dẫn nhiệm vụ kỹ thuật</label>
+                <textarea
+                  value={inspectionNotes}
+                  onChange={(e) => setInspectionNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent leading-relaxed"
+                  placeholder="Yêu cầu đo đạc chiều dài, rộng, sâu và đề xuất giải pháp cào bóc hay thảm bù..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignInspectionOpen(false)}
+                  className="px-3.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors font-medium cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDispatch}
+                  className="px-4 py-1.5 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSubmittingDispatch ? 'Đang gửi...' : 'Xác nhận giao khảo sát'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Modal Giao Thi Công Sửa Chữa */}
+      {isAssignConstructionOpen && incident && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-lg border border-slate-200 shadow-xl p-6 flex flex-col gap-4 animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
+                  <HardHat className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Giao nhiệm vụ thi công sửa chữa</h3>
+                  <span className="font-mono text-xs text-emerald-700 font-medium">{incident.ticketCode}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAssignConstructionOpen(false)}
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignConstructionSubmit} className="flex flex-col gap-3.5 text-xs">
+              <div className="p-3 rounded-md bg-slate-50 border border-slate-200 flex flex-col gap-1 text-xs">
+                <span className="font-semibold text-slate-800">{incident.title}</span>
+                <span className="text-slate-500 line-clamp-1">{incident.address || 'Không rõ địa chỉ'}</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium mb-1 text-slate-700">Chọn Tổ Thi Công *</label>
+                  <select
+                    value={constructionTeamId}
+                    onChange={(e) => setConstructionTeamId(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
+                  >
+                    {teams.filter(t => t.teamType === 'CONSTRUCTION' || t.teamType === 'EMERGENCY').length > 0 ? (
+                      teams.filter(t => t.teamType === 'CONSTRUCTION' || t.teamType === 'EMERGENCY').map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.teamType})
+                        </option>
+                      ))
+                    ) : teams.length > 0 ? (
+                      teams.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value={2}>Tổ Thi Công Duy Tu Số 1</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-medium mb-1 text-slate-700">Mức độ ưu tiên</label>
+                  <select
+                    value={constructionPriority}
+                    onChange={(e) => setConstructionPriority(e.target.value as Priority)}
+                    className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
+                  >
+                    <option value="LOW">Thấp (Trong 7 ngày)</option>
+                    <option value="NORMAL">Bình thường (Trong 48 giờ)</option>
+                    <option value="HIGH">Ưu tiên cao (Trong 24 giờ)</option>
+                    <option value="CRITICAL">Khẩn cấp (Xử lý ngay trong ca)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Hạn hoàn thành thi công (Deadline) *</label>
+                <input
+                  type="datetime-local"
+                  value={plannedDeadline}
+                  onChange={(e) => setPlannedDeadline(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Phương án thi công sửa chữa * (Tối thiểu 10 ký tự)</label>
+                <textarea
+                  value={workPlan}
+                  onChange={(e) => setWorkPlan(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent leading-relaxed"
+                  placeholder="Ghi rõ biện pháp thi công, cào bóc, tưới nhũ tương, thảm bù BTN C12.5..."
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Yêu cầu an toàn & phân luồng giao thông</label>
+                <textarea
+                  value={safetyNotes}
+                  onChange={(e) => setSafetyNotes(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent leading-relaxed"
+                  placeholder="Đặt cọc tiêu chóp nón, biển báo công trường, người điều tiết giao thông..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignConstructionOpen(false)}
+                  className="px-3.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors font-medium cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDispatch}
+                  className="px-4 py-1.5 rounded-md bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSubmittingDispatch ? 'Đang gửi...' : 'Xác nhận giao thi công'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Modal Từ Chối Tiếp Nhận */}
+      {isRejectOpen && incident && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-lg border border-slate-200 shadow-xl p-6 flex flex-col gap-4 animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center">
+                  <X className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-rose-700">Từ chối tiếp nhận phản ánh</h3>
+                  <span className="font-mono text-xs text-slate-500">{incident.ticketCode}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRejectOpen(false)}
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectSubmit} className="flex flex-col gap-3.5 text-xs">
+              <div className="p-3 bg-rose-50/60 rounded-md border border-rose-200 text-rose-900 text-xs">
+                ⚠️ Lý do từ chối sẽ được thông báo trực tiếp đến tài khoản người dân. Người gửi tin giả hoặc spam liên tục có thể bị trừ điểm uy tín.
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Lý do từ chối cụ thể * (Tối thiểu 10 ký tự)</label>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  rows={3}
+                  required
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent leading-relaxed"
+                  placeholder="Ví dụ: Ảnh chụp quá mờ không xác định được hiện trường, hoặc vị trí thuộc đường nội bộ dân cư không thuộc quyền quản lý..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsRejectOpen(false)}
+                  className="px-3.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors font-medium cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDispatch}
+                  className="px-4 py-1.5 rounded-md bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>{isSubmittingDispatch ? 'Đang từ chối...' : 'Xác nhận từ chối'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>

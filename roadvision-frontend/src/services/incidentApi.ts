@@ -322,6 +322,25 @@ export const incidentApi = {
   toggleStaffStatus: (id: number | string) => {
     return axiosClient.put<import('../types').Staff>(`/admin/staff/${id}/toggle-status`);
   },
+
+  // --- HỆ THỐNG CHUÔNG THÔNG BÁO REAL-TIME ---
+  getNotifications: (page = 0, size = 15) => {
+    return axiosClient.get<{ content: import('../types').NotificationItem[]; totalElements: number; totalPages: number }>('/notifications', {
+      params: { page, size },
+    });
+  },
+
+  getUnreadNotificationCount: () => {
+    return axiosClient.get<{ unreadCount: number }>('/notifications/unread-count');
+  },
+
+  markNotificationRead: (id: number | string) => {
+    return axiosClient.put(`/notifications/${id}/read`);
+  },
+
+  markAllNotificationsRead: () => {
+    return axiosClient.put('/notifications/read-all');
+  },
 };
 
 

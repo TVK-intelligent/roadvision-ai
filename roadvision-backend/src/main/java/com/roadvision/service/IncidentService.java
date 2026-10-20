@@ -44,6 +44,7 @@ public class IncidentService {
     private final IncidentEvidenceRepository incidentEvidenceRepository;
     private final FileStorageService fileStorageService;
     private final AiInferenceService aiInferenceService;
+    private final NotificationService notificationService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     /**
@@ -246,6 +247,14 @@ public class IncidentService {
         aiDetectionRepository.save(aiDetection);
         savedIncident.setAiDetection(aiDetection);
 
+        // Gửi thông báo Real-time đến Quản trị viên
+        notificationService.notifyAdmins(
+            "Phản ánh mới tiếp nhận: " + savedIncident.getTicketCode(),
+            "Sự cố [" + savedIncident.getTitle() + "] vừa được ghi nhận tại " + savedIncident.getAddress(),
+            "INFO",
+            savedIncident
+        );
+
         return mapToResponse(savedIncident);
     }
 
@@ -295,6 +304,13 @@ public class IncidentService {
         assignmentRepository.save(assignment);
         incident.setAssignment(assignment);
 
+        notificationService.notifyStaff(
+            "Phân công xử lý sự cố: " + incident.getTicketCode(),
+            "Nhân viên kỹ thuật [" + staff.getFullName() + "] được giao xử lý sự cố tại: " + incident.getAddress(),
+            "URGENT",
+            incident
+        );
+
         return mapToResponse(incidentRepository.save(incident));
     }
 
@@ -322,6 +338,21 @@ public class IncidentService {
         }
 
         log.info("Quản trị viên ID {} đã thẩm định xác nhận sự cố #{}", adminId, incident.getTicketCode());
+        if (citizen != null) {
+            notificationService.notifyUser(
+                citizen.getId(),
+                "Phản ánh hợp lệ: " + incident.getTicketCode(),
+                "Phản ánh của bạn đã được Quản trị viên thẩm định hợp lệ và đưa vào kế hoạch bảo trì.",
+                "SUCCESS",
+                incident
+            );
+        }
+        notificationService.notifyStaff(
+            "Hồ sơ sẵn sàng điều phối: " + incident.getTicketCode(),
+            "Sự cố [" + incident.getTitle() + "] đã được duyệt hợp lệ và sẵn sàng phân công khảo sát/thi công.",
+            "INFO",
+            incident
+        );
         return mapToResponse(incidentRepository.save(incident));
     }
 
@@ -358,6 +389,13 @@ public class IncidentService {
             userRepository.save(citizen);
             log.info("Trừ -10 điểm uy tín cho người dùng ID {}. Điểm mới: {}, Số strike vi phạm: {}", 
                     citizen.getId(), citizen.getReputationScore(), citizen.getSpamStrikes());
+            notificationService.notifyUser(
+                citizen.getId(),
+                "Phản ánh bị từ chối: " + incident.getTicketCode(),
+                "Phản ánh sự cố của bạn đã bị từ chối tiếp nhận. Lý do: " + request.getRejectionReason(),
+                "WARNING",
+                incident
+            );
         }
 
         return mapToResponse(incidentRepository.save(incident));
@@ -447,6 +485,13 @@ public class IncidentService {
 
         resolutionRepository.save(resolution);
         incident.setResolution(resolution);
+
+        notificationService.notifyAdmins(
+            "Hồ sơ nghiệm thu mới: " + incident.getTicketCode(),
+            "Tổ thi công đã nộp hồ sơ hoàn thành (kèm ảnh và kết quả quét AI). Đang chờ Admin duyệt nghiệm thu.",
+            "INFO",
+            incident
+        );
 
         return mapToResponse(incidentRepository.save(incident));
     }
@@ -917,7 +962,28 @@ public class IncidentService {
             assignment.setNotes(req.getNotes());
             assignment.setAssignedAt(LocalDateTime.now());
             assignmentRepository.save(assignment);
+            notificationService.notifyStaff(
+                "Nhiệm vụ khảo sát mới: " + incident.getTicketCode(),
+                "Tổ [" + team.getName() + "] được giao nhiệm vụ khảo sát thực địa sự cố tại: " + incident.getAddress(),
+                "WARNING",
+                incident
+            );
             incident.setAssignment(assignment);
+        notificationService.notifyStaff(
+            "Nhiệm vụ thi công mới: " + incident.getTicketCode(),
+            "Tổ [" + team.getName() + "] được giao thi công sửa chữa sự cố tại: " + incident.getAddress(),
+            "URGENT",
+            incident
+        );
+        if (incident.getCitizen() != null) {
+            notificationService.notifyUser(
+                incident.getCitizen().getId(),
+                "Triển khai thi công: " + incident.getTicketCode(),
+                "Sự cố mặt đường của bạn đã được chuyển cho Tổ Thi công tiến hành xử lý.",
+                "INFO",
+                incident
+            );
+        }
         }
 
         return mapToResponse(incidentRepository.save(incident));
@@ -1057,6 +1123,12 @@ public class IncidentService {
         incident.setLongitude(lng);
 
         incident.setStatus(IncidentStatus.INSPECTED);
+        notificationService.notifyAdmins(
+            "Biên bản khảo sát hoàn tất: " + incident.getTicketCode(),
+            "Tổ kỹ thuật đã nộp biên bản đo đạc và đề xuất phương án thi công. Sẵn sàng điều phối giao việc.",
+            "SUCCESS",
+            incident
+        );
         return mapToResponse(incidentRepository.save(incident));
     }
 
@@ -1108,6 +1180,22 @@ public class IncidentService {
         assignment.setAssignedAt(LocalDateTime.now());
         assignmentRepository.save(assignment);
         incident.setAssignment(assignment);
+
+        notificationService.notifyStaff(
+            "Nhiệm vụ thi công mới: " + incident.getTicketCode(),
+            "Tổ [" + team.getName() + "] được giao thi công sửa chữa sự cố tại: " + incident.getAddress(),
+            "URGENT",
+            incident
+        );
+        if (incident.getCitizen() != null) {
+            notificationService.notifyUser(
+                incident.getCitizen().getId(),
+                "Triển khai thi công: " + incident.getTicketCode(),
+                "Sự cố mặt đường của bạn đã được chuyển cho Tổ Thi công tiến hành xử lý.",
+                "INFO",
+                incident
+            );
+        }
 
         return mapToResponse(incidentRepository.save(incident));
     }
@@ -1282,6 +1370,13 @@ public class IncidentService {
         resolutionRepository.save(resolution);
         incident.setResolution(resolution);
 
+        notificationService.notifyAdmins(
+            "Hồ sơ nghiệm thu mới: " + incident.getTicketCode(),
+            "Tổ thi công đã nộp hồ sơ hoàn thành (kèm ảnh và kết quả quét AI). Đang chờ Admin duyệt nghiệm thu.",
+            "INFO",
+            incident
+        );
+
         return mapToResponse(incidentRepository.save(incident));
     }
 
@@ -1343,7 +1438,34 @@ public class IncidentService {
             incident.setReworkReason(req.getReworkReason().trim());
             incident.setReworkCount(incident.getReworkCount() != null ? incident.getReworkCount() + 1 : 1);
         }
-        return mapToResponse(incidentRepository.save(incident));
+
+        Incident savedIncident = incidentRepository.save(incident);
+        if (req.getApproved() != null && req.getApproved()) {
+            if (savedIncident.getCitizen() != null) {
+                notificationService.notifyUser(
+                    savedIncident.getCitizen().getId(),
+                    "Nghiệm thu hoàn tất: " + savedIncident.getTicketCode(),
+                    "Sự cố mặt đường bạn phản ánh đã được nghiệm thu sửa chữa đạt chuẩn và đóng hồ sơ thành công.",
+                    "SUCCESS",
+                    savedIncident
+                );
+            }
+            notificationService.notifyStaff(
+                "Nghiệm thu được duyệt: " + savedIncident.getTicketCode(),
+                "Hồ sơ thi công " + savedIncident.getTicketCode() + " đã được Quản trị viên duyệt nghiệm thu đạt chuẩn.",
+                "SUCCESS",
+                savedIncident
+            );
+        } else {
+            notificationService.notifyStaff(
+                "Yêu cầu sửa lại (Rework): " + savedIncident.getTicketCode(),
+                "Hồ sơ nghiệm thu " + savedIncident.getTicketCode() + " chưa đạt yêu cầu. Lý do: " + req.getReworkReason(),
+                "URGENT",
+                savedIncident
+            );
+        }
+
+        return mapToResponse(savedIncident);
     }
 
     /**

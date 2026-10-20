@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { incidentApi } from '../services/incidentApi';
 import { Incident } from '../types';
 import { StatusBadge } from './StatusBadge';
@@ -17,6 +18,9 @@ import {
   X,
   ArrowUpRight,
   AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
   MapPin,
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
@@ -34,8 +38,10 @@ export const Topbar: React.FC<TopbarProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead } = useNotifications();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
+  const [isNotiOpen, setIsNotiOpen] = useState<boolean>(false);
 
   // Trạng thái tìm kiếm toàn hệ thống
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -83,6 +89,19 @@ export const Topbar: React.FC<TopbarProps> = ({
           className: 'bg-slate-100 text-slate-600 border border-slate-200',
         };
     }
+  };
+
+  const formatTimeAgo = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return 'Vừa xong';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} phút trước`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} giờ trước`;
+    const days = Math.floor(hours / 24);
+    return `${days} ngày trước`;
   };
 
   // Tự động tìm kiếm tức thì với Debounce 250ms
@@ -292,14 +311,115 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span>AI YOLOv8 Online</span>
           </div>
 
-          {/* Chuông thông báo */}
-          <button
-            className="relative w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 flex items-center justify-center transition-colors cursor-pointer"
-            title="Thông báo hệ thống"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
-          </button>
+          {/* Chuông thông báo Real-time WebSocket */}
+          <div className="relative">
+            <button
+              onClick={() => setIsNotiOpen(!isNotiOpen)}
+              className="relative w-9 h-9 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center justify-center transition-colors cursor-pointer"
+              title="Thông báo hệ thống thời gian thực"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 min-w-[18px] h-[18px] rounded-full bg-rose-600 text-white font-bold text-[10px] flex items-center justify-center ring-2 ring-white animate-pulse shadow-xs">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Dropdown Danh sách thông báo */}
+            {isNotiOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setIsNotiOpen(false)} />
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl border border-slate-200 shadow-xl z-40 overflow-hidden animate-in fade-in flex flex-col max-h-[500px]">
+                  {/* Header */}
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-xs text-slate-900">Thông báo</h3>
+                      {unreadCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">
+                          {unreadCount} mới
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isConnected ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium" title="Đã kết nối máy chủ WebSocket">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Trực tuyến
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium" title="Đang thử kết nối lại">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          Ngoại tuyến
+                        </span>
+                      )}
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={() => markAllAsRead()}
+                          className="text-[11px] text-blue-600 hover:text-blue-800 font-medium ml-1 cursor-pointer"
+                        >
+                          Đọc tất cả
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Body - Danh sách thông báo */}
+                  <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+                    {notifications.length === 0 ? (
+                      <div className="py-10 text-center text-slate-400 flex flex-col items-center gap-2">
+                        <Bell className="w-8 h-8 opacity-40 text-slate-300" />
+                        <span className="text-xs">Chưa có thông báo nào</span>
+                      </div>
+                    ) : (
+                      notifications.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            if (!item.read) markAsRead(item.id);
+                            if (item.incidentId) {
+                              navigate(`/incidents/${item.incidentId}`);
+                              setIsNotiOpen(false);
+                            }
+                          }}
+                          className={`p-3.5 flex items-start gap-3 hover:bg-slate-50 transition-colors cursor-pointer text-left ${
+                            !item.read ? 'bg-blue-50/40' : ''
+                          }`}
+                        >
+                          <div className="mt-0.5 shrink-0">
+                            {item.type === 'SUCCESS' && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                            {item.type === 'URGENT' && <AlertCircle className="w-4 h-4 text-rose-600" />}
+                            {item.type === 'WARNING' && <AlertTriangle className="w-4 h-4 text-amber-600" />}
+                            {item.type === 'INFO' && <Info className="w-4 h-4 text-blue-600" />}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <h4 className={`text-xs font-semibold truncate ${!item.read ? 'text-slate-900' : 'text-slate-700'}`}>
+                                {item.title}
+                              </h4>
+                              {!item.read && (
+                                <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" title="Chưa đọc" />
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-600 leading-snug line-clamp-2">
+                              {item.message}
+                            </p>
+                            <div className="flex items-center justify-between gap-2 mt-1.5 text-[10px] text-slate-400 font-mono">
+                              <span>{formatTimeAgo(item.createdAt)}</span>
+                              {item.ticketCode && (
+                                <span className="text-blue-600 font-semibold">{item.ticketCode}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Khối người dùng */}
           {user ? (
