@@ -30,7 +30,7 @@ public class Assignment {
     @JoinColumn(name = "assigned_to_staff_id", nullable = false)
     private User assignedToStaff;
 
-    @Column(name = "verified_category", nullable = false, length = 50)
+    @Column(name = "verified_category", length = 50)
     private String verifiedCategory;
 
     @Enumerated(EnumType.STRING)

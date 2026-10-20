@@ -161,6 +161,59 @@ export const incidentApi = {
     return axiosClient.post<Incident>(`/incidents/${id}/rework`, data);
   },
 
+  // ==========================================
+  // LUỒNG 7 GIAI ĐOẠN ĐỒ ÁN ROADVISION
+  // ==========================================
+
+  // Giai đoạn 3 -> 4: Admin giao nhiệm vụ khảo sát hiện trường cho Tổ Khảo sát
+  assignInspection: (id: number | string, data: import('../types').InspectionAssignRequest) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/assign-inspection`, data);
+  },
+
+  // Giai đoạn 4: Nhân viên khảo sát xác nhận đã đến vị trí và bắt đầu khảo sát
+  startInspection: (id: number | string) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/start-inspection`);
+  },
+
+  // Giai đoạn 4: Nhân viên nộp báo cáo khảo sát hiện trường + ảnh hiện trạng
+  submitInspectionReport: (id: number | string, formData: FormData) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/inspection-report`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  // Giai đoạn 5: Admin duyệt phương án và giao việc cho Tổ Thi công chuyên trách
+  assignConstruction: (id: number | string, data: import('../types').ConstructionAssignRequest) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/assign-construction`, data);
+  },
+
+  // Giai đoạn 6: Tổ đội bắt đầu triển khai thi công (IN_PROGRESS)
+  startConstruction: (id: number | string) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/start-construction`);
+  },
+
+  // Giai đoạn 6: Tổ đội tải lên ảnh bằng chứng theo từng mốc (BEFORE_WORK, PROGRESS, AFTER_WORK, REWORK)
+  uploadEvidence: (id: number | string, formData: FormData) => {
+    return axiosClient.post<import('../types').EvidenceResponse>(`/incidents/${id}/evidence`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  // Giai đoạn 6: Tổ đội hoàn tất thi công và gửi hồ sơ nộp nghiệm thu có AI quét (PENDING_ACCEPTANCE)
+  submitAcceptance: (id: number | string, data?: FormData | { notes?: string }) => {
+    if (data instanceof FormData) {
+      return axiosClient.post<Incident>(`/incidents/${id}/submit-acceptance`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return axiosClient.post<Incident>(`/incidents/${id}/submit-acceptance`, data || {});
+  },
+
+  // Giai đoạn 7: Admin thẩm định nghiệm thu (Đạt -> CLOSED, Không đạt -> REWORK_REQUIRED)
+  reviewAcceptance: (id: number | string, data: import('../types').AcceptanceReviewRequest) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/review-acceptance`, data);
+  },
+
   // Danh sách kỹ thuật viên
   getStaffList: () => {
     return axiosClient.get<any[]>('/incidents/staff-list');
@@ -220,6 +273,56 @@ export const incidentApi = {
       }>;
     }>('/ai/chat', data);
   },
+
+  // ==========================================
+  // QUẢN LÝ TỔ ĐỘI & NHÂN VIÊN CHUYÊN TRÁCH
+  // ==========================================
+
+  // Lấy danh sách toàn bộ tổ đội
+  getTeams: () => {
+    return axiosClient.get<import('../types').Team[]>('/admin/teams');
+  },
+
+  // Lấy chi tiết một tổ đội
+  getTeamById: (id: number | string) => {
+    return axiosClient.get<import('../types').Team>(`/admin/teams/${id}`);
+  },
+
+  // Tạo tổ đội mới
+  createTeam: (data: import('../types').TeamRequest) => {
+    return axiosClient.post<import('../types').Team>('/admin/teams', data);
+  },
+
+  // Cập nhật thông tin tổ đội
+  updateTeam: (id: number | string, data: import('../types').TeamRequest) => {
+    return axiosClient.put<import('../types').Team>(`/admin/teams/${id}`, data);
+  },
+
+  // Xóa / giải thể tổ đội
+  deleteTeam: (id: number | string) => {
+    return axiosClient.delete<{ message: string }>(`/admin/teams/${id}`);
+  },
+
+  // Lấy danh sách nhân viên chi tiết (hỗ trợ lọc theo tổ đội, loại đội, trạng thái)
+  getStaffDetailedList: (params?: { teamId?: number; teamType?: string; isActive?: boolean }) => {
+    return axiosClient.get<import('../types').Staff[]>('/admin/staff', { params });
+  },
+
+  // Tạo tài khoản nhân viên kỹ thuật mới
+  createStaff: (data: import('../types').StaffCreateRequest) => {
+    return axiosClient.post<import('../types').Staff>('/admin/staff', data);
+  },
+
+  // Cập nhật thông tin / tổ đội / vai trò của nhân viên
+  updateStaff: (id: number | string, data: import('../types').StaffUpdateRequest) => {
+    return axiosClient.put<import('../types').Staff>(`/admin/staff/${id}`, data);
+  },
+
+  // Khóa hoặc mở khóa tài khoản nhân viên
+  toggleStaffStatus: (id: number | string) => {
+    return axiosClient.put<import('../types').Staff>(`/admin/staff/${id}/toggle-status`);
+  },
 };
+
 
 

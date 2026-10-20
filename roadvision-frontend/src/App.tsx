@@ -2,11 +2,9 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
-import { Navbar } from './components/Navbar';
-import { Footer } from './components/Footer';
+import { MainLayout } from './components/MainLayout';
 import { PageLoader } from './components/PageLoader';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { AiChatWidget } from './components/AiChatWidget';
 
 // Tách nhỏ Bundle và nạp trang theo nhu cầu (Code-Splitting / Lazy Loading)
 const HomePage = lazy(() =>
@@ -27,14 +25,20 @@ const MyReportsPage = lazy(() =>
 const SpatialMapPage = lazy(() =>
   import('./pages/SpatialMapPage').then((m) => ({ default: m.SpatialMapPage }))
 );
-const StaffTasksPage = lazy(() =>
-  import('./pages/StaffTasksPage').then((m) => ({ default: m.StaffTasksPage }))
+const InspectionTasksPage = lazy(() =>
+  import('./pages/InspectionTasksPage').then((m) => ({ default: m.InspectionTasksPage }))
+);
+const ConstructionTasksPage = lazy(() =>
+  import('./pages/ConstructionTasksPage').then((m) => ({ default: m.ConstructionTasksPage }))
 );
 const PatrolModePage = lazy(() =>
   import('./pages/PatrolModePage').then((m) => ({ default: m.PatrolModePage }))
 );
 const AdminAnalyticsPage = lazy(() =>
   import('./pages/AdminAnalyticsPage').then((m) => ({ default: m.AdminAnalyticsPage }))
+);
+const AdminTeamsPage = lazy(() =>
+  import('./pages/AdminTeamsPage').then((m) => ({ default: m.AdminTeamsPage }))
 );
 
 
@@ -43,14 +47,9 @@ export function App() {
     <AuthProvider>
       <ToastProvider>
         <BrowserRouter>
-          <div className="min-h-screen bg-surface flex flex-col font-sans text-on-surface">
-            {/* Header Kính Mờ Định Vị Cố Định */}
-            <Navbar />
-
-            {/* Vùng Nội Dung Chính */}
-            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-12">
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
+          <MainLayout>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
                   {/* Tuyến công khai (Public Routes) */}
                   <Route path="/" element={<HomePage />} />
                   <Route path="/map" element={<SpatialMapPage />} />
@@ -68,12 +67,32 @@ export function App() {
                     }
                   />
 
-                  {/* Tuyến Kỹ Thuật Viên (Staff & Admin): Nhiệm vụ bảo trì hiện trường */}
+                  {/* Tuyến Kỹ Thuật Viên: Khảo sát thực địa (Giai đoạn 4) */}
+                  <Route
+                    path="/inspection-tasks"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_STAFF', 'ROLE_ADMIN']}>
+                        <InspectionTasksPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Tuyến Kỹ Thuật Viên: Thi công sửa chữa (Giai đoạn 6) */}
+                  <Route
+                    path="/construction-tasks"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_STAFF', 'ROLE_ADMIN']}>
+                        <ConstructionTasksPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Tuyến Kỹ Thuật Viên: Nhiệm vụ bảo trì hiện trường (Tương thích cũ) */}
                   <Route
                     path="/tasks"
                     element={
                       <ProtectedRoute allowedRoles={['ROLE_STAFF', 'ROLE_ADMIN']}>
-                        <StaffTasksPage />
+                        <InspectionTasksPage />
                       </ProtectedRoute>
                     }
                   />
@@ -106,19 +125,22 @@ export function App() {
                     }
                   />
 
+                  {/* Tuyến Quản Trị Viên: Quản lý Tổ Đội & Nhân Viên Chuyên Trách */}
+                  <Route
+                    path="/admin/teams"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
+                        <AdminTeamsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
 
                   {/* Tuyến mặc định quay về trang chủ */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
-            </main>
-
-            {/* Chân trang hiện đại */}
-            <Footer />
-
-            {/* Trợ lý AI Thông Minh RoadVision (Gemini Multimodal Floating Assistant) */}
-            <AiChatWidget />
-          </div>
+          </MainLayout>
         </BrowserRouter>
       </ToastProvider>
     </AuthProvider>

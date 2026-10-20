@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Incident {
 
     @Id
@@ -48,6 +50,15 @@ public class Incident {
     @Column(nullable = false, precision = 11, scale = 8)
     private BigDecimal longitude;
 
+    @Column(name = "original_latitude", precision = 10, scale = 8)
+    private BigDecimal originalLatitude;
+
+    @Column(name = "original_longitude", precision = 11, scale = 8)
+    private BigDecimal originalLongitude;
+
+    @Column(name = "gps_accuracy")
+    private Double gpsAccuracy; // Sai số GPS tính bằng mét (m)
+
     @Column(length = 255)
     private String address;
 
@@ -56,6 +67,26 @@ public class Incident {
 
     @Column(name = "zone_name", length = 150)
     private String zoneName; // Tên đầy đủ của Hạt & Tuyến
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "inspection_team_id")
+    private Team inspectionTeam; // Tổ phụ trách Khảo sát (Giai đoạn 4)
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_team_id")
+    private Team assignedTeam; // Tổ phụ trách Thi công (Giai đoạn 5 & 6)
+
+    @Column(name = "work_plan", length = 1000)
+    private String workPlan; // Phương án thi công được duyệt
+
+    @Column(name = "safety_notes", length = 1000)
+    private String safetyNotes; // Ghi chú về ATGT, biển báo hiệu hoặc vật tư yêu cầu
+
+    @Column(name = "planned_start_date")
+    private LocalDateTime plannedStartDate;
+
+    @Column(name = "planned_deadline")
+    private LocalDateTime plannedDeadline;
 
 
     @Enumerated(EnumType.STRING)
@@ -102,6 +133,14 @@ public class Incident {
     @OneToOne(mappedBy = "incident", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Feedback feedback;
 
+    @OneToOne(mappedBy = "incident", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private IncidentInspection inspection;
+
+    @OneToMany(mappedBy = "incident", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OrderBy("createdAt ASC")
+    @Builder.Default
+    private java.util.List<IncidentEvidence> evidences = new java.util.ArrayList<>();
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -115,38 +154,4 @@ public class Incident {
 
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
-
-    public Incident() {
-    }
-
-    public Incident(Long id, String ticketCode, User citizen, String title, String description, String imageUrl, String imageSha256, BigDecimal latitude, BigDecimal longitude, String address, String routeCorridor, String zoneName, Category category, IncidentStatus status, Severity severity, String flag, String rejectionReason, String reworkReason, Integer reworkCount, Integer upvoteCount, AiDetection aiDetection, Assignment assignment, Resolution resolution, Feedback feedback, LocalDateTime createdAt, LocalDateTime updatedAt, LocalDateTime resolvedAt, LocalDateTime closedAt) {
-        this.id = id;
-        this.ticketCode = ticketCode;
-        this.citizen = citizen;
-        this.title = title != null ? title : "Sự cố mặt đường";
-        this.description = description;
-        this.imageUrl = imageUrl;
-        this.imageSha256 = imageSha256;
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.address = address;
-        this.routeCorridor = routeCorridor;
-        this.zoneName = zoneName;
-        this.category = category != null ? category : Category.POTHOLE;
-        this.status = status != null ? status : IncidentStatus.SUBMITTED;
-        this.severity = severity != null ? severity : Severity.MEDIUM;
-        this.flag = flag;
-        this.rejectionReason = rejectionReason;
-        this.reworkReason = reworkReason;
-        this.reworkCount = reworkCount != null ? reworkCount : 0;
-        this.upvoteCount = upvoteCount != null ? upvoteCount : 1;
-        this.aiDetection = aiDetection;
-        this.assignment = assignment;
-        this.resolution = resolution;
-        this.feedback = feedback;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.resolvedAt = resolvedAt;
-        this.closedAt = closedAt;
-    }
 }

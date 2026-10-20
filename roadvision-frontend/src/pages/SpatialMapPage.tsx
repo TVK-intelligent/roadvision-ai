@@ -96,12 +96,24 @@ export const SpatialMapPage: React.FC = () => {
       if (!matchText) return false;
     }
 
+    const pendingStatuses = ['SUBMITTED', 'AI_ANALYZED', 'VERIFIED'];
+    const workingStatuses = [
+      'INSPECTION_ASSIGNED',
+      'INSPECTING',
+      'INSPECTED',
+      'ASSIGNED',
+      'IN_PROGRESS',
+      'PENDING_ACCEPTANCE',
+      'REWORK_REQUIRED',
+    ];
+    const doneStatuses = ['RESOLVED', 'CLOSED'];
+
     if (selectedStatus === 'PENDING') {
-      if (item.status !== 'SUBMITTED' && item.status !== 'AI_ANALYZED') return false;
+      if (!pendingStatuses.includes(item.status)) return false;
     } else if (selectedStatus === 'WORKING') {
-      if (item.status !== 'ASSIGNED' && item.status !== 'IN_PROGRESS') return false;
+      if (!workingStatuses.includes(item.status)) return false;
     } else if (selectedStatus === 'DONE') {
-      if (item.status !== 'RESOLVED' && item.status !== 'CLOSED') return false;
+      if (!doneStatuses.includes(item.status)) return false;
     }
 
     if (selectedCategory !== 'ALL' && item.category !== selectedCategory) {
@@ -208,7 +220,7 @@ export const SpatialMapPage: React.FC = () => {
                     : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200'
                 }`}
               >
-                Đang sửa
+                Đang xử lý
               </button>
               <button
                 onClick={() => setSelectedStatus('DONE')}

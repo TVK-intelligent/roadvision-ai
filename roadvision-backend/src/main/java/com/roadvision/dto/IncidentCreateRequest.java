@@ -22,6 +22,10 @@ public class IncidentCreateRequest {
     @NotNull(message = "Kinh độ (longitude) là bắt buộc")
     private BigDecimal longitude;
 
+    private BigDecimal originalLatitude;
+    private BigDecimal originalLongitude;
+    private Double gpsAccuracy;
+
     private String address;
     private com.roadvision.enums.Category category;
     private java.util.List<com.roadvision.enums.Category> categories;

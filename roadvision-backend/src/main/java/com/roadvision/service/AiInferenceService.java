@@ -162,8 +162,25 @@ public class AiInferenceService {
                     // BƯỚC 3: GLOBAL NMS
                     List<ImageTensorUtil.BoundingBox> nmsBoxes = ImageTensorUtil.applyNms(allCandidates, iouThreshold);
 
+                    // Chuẩn hóa: Nếu là vũng lòng hốc chứa nước bùn -> POTHOLE (Ổ gà)
+                    List<ImageTensorUtil.BoundingBox> sanitizedBoxes = new ArrayList<>();
+                    for (ImageTensorUtil.BoundingBox b : nmsBoxes) {
+                        if ("ROAD_FLOODING".equals(b.getClassName()) && isWaterCavity(image, b.getX(), b.getY(), b.getWidth(), b.getHeight())) {
+                            sanitizedBoxes.add(ImageTensorUtil.BoundingBox.builder()
+                                    .className("POTHOLE")
+                                    .confidence(b.getConfidence())
+                                    .x(b.getX())
+                                    .y(b.getY())
+                                    .width(b.getWidth())
+                                    .height(b.getHeight())
+                                    .build());
+                        } else {
+                            sanitizedBoxes.add(b);
+                        }
+                    }
+
                     // BƯỚC 3.1: LỌC Ổ GÀ ẢO TRONG BIỂN NƯỚC
-                    List<ImageTensorUtil.BoundingBox> nonFloodGhostBoxes = filterPotholesInFlood(nmsBoxes, origWidth, origHeight);
+                    List<ImageTensorUtil.BoundingBox> nonFloodGhostBoxes = filterPotholesInFlood(sanitizedBoxes, origWidth, origHeight);
 
                     // BƯỚC 3.2: KHỬ XUNG ĐỘT ĐA LỚP
                     List<ImageTensorUtil.BoundingBox> conflictResolvedBoxes = suppressCrossClassConflicts(nonFloodGhostBoxes);
@@ -171,8 +188,8 @@ public class AiInferenceService {
                     // BƯỚC 3.3: CHUẨN HÓA VẬT THỂ THEO BỐI CẢNH
                     List<ImageTensorUtil.BoundingBox> calibratedBoxes = calibratePlanAObjects(conflictResolvedBoxes, origWidth, origHeight);
 
-                    // BƯỚC 3.4: HỢP NHẤT DẢI NỨT CÙNG PHƯƠNG
-                    List<ImageTensorUtil.BoundingBox> mergedBoxes = mergeCollinearCracks(calibratedBoxes, origWidth, origHeight);
+                    // BƯỚC 3.4: HỢP NHẤT DẢI NỨT CÙNG PHƯƠNG & Ổ GÀ TRÙNG LẶP
+                    List<ImageTensorUtil.BoundingBox> mergedBoxes = mergeOverlappingPotholes(mergeCollinearCracks(calibratedBoxes, origWidth, origHeight));
 
                     // BƯỚC 3.5: THU GỌN KHUNG + LOẠI BOX RÁC
                     List<ImageTensorUtil.BoundingBox> tightenedBoxes = tightenAndFilterBoundingBoxes(image, mergedBoxes);
@@ -364,6 +381,10 @@ public class AiInferenceService {
                             if (bestConf < 0.35f && !isWaterCavity(subImg, lx, ly, lw, lh)) {
                                 continue;
                             }
+                            // Nếu là vũng nước lòng hốc trũng mặt đường (ổ gà ngập nước / vũng bùn)
+                            if (isWaterCavity(subImg, lx, ly, lw, lh)) {
+                                className = "POTHOLE";
+                            }
                         }
 
                         boxes.add(ImageTensorUtil.BoundingBox.builder()
@@ -486,7 +507,7 @@ public class AiInferenceService {
             int bh = Math.min(h - by, (maxCrackY - minCrackY) + padY * 2);
 
             double areaRatio = (double) ((long) bw * bh) / ((double) w * h);
-            if (areaRatio > 0.85 || (bw > w * 0.88 && bh > h * 0.80)) {
+            if (areaRatio > 0.96) {
                 log.debug("Bỏ qua dải truy vết quá lớn (areaRatio={})", String.format("%.2f", areaRatio));
                 return traced;
             }
@@ -1352,6 +1373,74 @@ public class AiInferenceService {
         return finalResult;
     }
 
+    private List<ImageTensorUtil.BoundingBox> mergeOverlappingPotholes(
+            List<ImageTensorUtil.BoundingBox> boxes) {
+        if (boxes == null || boxes.size() < 2) return boxes;
+
+        List<ImageTensorUtil.BoundingBox> nonPotholes = new ArrayList<>();
+        List<ImageTensorUtil.BoundingBox> potholes = new ArrayList<>();
+
+        for (ImageTensorUtil.BoundingBox b : boxes) {
+            if ("POTHOLE".equals(b.getClassName())) {
+                potholes.add(b);
+            } else {
+                nonPotholes.add(b);
+            }
+        }
+
+        if (potholes.size() < 2) return boxes;
+
+        boolean mergedAny = true;
+        while (mergedAny) {
+            mergedAny = false;
+            for (int i = 0; i < potholes.size(); i++) {
+                for (int j = i + 1; j < potholes.size(); j++) {
+                    ImageTensorUtil.BoundingBox a = potholes.get(i);
+                    ImageTensorUtil.BoundingBox b = potholes.get(j);
+
+                    int interX1 = Math.max(a.getX(), b.getX());
+                    int interY1 = Math.max(a.getY(), b.getY());
+                    int interX2 = Math.min(a.getX() + a.getWidth(), b.getX() + b.getWidth());
+                    int interY2 = Math.min(a.getY() + a.getHeight(), b.getY() + b.getHeight());
+                    float interArea = Math.max(0, interX2 - interX1) * Math.max(0, interY2 - interY1);
+
+                    float areaA = (float) a.getWidth() * a.getHeight();
+                    float areaB = (float) b.getWidth() * b.getHeight();
+                    float minArea = Math.min(areaA, areaB);
+
+                    if (interArea / minArea >= 0.35f || ImageTensorUtil.computeIoU(a, b) >= 0.20f) {
+                        int nx = Math.min(a.getX(), b.getX());
+                        int ny = Math.min(a.getY(), b.getY());
+                        int nr = Math.max(a.getX() + a.getWidth(), b.getX() + b.getWidth());
+                        int nb = Math.max(a.getY() + a.getHeight(), b.getY() + b.getHeight());
+                        float nConf = Math.max(a.getConfidence(), b.getConfidence());
+
+                        ImageTensorUtil.BoundingBox merged = ImageTensorUtil.BoundingBox.builder()
+                                .className("POTHOLE")
+                                .confidence(nConf)
+                                .x(nx)
+                                .y(ny)
+                                .width(nr - nx)
+                                .height(nb - ny)
+                                .build();
+
+                        potholes.remove(j);
+                        potholes.remove(i);
+                        potholes.add(merged);
+                        mergedAny = true;
+                        break;
+                    }
+                }
+                if (mergedAny) break;
+            }
+        }
+
+        List<ImageTensorUtil.BoundingBox> result = new ArrayList<>(nonPotholes);
+        result.addAll(potholes);
+        result.sort((a, b) -> Float.compare(b.getConfidence(), a.getConfidence()));
+        return result;
+    }
+
     private List<ImageTensorUtil.BoundingBox> tightenAndFilterBoundingBoxes(
             BufferedImage img, List<ImageTensorUtil.BoundingBox> boxes) {
         if (boxes == null || boxes.isEmpty() || img == null) return boxes;
@@ -1371,6 +1460,13 @@ public class AiInferenceService {
                     result.add(tightened);
                 } else {
                     result.add(b); // Giữ nguyên box gốc nếu không tìm thấy điểm co hẹp, không loại bỏ vết nứt
+                }
+            } else if ("POTHOLE".equals(b.getClassName())) {
+                ImageTensorUtil.BoundingBox tightened = tightenSinglePotholeBox(img, b);
+                if (tightened != null) {
+                    result.add(tightened);
+                } else {
+                    result.add(b);
                 }
             } else if ("ROAD_OBSTACLE".equals(b.getClassName())) {
                 ImageTensorUtil.BoundingBox tightened = tightenSingleObstacleBox(img, b);
@@ -1394,6 +1490,75 @@ public class AiInferenceService {
         }
 
         return result;
+    }
+
+    private ImageTensorUtil.BoundingBox tightenSinglePotholeBox(
+            BufferedImage img, ImageTensorUtil.BoundingBox b) {
+        if (img == null || b == null) return b;
+        int imgW = img.getWidth();
+        int imgH = img.getHeight();
+
+        int rx = Math.max(0, Math.min(b.getX(), imgW - 1));
+        int ry = Math.max(0, Math.min(b.getY(), imgH - 1));
+        int rw = Math.min(b.getWidth(), imgW - rx);
+        int rh = Math.min(b.getHeight(), imgH - ry);
+        if (rw <= 16 || rh <= 16) return b;
+
+        int minX = rx + rw, maxX = rx, minY = ry + rh, maxY = ry;
+        int cavityPixelCount = 0;
+        int step = Math.max(1, Math.min(rw, rh) / 30);
+
+        for (int py = ry; py < ry + rh; py += step) {
+            for (int px = rx; px < rx + rw; px += step) {
+                int rgb = img.getRGB(px, py);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int bVal = rgb & 0xFF;
+                int luma = (int) (0.299 * r + 0.587 * g + 0.114 * bVal);
+
+                boolean isNeutralDryAsphalt = (Math.abs(r - g) <= 15 && Math.abs(g - bVal) <= 15 && Math.abs(r - bVal) <= 15 && luma <= 215);
+                boolean isMirrorWater = !isNeutralDryAsphalt && (luma > 220 && Math.abs(r - bVal) < 25);
+                boolean isSkyBlueWater = (bVal > r + 15 && bVal > g + 8 && luma > 110);
+                boolean isMuddyWater = (r > bVal + 18 && g > bVal + 10 && luma >= 65 && luma <= 215);
+                boolean isDarkDepression = (luma < 65);
+
+                if (isMirrorWater || isSkyBlueWater || isMuddyWater || isDarkDepression) {
+                    cavityPixelCount++;
+                    if (px < minX) minX = px;
+                    if (px > maxX) maxX = px;
+                    if (py < minY) minY = py;
+                    if (py > maxY) maxY = py;
+                }
+            }
+        }
+
+        if (cavityPixelCount >= 8 && minX < maxX && minY < maxY) {
+            int detectedW = maxX - minX;
+            int detectedH = maxY - minY;
+
+            int padX = Math.max(4, (int) (detectedW * 0.08));
+            int padY = Math.max(4, (int) (detectedH * 0.08));
+
+            int tightX = Math.max(rx, minX - padX);
+            int tightY = Math.max(ry, minY - padY);
+            int tightRight = Math.min(rx + rw, maxX + padX);
+            int tightBottom = Math.min(ry + rh, maxY + padY);
+            int tightW = tightRight - tightX;
+            int tightH = tightBottom - tightY;
+
+            if (tightW >= 12 && tightH >= 10 && tightW <= rw && tightH <= rh) {
+                return ImageTensorUtil.BoundingBox.builder()
+                        .className("POTHOLE")
+                        .confidence(b.getConfidence())
+                        .x(tightX)
+                        .y(tightY)
+                        .width(tightW)
+                        .height(tightH)
+                        .build();
+            }
+        }
+
+        return b;
     }
 
     private ImageTensorUtil.BoundingBox tightenSingleObstacleBox(

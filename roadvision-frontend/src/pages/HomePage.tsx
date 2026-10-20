@@ -17,6 +17,8 @@ import {
   Activity,
   Droplets,
   Box,
+  Compass,
+  HardHat,
 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
@@ -76,13 +78,22 @@ export const HomePage: React.FC = () => {
             )}
 
             {user?.role === 'ROLE_STAFF' && (
-              <Link
-                to="/tasks"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-slate-100 text-slate-800 font-medium text-xs hover:bg-slate-200 transition-colors border border-slate-200"
-              >
-                <Wrench className="w-4 h-4 text-slate-600" />
-                <span>Nhiệm vụ kỹ thuật</span>
-              </Link>
+              <>
+                <Link
+                  to="/inspection-tasks"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-slate-100 text-slate-800 font-medium text-xs hover:bg-slate-200 transition-colors border border-slate-200"
+                >
+                  <Compass className="w-4 h-4 text-teal-600" />
+                  <span>Khảo sát hiện trường</span>
+                </Link>
+                <Link
+                  to="/construction-tasks"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-slate-100 text-slate-800 font-medium text-xs hover:bg-slate-200 transition-colors border border-slate-200"
+                >
+                  <HardHat className="w-4 h-4 text-amber-600" />
+                  <span>Thi công sửa chữa</span>
+                </Link>
+              </>
             )}
 
             {user?.role === 'ROLE_CITIZEN' && (
@@ -225,29 +236,31 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Quy trình xử lý sự cố 5 bước */}
+      {/* Quy trình quản lý bảo trì 7 giai đoạn chuẩn */}
       <section className="bg-white p-6 md:p-8 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-6">
         <div>
           <h2 className="text-base font-bold text-slate-900">
-            Quy trình phối hợp xử lý sự cố
+            Quy trình quản lý bảo trì đường bộ 7 giai đoạn chuẩn
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Quy trình tiêu chuẩn từ khâu tiếp nhận hiện trường đến nghiệm thu và đóng hồ sơ
+            Quy trình phối hợp khép kín từ tiếp nhận hiện trường, phân tích AI, khảo sát đo đạc đến nghiệm thu bàn giao
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           {[
-            { step: '01', title: 'Tiếp nhận phản ánh', desc: 'Ghi nhận ảnh hiện trường và tọa độ GPS định vị chính xác.' },
-            { step: '02', title: 'Phân tích tự động', desc: 'Hệ thống quét sơ bộ loại hư hại, tính toán vị trí và mức độ.' },
-            { step: '03', title: 'Thẩm định & Phân công', desc: 'Ban điều hành kiểm tra hồ sơ và giao việc cho đội duy tu.' },
-            { step: '04', title: 'Thi công khắc phục', desc: 'Đội bảo dưỡng xử lý tại chỗ và chụp ảnh nghiệm thu hoàn tất.' },
-            { step: '05', title: 'Nghiệm thu & Đóng hồ sơ', desc: 'Đánh giá chất lượng xử lý và cập nhật trạng thái trên bản đồ.' },
+            { step: '01', title: 'Gửi phản ánh', desc: 'Tiếp nhận ảnh hiện trường và tọa độ GPS định vị chính xác.' },
+            { step: '02', title: 'AI phân tích', desc: 'Mô hình RoadVision quét phát hiện hư hỏng tự động.' },
+            { step: '03', title: 'Phân loại', desc: 'Thẩm định hồ sơ, xác định tính hợp lệ và độ ưu tiên.' },
+            { step: '04', title: 'Khảo sát', desc: 'Tổ kỹ thuật đo đạc kích thước thực địa, đề xuất phương án.' },
+            { step: '05', title: 'Giao tổ đội', desc: 'Điều phối tổ thi công kèm vật tư và hạn hoàn thành.' },
+            { step: '06', title: 'Thi công', desc: 'Thực hiện sửa chữa, chụp ảnh hoàn thành và quét AI.' },
+            { step: '07', title: 'Nghiệm thu', desc: 'Đánh giá chất lượng xử lý, đối chiếu Trước/Sau và đóng hồ sơ.' },
           ].map((phase, idx) => (
-            <div key={idx} className="flex flex-col gap-2 p-4 rounded-md bg-slate-50 border border-slate-200">
+            <div key={idx} className="flex flex-col gap-2 p-3.5 rounded-md bg-slate-50 border border-slate-200">
               <span className="text-xs font-mono font-bold text-blue-600">{phase.step}</span>
               <h4 className="font-semibold text-xs text-slate-900">{phase.title}</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">{phase.desc}</p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">{phase.desc}</p>
             </div>
           ))}
         </div>

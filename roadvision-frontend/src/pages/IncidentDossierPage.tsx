@@ -10,7 +10,7 @@ import { ImageCanvasWithBBox } from '../components/ImageCanvasWithBBox';
 import { LeafletMap } from '../components/LeafletMap';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, CheckCircle2, Check, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Check, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock, Compass, HardHat, Camera, FileCheck } from 'lucide-react';
 
 export const IncidentDossierPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -163,8 +163,8 @@ export const IncidentDossierPage: React.FC = () => {
   const handleReworkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!incident) return;
-    if (!reworkInstructions.trim()) {
-      toast.warning('Vui lòng nhập chỉ đạo thi công bổ sung');
+    if (!reworkInstructions || reworkInstructions.trim().length < 10) {
+      toast.warning('Chỉ đạo yêu cầu thi công lại phải chi tiết tối thiểu 10 ký tự để tổ đội khắc phục!');
       return;
     }
 
@@ -238,7 +238,7 @@ export const IncidentDossierPage: React.FC = () => {
           <span>Quay lại danh sách sự cố</span>
         </Link>
         <span className="font-mono text-xs text-slate-500">
-          Mã phản ánh: #{incident.ticketCode}
+          Mã phản ánh: {incident.ticketCode?.startsWith('#') ? incident.ticketCode : `#${incident.ticketCode}`}
         </span>
       </div>
 
@@ -267,7 +267,7 @@ export const IncidentDossierPage: React.FC = () => {
               <span>Xác nhận hợp lệ (VERIFIED)</span>
             </button>
           )}
-          {user?.role === 'ROLE_ADMIN' && incident.status === 'PENDING_INSPECTION' && (
+          {user?.role === 'ROLE_ADMIN' && (incident.status === 'PENDING_ACCEPTANCE' || incident.status === 'PENDING_INSPECTION') && (
             <button
               onClick={handleApproveInspection}
               className="px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
@@ -276,15 +276,18 @@ export const IncidentDossierPage: React.FC = () => {
               <span>Duyệt nghiệm thu (RESOLVED)</span>
             </button>
           )}
-          <button
-            onClick={handleUpvote}
-            disabled={isUpvoting || incident.status === 'RESOLVED' || incident.status === 'CLOSED'}
-            className="px-3.5 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium text-xs flex items-center gap-1.5 transition-colors disabled:opacity-60 shadow-xs"
-            title="Bấm đồng tình để tăng cấp độ khẩn cấp xử lý"
-          >
-            <ThumbsUp className="w-3.5 h-3.5" />
-            <span>{incident.upvoteCount || 1} Đồng tình</span>
-          </button>
+          {/* Nút Đồng tình chỉ hiển thị cho người dân (ROLE_CITIZEN) hoặc khách vãng lai, ẩn hoàn toàn đối với Quản trị viên và Kỹ thuật viên */}
+          {user?.role !== 'ROLE_ADMIN' && user?.role !== 'ROLE_STAFF' && (
+            <button
+              onClick={handleUpvote}
+              disabled={isUpvoting || incident.status === 'RESOLVED' || incident.status === 'CLOSED'}
+              className="px-3.5 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium text-xs flex items-center gap-1.5 transition-colors disabled:opacity-60 shadow-xs cursor-pointer"
+              title="Bấm đồng tình để tăng cấp độ khẩn cấp xử lý"
+            >
+              <ThumbsUp className="w-3.5 h-3.5" />
+              <span>{incident.upvoteCount || 1} Đồng tình</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -417,7 +420,7 @@ export const IncidentDossierPage: React.FC = () => {
                     <AlertTriangle className="w-4 h-4 text-rose-600" />
                     <span>Hồ sơ tái thi công: Đối chiếu hiện trạng gốc và lần sửa chưa đạt</span>
                   </div>
-                  {incident.reworkCount && (
+                  {Boolean(incident.reworkCount && incident.reworkCount > 0) && (
                     <span className="text-[11px] font-mono text-rose-700 font-medium bg-rose-100 px-2 py-0.5 rounded border border-rose-200">
                       Tái thi công lần #{incident.reworkCount}
                     </span>
@@ -555,7 +558,7 @@ export const IncidentDossierPage: React.FC = () => {
                 {incident.reworkReason && (
                   <div className="p-2.5 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs">
                     <strong>Đang thi công lại theo chỉ đạo:</strong> "{incident.reworkReason}"
-                    {incident.reworkCount && (
+                    {Boolean(incident.reworkCount && incident.reworkCount > 0) && (
                       <span className="ml-2 font-mono text-[10px] font-medium px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 border border-rose-200">
                         Lần {incident.reworkCount}
                       </span>
@@ -572,7 +575,7 @@ export const IncidentDossierPage: React.FC = () => {
         )}
 
         {/* Người dân (Citizen) & Quản trị viên đối chiếu ảnh Trước/Sau & Đóng sự cố hoặc Khiếu nại */}
-        {['PENDING_INSPECTION', 'RESOLVED', 'CLOSED'].includes(incident.status) && incident.resolution && (
+        {['PENDING_INSPECTION', 'PENDING_ACCEPTANCE', 'RESOLVED', 'CLOSED'].includes(incident.status) && incident.resolution && (
           <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
             {incident.status === 'PENDING_INSPECTION' && (
               <div className="p-3.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-950 flex items-start gap-2.5">
@@ -843,15 +846,24 @@ export const IncidentDossierPage: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-slate-700 mb-1">
-                            Chỉ đạo thi công khắc phục cho kỹ thuật viên:
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-medium text-slate-700">
+                              Chỉ đạo thi công khắc phục cho kỹ thuật viên: *
+                            </label>
+                            <span className={`text-[10px] font-mono ${reworkInstructions.trim().length >= 10 ? 'text-emerald-600 font-semibold' : 'text-rose-500'}`}>
+                              {reworkInstructions.trim().length}/10 ký tự tối thiểu
+                            </span>
+                          </div>
                           <textarea
                             rows={2}
                             value={reworkInstructions}
                             onChange={(e) => setReworkInstructions(e.target.value)}
                             placeholder="Mô tả cụ thể các điểm chưa đạt cần xử lý lại dứt điểm..."
-                            className="w-full px-3 py-2 text-xs rounded-md bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-blue-600"
+                            className={`w-full px-3 py-2 text-xs rounded-md bg-white border text-slate-900 focus:outline-none ${
+                              reworkInstructions.trim().length > 0 && reworkInstructions.trim().length < 10
+                                ? 'border-rose-400 focus:border-rose-500'
+                                : 'border-slate-300 focus:border-blue-600'
+                            }`}
                           />
                         </div>
 

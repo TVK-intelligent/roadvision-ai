@@ -69,7 +69,7 @@ export const AdminAnalyticsPage: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `roadcare_incidents_export_${new Date().toISOString().slice(0, 10)}.geojson`;
+      link.download = `roadvision_incidents_export_${new Date().toISOString().slice(0, 10)}.geojson`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -603,7 +603,7 @@ export const AdminAnalyticsPage: React.FC = () => {
                     data.urgentIncidents.map((inc) => (
                       <tr key={inc.id} className="hover:bg-surface-container-low/50 transition-colors">
                         <td className="py-3 px-3 font-mono font-bold text-primary">
-                          #{inc.ticketCode}
+                          {inc.ticketCode?.startsWith('#') ? inc.ticketCode : `#${inc.ticketCode}`}
                         </td>
                         <td className="py-3 px-3 font-medium text-on-surface max-w-[200px] truncate" title={inc.address}>
                           {inc.address || 'Hà Nam'}

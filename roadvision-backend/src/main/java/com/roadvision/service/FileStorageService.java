@@ -50,7 +50,9 @@ public class FileStorageService {
         String generatedFilename = UUID.randomUUID() + extension;
 
         try {
-            Path targetLocation = this.uploadLocation.resolve(subFolder).resolve(generatedFilename);
+            Path targetFolder = this.uploadLocation.resolve(subFolder);
+            Files.createDirectories(targetFolder);
+            Path targetLocation = targetFolder.resolve(generatedFilename);
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, targetLocation, StandardCopyOption.REPLACE_EXISTING);
             }

@@ -53,6 +53,9 @@ public class IncidentController {
             @RequestParam("image") MultipartFile image,
             @RequestParam("latitude") BigDecimal latitude,
             @RequestParam("longitude") BigDecimal longitude,
+            @RequestParam(value = "originalLatitude", required = false) BigDecimal originalLatitude,
+            @RequestParam(value = "originalLongitude", required = false) BigDecimal originalLongitude,
+            @RequestParam(value = "gpsAccuracy", required = false) Double gpsAccuracy,
             @RequestParam(value = "title", required = false) String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "address", required = false) String address,
@@ -91,6 +94,9 @@ public class IncidentController {
                 .description(description)
                 .latitude(latitude)
                 .longitude(longitude)
+                .originalLatitude(originalLatitude != null ? originalLatitude : latitude)
+                .originalLongitude(originalLongitude != null ? originalLongitude : longitude)
+                .gpsAccuracy(gpsAccuracy)
                 .address(address)
                 .category(effectiveCategory)
                 .categories(parsedCategories)
@@ -478,13 +484,123 @@ public class IncidentController {
      * PHA 1.9: Đồng tình với sự cố đã có (+1 Upvote)
      */
     @PostMapping("/{id}/upvote")
-    @PreAuthorize("hasAnyRole('CITIZEN', 'ADMIN', 'STAFF')")
-    @Operation(summary = "Pha 1.9: Người dùng bấm đồng tình (+1 Upvote) với sự cố đã được báo cáo")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Pha 1.9: Người dân bấm đồng tình (+1 Upvote) với sự cố đã được báo cáo")
     public ResponseEntity<IncidentResponse> upvoteIncident(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable("id") Long id) {
         Long userId = getUserIdFromHeader(authHeader);
         return ResponseEntity.ok(incidentService.upvoteIncident(id, userId));
+    }
+
+    // =========================================================================
+    // CÁC ENDPOINT CHO LUỒNG 7 GIAI ĐOẠN ĐỒ ÁN ROADVISION
+    // =========================================================================
+
+    @PostMapping("/{id}/assign-inspection")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Giai đoạn 3 & 4: Admin giao nhiệm vụ khảo sát hiện trường cho Tổ Khảo sát")
+    public ResponseEntity<IncidentResponse> assignInspection(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @Valid @RequestBody InspectionAssignRequest request) {
+        Long adminId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.assignInspection(id, request, adminId));
+    }
+
+    @PostMapping("/{id}/start-inspection")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @Operation(summary = "Giai đoạn 4: Nhân viên khảo sát xác nhận đã đến vị trí và bắt đầu khảo sát")
+    public ResponseEntity<IncidentResponse> startInspection(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id) {
+        Long staffId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.startInspecting(id, staffId));
+    }
+
+    @PostMapping(value = "/{id}/inspection-report", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @Operation(summary = "Giai đoạn 4: Nhân viên gửi báo cáo khảo sát hiện trường, ảnh hiện trạng, đo đạc & phương án")
+    public ResponseEntity<IncidentResponse> submitInspectionReport(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @Valid @RequestPart("data") InspectionReportRequest request,
+            @RequestPart(value = "photos", required = false) List<MultipartFile> photos) {
+        Long staffId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.submitInspectionReport(id, request, photos, staffId));
+    }
+
+    @PostMapping("/{id}/assign-construction")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Giai đoạn 5: Admin giao nhiệm vụ thi công cho Tổ Thi công chuyên trách")
+    public ResponseEntity<IncidentResponse> assignConstruction(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @Valid @RequestBody ConstructionAssignRequest request) {
+        Long adminId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.assignConstruction(id, request, adminId));
+    }
+
+    @PostMapping("/{id}/start-construction")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @Operation(summary = "Giai đoạn 6: Tổ đội bắt đầu triển khai thi công tại hiện trường (IN_PROGRESS)")
+    public ResponseEntity<IncidentResponse> startConstruction(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id) {
+        Long staffId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.startConstruction(id, staffId));
+    }
+
+    @PostMapping(value = "/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @Operation(summary = "Giai đoạn 6: Tổ đội tải lên bằng chứng theo giai đoạn (BEFORE_WORK, PROGRESS, AFTER_WORK, REWORK)")
+    public ResponseEntity<EvidenceResponse> uploadEvidence(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @RequestParam("stage") com.roadvision.enums.EvidenceStage stage,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "notes", required = false) String notes,
+            @RequestParam(value = "latitude", required = false) BigDecimal latitude,
+            @RequestParam(value = "longitude", required = false) BigDecimal longitude) {
+        Long staffId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.uploadEvidence(id, stage, file, notes, latitude, longitude, staffId));
+    }
+
+    @PostMapping(value = "/{id}/submit-acceptance", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @Operation(summary = "Giai đoạn 6: Tổ đội nộp ảnh hoàn thành & báo cáo nghiệm thu có AI quét (PENDING_ACCEPTANCE)")
+    public ResponseEntity<IncidentResponse> submitAcceptanceMultipart(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "notes", required = false) String notes,
+            @RequestParam(value = "latitude", required = false) BigDecimal latitude,
+            @RequestParam(value = "longitude", required = false) BigDecimal longitude) {
+        Long staffId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.submitForAcceptance(id, file, notes, latitude, longitude, staffId));
+    }
+
+    @PostMapping(value = "/{id}/submit-acceptance")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @Operation(summary = "Giai đoạn 6: Tổ đội hoàn tất thi công và gửi hồ sơ chờ Admin nghiệm thu (PENDING_ACCEPTANCE)")
+    public ResponseEntity<IncidentResponse> submitAcceptance(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        Long staffId = getUserIdFromHeader(authHeader);
+        String notes = body != null ? body.get("notes") : null;
+        return ResponseEntity.ok(incidentService.submitForAcceptance(id, notes, staffId));
+    }
+
+    @PostMapping("/{id}/review-acceptance")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Giai đoạn 7: Admin thẩm định nghiệm thu (Đạt -> CLOSED, Không đạt -> REWORK_REQUIRED)")
+    public ResponseEntity<IncidentResponse> reviewAcceptance(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @Valid @RequestBody AcceptanceReviewRequest request) {
+        Long adminId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.reviewAcceptance(id, request, adminId));
     }
 
     private Long getUserIdFromHeader(String authHeader) {

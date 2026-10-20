@@ -1,6 +1,6 @@
 import React from 'react';
 import { IncidentStatus } from '../types';
-import { Check, Layers, UserCheck, Hammer, CheckCircle2, AlertTriangle, XCircle, ShieldCheck, FileCheck, Archive } from 'lucide-react';
+import { Check, Layers, UserCheck, Hammer, CheckCircle2, AlertTriangle, XCircle, ShieldCheck, FileCheck, Archive, Compass, RefreshCw } from 'lucide-react';
 
 interface TimelineProps {
   status: IncidentStatus;
@@ -21,63 +21,65 @@ const STEPS: StepDef[] = [
   {
     key: 'SUBMITTED',
     stepNum: 1,
-    label: 'Tiếp nhận',
+    label: '1. Gửi phản ánh',
     subLabel: () => 'Đã tiếp nhận',
     icon: <Check className="w-3.5 h-3.5" />,
   },
   {
     key: 'AI_ANALYZED',
     stepNum: 2,
-    label: 'AI phân tích',
-    subLabel: () => 'YOLO đề xuất',
+    label: '2. AI phân tích',
+    subLabel: () => 'RoadVision AI',
     icon: <Layers className="w-3.5 h-3.5" />,
   },
   {
     key: 'VERIFIED',
     stepNum: 3,
-    label: 'Thẩm định',
-    subLabel: () => 'Xác nhận hợp lệ',
+    label: '3. Phân loại',
+    subLabel: () => 'Duyệt đầu vào',
     icon: <FileCheck className="w-3.5 h-3.5" />,
   },
   {
-    key: 'ASSIGNED',
+    key: 'INSPECTION',
     stepNum: 4,
-    label: 'Phân công',
-    subLabel: () => 'Đã giao thợ',
+    label: '4. Khảo sát',
+    subLabel: (status) => {
+      if (status === 'INSPECTION_ASSIGNED') return 'Đã giao khảo sát';
+      if (status === 'INSPECTING') return 'Đang đo đạc';
+      if (status === 'INSPECTED') return 'Đã có báo cáo';
+      return 'Khảo sát thực địa';
+    },
+    icon: <Compass className="w-3.5 h-3.5" />,
+  },
+  {
+    key: 'ASSIGNED',
+    stepNum: 5,
+    label: '5. Giao tổ đội',
+    subLabel: () => 'Tổ thi công',
     icon: <UserCheck className="w-3.5 h-3.5" />,
   },
   {
     key: 'IN_PROGRESS',
-    stepNum: 5,
-    label: 'Thi công',
-    subLabel: (_, isRework, reworkCount) => {
-      if (isRework) {
-        return reworkCount ? `Tái thi công (#${reworkCount})` : 'Tái thi công';
-      }
+    stepNum: 6,
+    label: '6. Thi công',
+    subLabel: (status, isRework, reworkCount) => {
+      if (status === 'REWORK_REQUIRED') return 'Yêu cầu làm lại';
+      if (status === 'PENDING_ACCEPTANCE' || status === 'PENDING_INSPECTION') return 'Chờ nghiệm thu';
+      if (isRework) return reworkCount ? `Thi công lại (#${reworkCount})` : 'Thi công lại';
       return 'Đang thi công';
     },
     icon: <Hammer className="w-3.5 h-3.5" />,
   },
   {
-    key: 'PENDING_INSPECTION',
-    stepNum: 6,
-    label: 'Nghiệm thu',
-    subLabel: (status) => (status === 'PENDING_INSPECTION' ? 'Đang kiểm tra' : 'Đã nộp ảnh'),
-    icon: <ShieldCheck className="w-3.5 h-3.5" />,
-  },
-  {
-    key: 'RESOLVED',
-    stepNum: 7,
-    label: 'Hoàn thành',
-    subLabel: () => 'Đạt chuẩn',
-    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-  },
-  {
     key: 'CLOSED',
-    stepNum: 8,
-    label: 'Đóng hồ sơ',
-    subLabel: () => 'Đã lưu trữ',
-    icon: <Archive className="w-3.5 h-3.5" />,
+    stepNum: 7,
+    label: '7. Nghiệm thu',
+    subLabel: (status) => {
+      if (status === 'CLOSED') return 'Nghiệm thu đạt';
+      if (status === 'REWORK_REQUIRED') return 'Chưa đạt yêu cầu';
+      return 'Đối chiếu bằng chứng';
+    },
+    icon: <ShieldCheck className="w-3.5 h-3.5" />,
   },
 ];
 
@@ -90,16 +92,21 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
         return 1;
       case 'VERIFIED':
         return 2;
-      case 'ASSIGNED':
+      case 'INSPECTION_ASSIGNED':
+      case 'INSPECTING':
+      case 'INSPECTED':
         return 3;
-      case 'IN_PROGRESS':
+      case 'ASSIGNED':
         return 4;
+      case 'IN_PROGRESS':
       case 'PENDING_INSPECTION':
+      case 'PENDING_ACCEPTANCE':
+        return 5;
+      case 'REWORK_REQUIRED':
         return 5;
       case 'RESOLVED':
-        return 6;
       case 'CLOSED':
-        return 7;
+        return 6;
       case 'REJECTED':
         return 0;
       default:
@@ -132,11 +139,16 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-700">
-            Tiến độ xử lý 8 giai đoạn chuẩn
+            Quy trình Quản lý Bảo trì 7 Giai đoạn Chuẩn
           </span>
           {isDisputed && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-medium border border-rose-200">
               <AlertTriangle className="w-3 h-3" /> Đang khiếu nại
+            </span>
+          )}
+          {status === 'REWORK_REQUIRED' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-800 text-[11px] font-medium border border-rose-300">
+              <RefreshCw className="w-3 h-3 animate-spin" /> Yêu cầu thi công lại {reworkCount ? `(Lần #${reworkCount})` : ''}
             </span>
           )}
           {isRework && status === 'IN_PROGRESS' && (
@@ -146,15 +158,15 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
           )}
         </div>
         <span className="font-mono text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-          Giai đoạn {currentIndex + 1} / 8
+          Giai đoạn {currentIndex + 1} / 7
         </span>
       </div>
 
-      {/* Dải Stepper 8 bước với đường nối */}
+      {/* Dải Stepper 7 bước với đường nối */}
       <div className="relative">
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+        <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
           {STEPS.map((step, idx) => {
-            const isCompleted = idx < currentIndex || (idx === 7 && status === 'CLOSED');
+            const isCompleted = idx < currentIndex || (idx === 6 && status === 'CLOSED');
             const isCurrent = idx === currentIndex;
 
             return (

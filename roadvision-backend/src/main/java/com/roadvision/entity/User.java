@@ -56,6 +56,18 @@ public class User {
     @Column(name = "suspend_reason", length = 255)
     private String suspendReason;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"members", "leader", "hibernateLazyInitializer"})
+    private Team team;
+
+    @Column(name = "is_team_leader")
+    @Builder.Default
+    private Boolean isTeamLeader = false;
+
+    @Column(name = "specialization", length = 150)
+    private String specialization;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -67,7 +79,7 @@ public class User {
     public User() {
     }
 
-    public User(Long id, String email, String password, String fullName, String phone, Role role, String avatarUrl, Boolean isActive, Integer reputationScore, Integer spamStrikes, LocalDateTime suspendedUntil, String suspendReason, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public User(Long id, String email, String password, String fullName, String phone, Role role, String avatarUrl, Boolean isActive, Integer reputationScore, Integer spamStrikes, LocalDateTime suspendedUntil, String suspendReason, Team team, Boolean isTeamLeader, String specialization, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.email = email;
         this.password = password;
@@ -80,7 +92,14 @@ public class User {
         this.spamStrikes = spamStrikes != null ? spamStrikes : 0;
         this.suspendedUntil = suspendedUntil;
         this.suspendReason = suspendReason;
+        this.team = team;
+        this.isTeamLeader = isTeamLeader != null ? isTeamLeader : false;
+        this.specialization = specialization;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+    }
+
+    public User(Long id, String email, String password, String fullName, String phone, Role role, String avatarUrl, Boolean isActive, Integer reputationScore, Integer spamStrikes, LocalDateTime suspendedUntil, String suspendReason, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this(id, email, password, fullName, phone, role, avatarUrl, isActive, reputationScore, spamStrikes, suspendedUntil, suspendReason, null, false, null, createdAt, updatedAt);
     }
 }

@@ -12,4 +12,4 @@ names:
   0: POTHOLE        # Ổ gà / Hố sụt mặt đường
   1: ROAD_CRACK     # Vết nứt mặt đường
   2: ROAD_FLOODING  # Điểm ngập úng mặt đường
-  3: ROAD_OBSTACLE  # Vật cản, chướng ngại vật (Cây đổ / cành cây chắn đường - tree fallen, thùng xốp, rào chắn, cọc tiêu, sọt rác, chậu cây lấn chiếm)
+  3: ROAD_OBSTACLE  # Vật cản, chướng ngại vật (Cây đổ - tree fallen, lốp xe - tire debris, đá rơi - rock debris, thùng xốp, sọt nhựa, rào chắn, cọc tiêu, sọt rác, chậu cây lấn chiếm)

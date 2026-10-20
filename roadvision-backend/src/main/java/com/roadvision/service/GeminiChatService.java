@@ -168,13 +168,19 @@ public class GeminiChatService {
         return switch (status) {
             case SUBMITTED -> "Mới gửi (Chờ AI xác thực)";
             case AI_ANALYZED -> "AI Đã phân tích (Chờ điều phối)";
-            case VERIFIED -> "Đã nghiệm thu đạt chuẩn";
-            case ASSIGNED -> "Đã phân công Đội cơ động";
+            case VERIFIED -> "Đã xác minh hợp lệ";
+            case INSPECTION_ASSIGNED -> "Đã giao tổ khảo sát hiện trường";
+            case INSPECTING -> "Đang khảo sát thực địa";
+            case INSPECTED -> "Đã có báo cáo khảo sát & phương án";
+            case ASSIGNED -> "Đã giao việc cho Tổ thi công";
             case IN_PROGRESS -> "Đang thi công khắc phục";
             case PENDING_INSPECTION -> "Chờ kiểm tra nghiệm thu";
+            case PENDING_ACCEPTANCE -> "Hoàn tất thi công (Chờ nghiệm thu)";
             case RESOLVED -> "Đã khắc phục hoàn tất";
-            case CLOSED -> "Đã đóng hồ sơ";
+            case REWORK_REQUIRED -> "Nghiệm thu không đạt (Yêu cầu làm lại)";
+            case CLOSED -> "Đã nghiệm thu đạt chuẩn & đóng hồ sơ";
             case REJECTED -> "Từ chối tiếp nhận";
+            default -> status.name();
         };
     }
 

@@ -32,8 +32,28 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
 
     Page<Incident> findByCitizenId(Long citizenId, Pageable pageable);
 
-    @Query("SELECT i FROM Incident i JOIN i.assignment a WHERE a.assignedToStaff.id = :staffId")
+    @Query("SELECT DISTINCT i FROM Incident i " +
+           "LEFT JOIN i.assignment a " +
+           "LEFT JOIN i.inspection insp " +
+           "LEFT JOIN i.inspectionTeam it " +
+           "LEFT JOIN i.assignedTeam at " +
+           "WHERE a.assignedToStaff.id = :staffId " +
+           "   OR insp.inspector.id = :staffId " +
+           "   OR (it.id IS NOT NULL AND it.id = (SELECT u.team.id FROM User u WHERE u.id = :staffId)) " +
+           "   OR (at.id IS NOT NULL AND at.id = (SELECT u.team.id FROM User u WHERE u.id = :staffId))")
     Page<Incident> findByAssignedStaffId(@Param("staffId") Long staffId, Pageable pageable);
+
+    @Query("SELECT COUNT(DISTINCT i) FROM Incident i " +
+           "LEFT JOIN i.assignment a " +
+           "LEFT JOIN i.inspection insp " +
+           "LEFT JOIN i.inspectionTeam it " +
+           "LEFT JOIN i.assignedTeam at " +
+           "WHERE (a.assignedToStaff.id = :staffId " +
+           "       OR insp.inspector.id = :staffId " +
+           "       OR (it.id IS NOT NULL AND it.id = (SELECT u.team.id FROM User u WHERE u.id = :staffId)) " +
+           "       OR (at.id IS NOT NULL AND at.id = (SELECT u.team.id FROM User u WHERE u.id = :staffId))) " +
+           "  AND i.status IN ('INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED')")
+    long countActiveTasksByStaffId(@Param("staffId") Long staffId);
 
     Page<Incident> findByStatus(IncidentStatus status, Pageable pageable);
 

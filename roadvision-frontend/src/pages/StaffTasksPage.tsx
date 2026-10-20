@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
-import { Incident, IncidentStatus } from '../types';
+import { Incident, IncidentStatus, Category, Severity, EvidenceStage } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { Pagination } from '../components/Pagination';
 import { useToast } from '../components/Toast';
@@ -16,6 +16,12 @@ import {
   FileCheck,
   MapPin,
   X,
+  Compass,
+  HardHat,
+  Camera,
+  Layers,
+  Send,
+  Navigation,
 } from 'lucide-react';
 
 export const StaffTasksPage: React.FC = () => {
@@ -30,12 +36,32 @@ export const StaffTasksPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(0);
   const [totalElements, setTotalElements] = useState<number>(0);
 
-  // Modal nộp nghiệm thu
-  const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
-  const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proofNotes, setProofNotes] = useState<string>('');
-  const [isSubmittingProof, setIsSubmittingProof] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Modal Báo cáo khảo sát hiện trường (Giai đoạn 4)
+  const [selectedSurveyTask, setSelectedSurveyTask] = useState<Incident | null>(null);
+  const [surveyLatitude, setSurveyLatitude] = useState<number>(21.0285);
+  const [surveyLongitude, setSurveyLongitude] = useState<number>(105.8542);
+  const [confirmedCategory, setConfirmedCategory] = useState<Category>('POTHOLE');
+  const [actualSeverity, setActualSeverity] = useState<Severity>('HIGH');
+  const [estimatedLengthM, setEstimatedLengthM] = useState<number>(1.2);
+  const [estimatedWidthM, setEstimatedWidthM] = useState<number>(0.8);
+  const [estimatedDepthCm, setEstimatedDepthCm] = useState<number>(6.0);
+  const [trafficImpact, setTrafficImpact] = useState<string>('HIGH');
+  const [proposedSolution, setProposedSolution] = useState<string>('Cào bóc 4cm, thảm bù BTN C12.5 đầm lèn K98');
+  const [surveyNotes, setSurveyNotes] = useState<string>('Mặt đường lún võng nguy hiểm cho xe máy');
+  const [surveyPhotos, setSurveyPhotos] = useState<File[]>([]);
+  const [isSubmittingSurvey, setIsSubmittingSurvey] = useState<boolean>(false);
+
+  // Modal Tải ảnh bằng chứng thi công (Giai đoạn 6)
+  const [selectedEvidenceTask, setSelectedEvidenceTask] = useState<Incident | null>(null);
+  const [evidenceStage, setEvidenceStage] = useState<EvidenceStage>('BEFORE_WORK');
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [evidenceNotes, setEvidenceNotes] = useState<string>('');
+  const [isSubmittingEvidence, setIsSubmittingEvidence] = useState<boolean>(false);
+
+  // Modal Nộp xin nghiệm thu (Giai đoạn 6c)
+  const [selectedAcceptanceTask, setSelectedAcceptanceTask] = useState<Incident | null>(null);
+  const [acceptanceNotes, setAcceptanceNotes] = useState<string>('Đã thi công xong theo đúng hồ sơ thiết kế và đạt chuẩn độ bằng phẳng');
+  const [isSubmittingAcceptance, setIsSubmittingAcceptance] = useState<boolean>(false);
 
   const fetchTasks = (targetPage = page, targetSize = pageSize) => {
     setLoading(true);
@@ -58,66 +84,146 @@ export const StaffTasksPage: React.FC = () => {
     fetchTasks(page, pageSize);
   }, [page, pageSize]);
 
-  const handleStartWork = async (taskId: number) => {
+  // Giai đoạn 4: Bắt đầu khảo sát
+  const handleStartInspection = async (taskId: number) => {
     try {
-      await incidentApi.updateStatus(taskId, 'IN_PROGRESS');
-      toast.info('Đã chuyển trạng thái sang Đang thi công!', 'Bắt đầu xử lý');
+      await incidentApi.startInspection(taskId);
+      toast.info('Đã xác nhận có mặt tại hiện trường và bắt đầu khảo sát!', 'Bắt đầu khảo sát');
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: 'INSPECTING' as IncidentStatus } : t))
+      );
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể bắt đầu khảo sát', 'Lỗi');
+    }
+  };
+
+  // Giai đoạn 4: Mở modal nộp báo cáo khảo sát
+  const handleOpenSurveyModal = (task: Incident) => {
+    setSelectedSurveyTask(task);
+    setSurveyLatitude(task.latitude || 21.0285);
+    setSurveyLongitude(task.longitude || 105.8542);
+    setConfirmedCategory(task.category || 'POTHOLE');
+    setActualSeverity(task.severity || 'HIGH');
+    setSurveyPhotos([]);
+  };
+
+  const handleGetLiveLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setSurveyLatitude(pos.coords.latitude);
+          setSurveyLongitude(pos.coords.longitude);
+          toast.success('Đã lấy tọa độ GPS chính xác từ thiết bị!', 'Định vị GPS');
+        },
+        () => {
+          toast.warning('Không thể truy cập GPS từ trình duyệt.');
+        }
+      );
+    }
+  };
+
+  // Giai đoạn 4: Submit báo cáo khảo sát
+  const handleSubmitSurvey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSurveyTask) return;
+
+    setIsSubmittingSurvey(true);
+    try {
+      const dataPayload = {
+        actualLatitude: surveyLatitude,
+        actualLongitude: surveyLongitude,
+        confirmedCategory,
+        actualSeverity,
+        estimatedLengthM,
+        estimatedWidthM,
+        estimatedDepthCm,
+        trafficImpact,
+        proposedSolution,
+        notes: surveyNotes,
+      };
+
+      const fd = new FormData();
+      fd.append('data', new Blob([JSON.stringify(dataPayload)], { type: 'application/json' }));
+      surveyPhotos.forEach((file) => {
+        fd.append('photos', file);
+      });
+
+      await incidentApi.submitInspectionReport(selectedSurveyTask.id, fd);
+      toast.success('Đã nộp biên bản khảo sát hiện trường thành công! Hồ sơ chuyển sang Admin duyệt thi công.', 'Hoàn tất khảo sát');
+      fetchTasks(page, pageSize);
+      setSelectedSurveyTask(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể gửi báo cáo khảo sát', 'Lỗi');
+    } finally {
+      setIsSubmittingSurvey(false);
+    }
+  };
+
+  // Giai đoạn 6: Bắt đầu thi công
+  const handleStartConstruction = async (taskId: number) => {
+    try {
+      await incidentApi.startConstruction(taskId);
+      toast.info('Đã bắt đầu triển khai thi công tại hiện trường!', 'Bắt đầu thi công');
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, status: 'IN_PROGRESS' as IncidentStatus } : t))
       );
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || 'Không thể cập nhật trạng thái', 'Lỗi');
+      toast.error(err.response?.data?.message || 'Không thể bắt đầu thi công', 'Lỗi');
     }
   };
 
-  const handleResolveSubmit = async (e: React.FormEvent) => {
+  // Giai đoạn 6b: Submit ảnh bằng chứng
+  const handleSubmitEvidence = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTask || !proofFile) {
-      toast.warning('Vui lòng chọn ảnh chụp hiện trường đã sửa chữa');
-      setErrorMessage('Vui lòng chọn ảnh chụp hiện trường đã sửa chữa');
+    if (!selectedEvidenceTask || !evidenceFile) {
+      toast.warning('Vui lòng chọn ảnh chụp hiện trường');
       return;
     }
 
-    setIsSubmittingProof(true);
-    setErrorMessage(null);
-
-    const formData = new FormData();
-    formData.append('proofImage', proofFile);
-    formData.append('notes', proofNotes);
-
+    setIsSubmittingEvidence(true);
     try {
-      const res = await incidentApi.resolveIncident(selectedTask.id, formData);
-      const updated = res.data;
-      if (updated.resolution?.aiVerificationStatus === 'AI_VERIFIED_CLEAN') {
-        toast.success(
-          `AI đã đối chiếu đạt chuẩn! Hồ sơ đã chuyển sang Chờ Ban Quản trị duyệt nghiệm thu.`,
-          'Đã nộp nghiệm thu'
-        );
-      } else if (updated.resolution?.aiVerificationStatus === 'AI_WARNING_DEFECT_REMAINS') {
-        toast.warning(
-          (updated.resolution.aiVerificationNotes || 'Cảnh báo: Phát hiện dấu hiệu hư hỏng còn sót lại!') + ' (Đang chờ Ban Quản trị xem xét)',
-          'Cảnh báo kiểm định AI'
-        );
-      } else {
-        toast.success(`Đã nộp báo cáo nghiệm thu cho sự cố #${selectedTask.ticketCode}! Chờ Ban Quản trị phê duyệt.`, 'Thành công');
-      }
+      const fd = new FormData();
+      fd.append('stage', evidenceStage);
+      fd.append('file', evidenceFile);
+      if (evidenceNotes) fd.append('notes', evidenceNotes);
+      if (selectedEvidenceTask.latitude) fd.append('latitude', selectedEvidenceTask.latitude.toString());
+      if (selectedEvidenceTask.longitude) fd.append('longitude', selectedEvidenceTask.longitude.toString());
 
-      fetchTasks(page, pageSize);
-      setSelectedTask(null);
-      setProofFile(null);
+      await incidentApi.uploadEvidence(selectedEvidenceTask.id, fd);
+      toast.success(`Đã tải lên bằng chứng giai đoạn [${evidenceStage}]!`, 'Tải lên thành công');
+      setSelectedEvidenceTask(null);
+      setEvidenceFile(null);
+      setEvidenceNotes('');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Không thể gửi báo cáo nghiệm thu', 'Lỗi');
-      setErrorMessage(err.response?.data?.message || 'Có lỗi xảy ra khi nộp hồ sơ');
+      toast.error(err.response?.data?.message || 'Không thể tải lên ảnh bằng chứng', 'Lỗi');
     } finally {
-      setIsSubmittingProof(false);
+      setIsSubmittingEvidence(false);
+    }
+  };
+
+  // Giai đoạn 6c: Xin nghiệm thu
+  const handleSubmitAcceptance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAcceptanceTask) return;
+
+    setIsSubmittingAcceptance(true);
+    try {
+      await incidentApi.submitAcceptance(selectedAcceptanceTask.id, { notes: acceptanceNotes });
+      toast.success('Đã gửi hồ sơ nghiệm thu thành công! Chờ Admin thẩm định chất lượng.', 'Chờ nghiệm thu');
+      fetchTasks(page, pageSize);
+      setSelectedAcceptanceTask(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể gửi hồ sơ nghiệm thu', 'Lỗi');
+    } finally {
+      setIsSubmittingAcceptance(false);
     }
   };
 
   const filteredTasks = tasks.filter((t) => {
-    if (filter === 'ASSIGNED') return t.status === 'ASSIGNED';
-    if (filter === 'IN_PROGRESS') return t.status === 'IN_PROGRESS';
-    if (filter === 'PENDING_INSPECTION') return t.status === 'PENDING_INSPECTION';
-    if (filter === 'DONE') return t.status === 'RESOLVED' || t.status === 'CLOSED';
+    if (filter === 'INSPECTION') return ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(t.status);
+    if (filter === 'CONSTRUCTION') return ['ASSIGNED', 'IN_PROGRESS', 'REWORK_REQUIRED'].includes(t.status);
+    if (filter === 'PENDING_ACCEPTANCE') return ['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(t.status);
+    if (filter === 'DONE') return ['RESOLVED', 'CLOSED'].includes(t.status);
     return true;
   });
 
@@ -128,32 +234,32 @@ export const StaffTasksPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wide">
             <Wrench className="w-4 h-4 text-blue-600" />
-            <span>Nhiệm vụ kỹ thuật hiện trường</span>
+            <span>Nhiệm vụ tổ đội & kỹ thuật hiện trường</span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900 mt-1">
-            Quản lý nhiệm vụ thi công
+            Bảng điều hành công tác hiện trường
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Danh sách các sự cố mặt đường được phân công trực tiếp cho tổ kỹ thuật tiếp nhận, thi công và nghiệm thu.
+            Quản lý các sự cố được phân công: Khảo sát thực trạng, đo đạc thông số, triển khai thi công và nộp bằng chứng nghiệm thu.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-2 rounded-md bg-slate-50 border border-slate-200 flex items-center gap-2">
-            <span className="text-xs text-slate-500">Tổng nhiệm vụ:</span>
+            <span className="text-xs text-slate-500">Tổng nhiệm vụ được giao:</span>
             <span className="text-sm font-bold text-slate-900 leading-none">{totalElements}</span>
           </div>
         </div>
       </div>
 
-      {/* Thanh Lọc Trạng Thái Phân Việc */}
+      {/* Thanh Lọc Theo Giai Đoạn */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {[
           { id: 'ALL', label: 'Tất cả nhiệm vụ', count: tasks.length },
-          { id: 'ASSIGNED', label: 'Được giao mới', count: tasks.filter((t) => t.status === 'ASSIGNED').length },
-          { id: 'IN_PROGRESS', label: 'Đang thi công', count: tasks.filter((t) => t.status === 'IN_PROGRESS').length },
-          { id: 'PENDING_INSPECTION', label: 'Chờ duyệt nghiệm thu', count: tasks.filter((t) => t.status === 'PENDING_INSPECTION').length },
-          { id: 'DONE', label: 'Đã hoàn thành', count: tasks.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length },
+          { id: 'INSPECTION', label: 'Khảo sát hiện trường', count: tasks.filter((t) => ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(t.status)).length },
+          { id: 'CONSTRUCTION', label: 'Thi công sửa chữa', count: tasks.filter((t) => ['ASSIGNED', 'IN_PROGRESS', 'REWORK_REQUIRED'].includes(t.status)).length },
+          { id: 'PENDING_ACCEPTANCE', label: 'Chờ nghiệm thu', count: tasks.filter((t) => ['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(t.status)).length },
+          { id: 'DONE', label: 'Đã hoàn tất', count: tasks.filter((t) => ['RESOLVED', 'CLOSED'].includes(t.status)).length },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -202,7 +308,7 @@ export const StaffTasksPage: React.FC = () => {
                   <img
                     src={task.imageUrl}
                     alt={task.title}
-                    className="w-20 h-20 rounded-md object-cover shrink-0 border border-slate-200"
+                    className="w-24 h-24 rounded-md object-cover shrink-0 border border-slate-200"
                   />
                   <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -214,11 +320,33 @@ export const StaffTasksPage: React.FC = () => {
                       <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                       <span>{task.address || `${task.latitude?.toFixed(4)}, ${task.longitude?.toFixed(4)}`}</span>
                     </div>
+
+                    {/* Hiển thị Tổ phụ trách */}
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-600 mt-1">
+                      {task.inspectionTeamName && (
+                        <span className="px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200">
+                          Khảo sát: {task.inspectionTeamName}
+                        </span>
+                      )}
+                      {task.assignedTeamName && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                          Thi công: {task.assignedTeamName}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
+                {/* Phương án thi công đã duyệt nếu có */}
+                {task.workPlan && (
+                  <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 text-xs">
+                    <span className="font-semibold text-slate-700">Phương án thi công: </span>
+                    <span className="text-slate-600">{task.workPlan}</span>
+                  </div>
+                )}
+
                 {/* Cảnh báo yêu cầu thi công lại nếu có */}
-                {task.reworkCount && task.reworkCount > 0 && (
+                {Boolean(task.reworkCount && task.reworkCount > 0) && (
                   <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-md text-xs flex flex-col gap-1">
                     <div className="font-semibold flex items-center gap-1.5 text-rose-800">
                       <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -230,32 +358,82 @@ export const StaffTasksPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Thao tác kỹ thuật */}
+                {/* Thao tác kỹ thuật theo từng giai đoạn */}
                 <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
                   <div className="flex items-center gap-1.5 text-slate-500">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
                     <span>{task.createdAt ? new Date(task.createdAt).toLocaleDateString('vi-VN') : 'Mới giao'}</span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {/* Giai đoạn 4a: Tiếp cận hiện trường */}
+                    {task.status === 'INSPECTION_ASSIGNED' && (
+                      <button
+                        onClick={() => handleStartInspection(task.id)}
+                        className="px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                      >
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>Bắt đầu khảo sát</span>
+                      </button>
+                    )}
+
+                    {/* Giai đoạn 4b: Nộp biên bản khảo sát */}
+                    {task.status === 'INSPECTING' && (
+                      <button
+                        onClick={() => handleOpenSurveyModal(task)}
+                        className="px-3 py-1.5 rounded-md bg-teal-600 hover:bg-teal-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                      >
+                        <FileCheck className="w-3.5 h-3.5" />
+                        <span>Lập biên bản khảo sát</span>
+                      </button>
+                    )}
+
+                    {/* Giai đoạn 4 -> 5: Đã khảo sát xong, chờ Admin giao thi công */}
+                    {task.status === 'INSPECTED' && (
+                      <span className="text-[11px] font-medium text-teal-700 bg-teal-50 px-2 py-1 rounded border border-teal-200">
+                        Đã xong khảo sát • Chờ giao thi công
+                      </span>
+                    )}
+
+                    {/* Giai đoạn 6a: Bắt đầu thi công */}
                     {task.status === 'ASSIGNED' && (
                       <button
-                        onClick={() => handleStartWork(task.id)}
-                        className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors"
+                        onClick={() => handleStartConstruction(task.id)}
+                        className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
                       >
                         <Hammer className="w-3.5 h-3.5" />
                         <span>Bắt đầu thi công</span>
                       </button>
                     )}
 
-                    {task.status === 'IN_PROGRESS' && (
-                      <button
-                        onClick={() => setSelectedTask(task)}
-                        className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Nộp nghiệm thu</span>
-                      </button>
+                    {/* Giai đoạn 6b & 6c: Tải ảnh bằng chứng & Gửi nghiệm thu */}
+                    {['IN_PROGRESS', 'REWORK_REQUIRED'].includes(task.status) && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSelectedEvidenceTask(task);
+                            setEvidenceStage(task.status === 'REWORK_REQUIRED' ? 'REWORK' : 'BEFORE_WORK');
+                          }}
+                          className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1 transition-colors"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Nộp ảnh bằng chứng</span>
+                        </button>
+                        <button
+                          onClick={() => setSelectedAcceptanceTask(task)}
+                          className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Gửi nghiệm thu</span>
+                        </button>
+                      </>
+                    )}
+
+                    {/* Giai đoạn 7: Đang chờ Admin duyệt */}
+                    {['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(task.status) && (
+                      <span className="text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-200">
+                        Chờ Admin thẩm định
+                      </span>
                     )}
 
                     <Link
@@ -286,89 +464,321 @@ export const StaffTasksPage: React.FC = () => {
         </>
       )}
 
-      {/* Modal Nộp Nghiệm Thu */}
-      {selectedTask && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white max-w-lg w-full rounded-lg border border-slate-200 shadow-xl overflow-hidden animate-in fade-in">
+      {/* MODAL 1: BÁO CÁO KHẢO SÁT HIỆN TRƯỜNG (GIAI ĐOẠN 4) */}
+      {selectedSurveyTask && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-xl w-full rounded-lg border border-slate-200 shadow-xl overflow-hidden animate-in fade-in my-8">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
-                <FileCheck className="w-4 h-4 text-blue-600" />
-                <span>Nộp báo cáo nghiệm thu hiện trường</span>
+                <Compass className="w-4 h-4 text-teal-600" />
+                <span>Biên bản khảo sát hiện trường kỹ thuật</span>
+                <span className="font-mono text-xs text-blue-700 font-medium">{selectedSurveyTask.ticketCode?.startsWith('#') ? selectedSurveyTask.ticketCode : `#${selectedSurveyTask.ticketCode}`}</span>
               </div>
               <button
-                onClick={() => setSelectedTask(null)}
+                onClick={() => setSelectedSurveyTask(null)}
                 className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleResolveSubmit} className="p-6 flex flex-col gap-4 text-xs">
-              <div className="bg-slate-50 p-3 rounded-md flex flex-col gap-1 border border-slate-200">
-                <div className="font-semibold text-slate-900">
-                  {selectedTask.ticketCode} - {selectedTask.title}
+            <form onSubmit={handleSubmitSurvey} className="p-6 flex flex-col gap-4 text-xs">
+              {/* Vị trí GPS & Lấy vị trí */}
+              <div className="p-3 bg-slate-50 rounded-md border border-slate-200 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                    Tọa độ GPS xác thực hiện trường:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleGetLiveLocation}
+                    className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 flex items-center gap-1 font-medium transition-colors"
+                  >
+                    <Navigation className="w-3 h-3" />
+                    Lấy vị trí GPS hiện tại
+                  </button>
                 </div>
-                <div className="text-slate-500">{selectedTask.address}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-500">Vĩ độ (Latitude)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={surveyLatitude}
+                      onChange={(e) => setSurveyLatitude(parseFloat(e.target.value))}
+                      className="w-full px-2.5 py-1.5 rounded bg-white border border-slate-300 font-mono text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-500">Kinh độ (Longitude)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={surveyLongitude}
+                      onChange={(e) => setSurveyLongitude(parseFloat(e.target.value))}
+                      className="w-full px-2.5 py-1.5 rounded bg-white border border-slate-300 font-mono text-slate-900"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {selectedTask.reworkReason && (
-                <div className="p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs flex flex-col gap-1">
-                  <div className="font-semibold flex items-center gap-1.5 text-rose-800">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                    <span>Lệnh tái thi công:</span>
+              {/* Loại hư hỏng & Mức độ */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium mb-1 text-slate-700">Xác nhận loại hư hỏng *</label>
+                  <select
+                    value={confirmedCategory}
+                    onChange={(e) => setConfirmedCategory(e.target.value as Category)}
+                    className="w-full px-2.5 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                  >
+                    <option value="POTHOLE">Ổ gà / Hố sụt</option>
+                    <option value="ROAD_CRACK">Vết nứt mặt đường</option>
+                    <option value="ROAD_FLOODING">Điểm ngập úng</option>
+                    <option value="ROAD_OBSTACLE">Chướng ngại vật</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium mb-1 text-slate-700">Mức độ nguy hiểm thực tế *</label>
+                  <select
+                    value={actualSeverity}
+                    onChange={(e) => setActualSeverity(e.target.value as Severity)}
+                    className="w-full px-2.5 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                  >
+                    <option value="HIGH">Cao (Nguy hiểm lớn)</option>
+                    <option value="MEDIUM">Trung bình</option>
+                    <option value="LOW">Thấp (Chưa khẩn)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Đo đạc kích thước thực tế */}
+              <div className="p-3 bg-slate-50 rounded-md border border-slate-200">
+                <span className="font-semibold text-slate-800 block mb-2">Thông số đo đạc kích thước hiện trường:</span>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-500">Chiều dài (m)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={estimatedLengthM}
+                      onChange={(e) => setEstimatedLengthM(parseFloat(e.target.value) || 0)}
+                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium"
+                    />
                   </div>
-                  <p className="italic">"{selectedTask.reworkReason}"</p>
+                  <div>
+                    <label className="text-[11px] text-slate-500">Chiều rộng (m)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={estimatedWidthM}
+                      onChange={(e) => setEstimatedWidthM(parseFloat(e.target.value) || 0)}
+                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-500">Độ sâu (cm)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={estimatedDepthCm}
+                      onChange={(e) => setEstimatedDepthCm(parseFloat(e.target.value) || 0)}
+                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium"
+                    />
+                  </div>
                 </div>
-              )}
+              </div>
 
-              {errorMessage && (
-                <div className="p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
+              {/* Đề xuất phương án */}
               <div>
-                <label className="block font-medium text-slate-700 mb-1.5">
-                  Ảnh chụp sau khi hoàn tất sửa chữa *
-                </label>
+                <label className="block font-medium mb-1 text-slate-700">Đề xuất phương án xử lý kỹ thuật *</label>
+                <textarea
+                  rows={2}
+                  value={proposedSolution}
+                  required
+                  onChange={(e) => setProposedSolution(e.target.value)}
+                  placeholder="Ví dụ: Cào bóc 4cm, tưới nhựa dính bám 0.5kg/m2, thảm bù BTN C12.5 đầm lèn K98..."
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                />
+              </div>
+
+              {/* Ảnh chụp hiện trường */}
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Ảnh chụp hiện trạng tại hiện trường</label>
                 <input
                   type="file"
+                  multiple
                   accept="image/jpeg,image/png,image/webp"
-                  onChange={(e) => setProofFile(e.target.files ? e.target.files[0] : null)}
-                  className="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
-                  required
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setSurveyPhotos(Array.from(e.target.files));
+                    }
+                  }}
+                  className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
                 />
               </div>
 
+              {/* Ghi chú */}
               <div>
-                <label className="block font-medium text-slate-700 mb-1.5">
-                  Biên bản kỹ thuật & vật liệu sử dụng
-                </label>
+                <label className="block font-medium mb-1 text-slate-700">Nhận xét & Ghi chú thêm</label>
                 <textarea
-                  rows={3}
-                  value={proofNotes}
-                  onChange={(e) => setProofNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent font-medium text-slate-900"
-                  placeholder="Ghi chú quy trình thi công, vật liệu hoàn trả..."
-                  required
+                  rows={2}
+                  value={surveyNotes}
+                  onChange={(e) => setSurveyNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setSelectedTask(null)}
-                  className="px-3.5 py-1.5 rounded-md border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                  onClick={() => setSelectedSurveyTask(null)}
+                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmittingProof}
-                  className="px-4 py-1.5 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5 transition-colors shadow-xs"
+                  disabled={isSubmittingSurvey}
+                  className="px-4 py-1.5 rounded-md bg-teal-600 text-white font-medium hover:bg-teal-700 transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {isSubmittingProof ? 'Đang gửi...' : 'Xác nhận nghiệm thu'}
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSubmittingSurvey ? 'Đang gửi biên bản...' : 'Gửi biên bản khảo sát'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: TẢI LÊN ẢNH BẰNG CHỨNG THI CÔNG (GIAI ĐOẠN 6) */}
+      {selectedEvidenceTask && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-lg border border-slate-200 shadow-xl overflow-hidden animate-in fade-in">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
+                <Camera className="w-4 h-4 text-blue-600" />
+                <span>Nộp ảnh bằng chứng thi công</span>
+              </div>
+              <button
+                onClick={() => setSelectedEvidenceTask(null)}
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitEvidence} className="p-6 flex flex-col gap-3.5 text-xs">
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Mốc thi công tương ứng *</label>
+                <select
+                  value={evidenceStage}
+                  onChange={(e) => setEvidenceStage(e.target.value as EvidenceStage)}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                >
+                  <option value="BEFORE_WORK">1. BEFORE_WORK - Trước thi công (Hiện trạng cọc tiêu, rào chắn)</option>
+                  <option value="PROGRESS">2. PROGRESS - Đang thi công (Cào bóc, lu lèn)</option>
+                  <option value="AFTER_WORK">3. AFTER_WORK - Sau hoàn thành (Mặt đường thảm mới)</option>
+                  <option value="REWORK">4. REWORK - Bằng chứng sửa lại theo lệnh Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Tệp ảnh chụp hiện trường *</label>
+                <input
+                  type="file"
+                  required
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) setEvidenceFile(e.target.files[0]);
+                  }}
+                  className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Ghi chú bằng chứng</label>
+                <textarea
+                  rows={2}
+                  value={evidenceNotes}
+                  onChange={(e) => setEvidenceNotes(e.target.value)}
+                  placeholder="Mô tả công việc tại mốc này (ví dụ: Đã tưới dính bám 0.5kg/m2)..."
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSelectedEvidenceTask(null)}
+                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEvidence}
+                  className="px-4 py-1.5 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{isSubmittingEvidence ? 'Đang tải lên...' : 'Lưu bằng chứng'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: XIN NGHIỆM THU CÔNG TRÌNH (GIAI ĐOẠN 6c) */}
+      {selectedAcceptanceTask && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-lg border border-slate-200 shadow-xl overflow-hidden animate-in fade-in">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
+                <Send className="w-4 h-4 text-emerald-600" />
+                <span>Gửi hồ sơ nghiệm thu tới Quản trị viên</span>
+              </div>
+              <button
+                onClick={() => setSelectedAcceptanceTask(null)}
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitAcceptance} className="p-6 flex flex-col gap-3.5 text-xs">
+              <div className="p-3 bg-slate-50 rounded-md border border-slate-200 flex flex-col gap-1">
+                <span className="font-semibold text-slate-800">Sự cố: {selectedAcceptanceTask.title}</span>
+                <span className="text-slate-500">Mã phiếu: {selectedAcceptanceTask.ticketCode}</span>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Báo cáo hoàn thành & Ghi chú nghiệm thu *</label>
+                <textarea
+                  rows={3}
+                  value={acceptanceNotes}
+                  required
+                  onChange={(e) => setAcceptanceNotes(e.target.value)}
+                  placeholder="Xác nhận hoàn thành các hạng mục, bề mặt êm thuận, an toàn giao thông..."
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAcceptanceTask(null)}
+                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingAcceptance}
+                  className="px-4 py-1.5 rounded-md bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSubmittingAcceptance ? 'Đang gửi...' : 'Xác nhận nộp nghiệm thu'}</span>
                 </button>
               </div>
             </form>

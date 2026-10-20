@@ -83,7 +83,7 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
           )}
 
           <Link
-            to={user?.role === 'ROLE_STAFF' ? '/tasks' : user?.role === 'ROLE_CITIZEN' ? '/my-reports' : '/'}
+            to={user?.role === 'ROLE_STAFF' ? '/inspection-tasks' : user?.role === 'ROLE_CITIZEN' ? '/my-reports' : user?.role === 'ROLE_ADMIN' ? '/dispatch' : '/'}
             className="flex-1 w-full py-2.5 px-4 rounded-xl bg-surface-container border border-outline-variant/40 text-on-surface text-xs font-semibold hover:bg-surface-container-high flex items-center justify-center gap-2 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

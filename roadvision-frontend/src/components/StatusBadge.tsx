@@ -28,11 +28,32 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
           Đã xác nhận
         </span>
       );
+    case 'INSPECTION_ASSIGNED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-xs font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-600"></span>
+          Giao khảo sát
+        </span>
+      );
+    case 'INSPECTING':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200 text-xs font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-600 animate-pulse"></span>
+          Đang khảo sát
+        </span>
+      );
+    case 'INSPECTED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 text-xs font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-600"></span>
+          Đã khảo sát
+        </span>
+      );
     case 'ASSIGNED':
       return (
         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
-          Đã phân công
+          Giao thi công
         </span>
       );
     case 'IN_PROGRESS':
@@ -43,10 +64,18 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
         </span>
       );
     case 'PENDING_INSPECTION':
+    case 'PENDING_ACCEPTANCE':
       return (
         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-xs font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
           Chờ nghiệm thu
+        </span>
+      );
+    case 'REWORK_REQUIRED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-300 text-xs font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse"></span>
+          Yêu cầu làm lại
         </span>
       );
     case 'RESOLVED':
@@ -60,7 +89,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
       return (
         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-xs font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-          Đã đóng phiếu
+          Đã hoàn thành
         </span>
       );
     case 'REJECTED':
@@ -95,22 +124,22 @@ export const ModerationFlagBadge: React.FC<{ flag?: string; score?: number }> = 
       )}
       {flag === 'TRUSTED_REPORT' && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-          ⭐ Ưu tiên xử lý
+          Ưu tiên xử lý
         </span>
       )}
       {flag === 'SUSPECTED_DUPLICATE_IMAGE' && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
-          ⚠️ Nghi vấn ảnh trùng
+          Nghi vấn ảnh trùng
         </span>
       )}
       {flag === 'LOW_PRIORITY_REVIEW' && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-          🔍 Kiểm duyệt tăng cường
+          Kiểm duyệt tăng cường
         </span>
       )}
       {flag === 'POTENTIAL_DUPLICATE' && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
-          📍 Trùng vị trí lân cận
+          Trùng vị trí lân cận
         </span>
       )}
     </div>

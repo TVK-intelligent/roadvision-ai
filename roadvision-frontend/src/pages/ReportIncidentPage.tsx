@@ -62,6 +62,9 @@ export const ReportIncidentPage: React.FC = () => {
   // Vị trí GPS mặc định (Hà Nam / Thanh Liêm theo yêu cầu thực tế của người dùng)
   const [latitude, setLatitude] = useState<number>(20.436036);
   const [longitude, setLongitude] = useState<number>(105.904596);
+  const [originalLatitude, setOriginalLatitude] = useState<number | null>(null);
+  const [originalLongitude, setOriginalLongitude] = useState<number | null>(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [address, setAddress] = useState<string>('Thanh Liêm, Hà Nam');
 
   const [title, setTitle] = useState<string>('');
@@ -293,6 +296,9 @@ export const ReportIncidentPage: React.FC = () => {
       const acc = pos.coords.accuracy;
       setLatitude(lat);
       setLongitude(lng);
+      setOriginalLatitude(lat);
+      setOriginalLongitude(lng);
+      if (acc) setGpsAccuracy(acc);
       reverseGeocode(lat, lng);
       checkNearby(lat, lng);
       setIsLocating(false);
@@ -611,6 +617,9 @@ export const ReportIncidentPage: React.FC = () => {
     formData.append('image', selectedFile);
     formData.append('latitude', latitude.toString());
     formData.append('longitude', longitude.toString());
+    if (originalLatitude) formData.append('originalLatitude', originalLatitude.toString());
+    if (originalLongitude) formData.append('originalLongitude', originalLongitude.toString());
+    if (gpsAccuracy) formData.append('gpsAccuracy', gpsAccuracy.toString());
     formData.append('title', title || 'Phản ánh sự cố mặt đường');
     formData.append('description', description);
     formData.append('address', address);
@@ -1058,28 +1067,38 @@ export const ReportIncidentPage: React.FC = () => {
                     {nearbyDuplicate.existingIncident.address || 'Hiện trường lân cận'}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!isAuthenticated || !user) {
-                          setIsAuthModalOpen(true);
-                          toast.warning('Vui lòng đăng nhập để đồng tình phản ánh này.');
-                          return;
-                        }
-                        try {
-                          await incidentApi.upvoteIncident(nearbyDuplicate.existingIncident!.id);
-                          toast.success('Đã gửi +1 Đồng tình thành công! Mức độ khẩn cấp của sự cố đã được tăng.', 'Cộng Đồng Đồng Tình');
-                          navigate(`/incidents/${nearbyDuplicate.existingIncident!.id}`);
-                        } catch (err: any) {
-                          toast.info(err.response?.data?.message || 'Bạn đã đồng tình với phản ánh này trước đó rồi.');
-                          navigate(`/incidents/${nearbyDuplicate.existingIncident!.id}`);
-                        }
-                      }}
-                      className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
-                    >
-                      <ThumbsUp className="w-3.5 h-3.5" />
-                      <span>Đồng tình (+1 Upvote)</span>
-                    </button>
+                    {user?.role !== 'ROLE_ADMIN' && user?.role !== 'ROLE_STAFF' ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!isAuthenticated || !user) {
+                            setIsAuthModalOpen(true);
+                            toast.warning('Vui lòng đăng nhập để đồng tình phản ánh này.');
+                            return;
+                          }
+                          try {
+                            await incidentApi.upvoteIncident(nearbyDuplicate.existingIncident!.id);
+                            toast.success('Đã gửi +1 Đồng tình thành công! Mức độ khẩn cấp của sự cố đã được tăng.', 'Cộng Đồng Đồng Tình');
+                            navigate(`/incidents/${nearbyDuplicate.existingIncident!.id}`);
+                          } catch (err: any) {
+                            toast.info(err.response?.data?.message || 'Bạn đã đồng tình với phản ánh này trước đó rồi.');
+                            navigate(`/incidents/${nearbyDuplicate.existingIncident!.id}`);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                      >
+                        <ThumbsUp className="w-3.5 h-3.5" />
+                        <span>Đồng tình (+1 Upvote)</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/incidents/${nearbyDuplicate.existingIncident!.id}`)}
+                        className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                      >
+                        <span>Xem hồ sơ sự cố này</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setDismissDuplicate(true)}

@@ -24,6 +24,9 @@ public class IncidentResponse {
     private String imageUrl;
     private BigDecimal latitude;
     private BigDecimal longitude;
+    private BigDecimal originalLatitude;
+    private BigDecimal originalLongitude;
+    private Double gpsAccuracy;
     private String address;
     private String routeCorridor;
     private String zoneName;
@@ -36,6 +39,22 @@ public class IncidentResponse {
     private Integer reworkCount;
     private Integer upvoteCount;
     private Boolean hasUpvoted;
+
+    // Tổ đội & Phân công theo luồng mới
+    private Long inspectionTeamId;
+    private String inspectionTeamName;
+    private Long assignedTeamId;
+    private String assignedTeamName;
+    private String workPlan;
+    private String safetyNotes;
+    private LocalDateTime plannedStartDate;
+    private LocalDateTime plannedDeadline;
+
+    // Hồ sơ khảo sát hiện trường (Giai đoạn 4)
+    private InspectionResponse inspection;
+
+    // Danh sách bằng chứng đa giai đoạn (Giai đoạn 4, 6, 7)
+    private java.util.List<EvidenceResponse> evidences;
 
     private Long citizenId;
     private String reporterName;

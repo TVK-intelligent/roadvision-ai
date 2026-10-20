@@ -39,6 +39,9 @@ public class IncidentService {
     private final IncidentUpvoteRepository incidentUpvoteRepository;
     private final FeedbackRepository feedbackRepository;
     private final UserRepository userRepository;
+    private final TeamRepository teamRepository;
+    private final IncidentInspectionRepository incidentInspectionRepository;
+    private final IncidentEvidenceRepository incidentEvidenceRepository;
     private final FileStorageService fileStorageService;
     private final AiInferenceService aiInferenceService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
@@ -128,6 +131,9 @@ public class IncidentService {
                 .imageSha256(imageSha256)
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
+                .originalLatitude(request.getOriginalLatitude() != null ? request.getOriginalLatitude() : request.getLatitude())
+                .originalLongitude(request.getOriginalLongitude() != null ? request.getOriginalLongitude() : request.getLongitude())
+                .gpsAccuracy(request.getGpsAccuracy())
                 .address(request.getAddress() != null ? request.getAddress() : "Khu vực đô thị")
                 .routeCorridor(corridor.getCode())
                 .zoneName(corridor.getName())
@@ -793,7 +799,551 @@ public class IncidentService {
                     .build());
         }
 
+        // Mapping luồng 7 giai đoạn mới
+        builder.originalLatitude(i.getOriginalLatitude() != null ? i.getOriginalLatitude() : i.getLatitude())
+                .originalLongitude(i.getOriginalLongitude() != null ? i.getOriginalLongitude() : i.getLongitude())
+                .gpsAccuracy(i.getGpsAccuracy())
+                .inspectionTeamId(i.getInspectionTeam() != null ? i.getInspectionTeam().getId() : null)
+                .inspectionTeamName(i.getInspectionTeam() != null ? i.getInspectionTeam().getName() : null)
+                .assignedTeamId(i.getAssignedTeam() != null ? i.getAssignedTeam().getId() : null)
+                .assignedTeamName(i.getAssignedTeam() != null ? i.getAssignedTeam().getName() : null)
+                .workPlan(i.getWorkPlan())
+                .safetyNotes(i.getSafetyNotes())
+                .plannedStartDate(i.getPlannedStartDate())
+                .plannedDeadline(i.getPlannedDeadline());
+
+        // Mapping báo cáo khảo sát hiện trường (Giai đoạn 4)
+        if (i.getInspection() != null) {
+            IncidentInspection insp = i.getInspection();
+            List<String> photos = new java.util.ArrayList<>();
+            if (insp.getInspectionPhotos() != null && !insp.getInspectionPhotos().isBlank()) {
+                photos = java.util.Arrays.asList(insp.getInspectionPhotos().split(","));
+            }
+            builder.inspection(InspectionResponse.builder()
+                    .id(insp.getId())
+                    .incidentId(i.getId())
+                    .inspectorId(insp.getInspector() != null ? insp.getInspector().getId() : null)
+                    .inspectorName(insp.getInspector() != null ? insp.getInspector().getFullName() : null)
+                    .inspectionTeamId(insp.getInspectionTeam() != null ? insp.getInspectionTeam().getId() : null)
+                    .inspectionTeamName(insp.getInspectionTeam() != null ? insp.getInspectionTeam().getName() : null)
+                    .actualLatitude(insp.getActualLatitude())
+                    .actualLongitude(insp.getActualLongitude())
+                    .confirmedCategory(insp.getConfirmedCategory())
+                    .actualSeverity(insp.getActualSeverity())
+                    .estimatedSize(insp.getEstimatedSize())
+                    .trafficImpact(insp.getTrafficImpact())
+                    .proposedSolution(insp.getProposedSolution())
+                    .noDamageFound(insp.getNoDamageFound())
+                    .reasonNoDamage(insp.getReasonNoDamage())
+                    .notes(insp.getNotes())
+                    .inspectionPhotos(photos)
+                    .inspectedAt(insp.getInspectedAt())
+                    .build());
+        }
+
+        // Mapping bằng chứng các giai đoạn (Giai đoạn 4, 6, 7)
+        if (i.getEvidences() != null && !i.getEvidences().isEmpty()) {
+            builder.evidences(i.getEvidences().stream().map(ev -> EvidenceResponse.builder()
+                    .id(ev.getId())
+                    .incidentId(i.getId())
+                    .stage(ev.getStage())
+                    .imageUrl(ev.getImageUrl())
+                    .uploaderId(ev.getUploader() != null ? ev.getUploader().getId() : null)
+                    .uploaderName(ev.getUploader() != null ? ev.getUploader().getFullName() : null)
+                    .notes(ev.getNotes())
+                    .latitude(ev.getLatitude())
+                    .longitude(ev.getLongitude())
+                    .reworkIteration(ev.getReworkIteration())
+                    .createdAt(ev.getCreatedAt())
+                    .build()).toList());
+        }
+
         return builder.build();
+    }
+
+    // =========================================================================
+    // CÁC PHƯƠNG THỨC MỚI CHO LUỒNG 7 GIAI ĐOẠN ĐỒ ÁN
+    // =========================================================================
+
+    /**
+     * GIAI ĐOẠN 3 -> 4: ADMIN GIAO KHẢO SÁT HIỆN TRƯỜNG CHO TỔ ĐỘI
+     */
+    @Transactional
+    public IncidentResponse assignInspection(Long incidentId, InspectionAssignRequest req, Long adminId) {
+        Incident incident = getIncidentEntity(incidentId);
+        Team team = teamRepository.findById(req.getTeamId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tổ đội khảo sát ID: " + req.getTeamId()));
+
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Quản trị viên"));
+
+        User inspector = null;
+        if (req.getInspectorId() != null) {
+            inspector = userRepository.findById(req.getInspectorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên khảo sát ID: " + req.getInspectorId()));
+        } else if (team.getLeader() != null) {
+            inspector = team.getLeader();
+        }
+
+        incident.setInspectionTeam(team);
+        incident.setStatus(IncidentStatus.INSPECTION_ASSIGNED);
+        incident.setFlag(null);
+
+        IncidentInspection inspection = incident.getInspection();
+        if (inspection == null) {
+            inspection = IncidentInspection.builder()
+                    .incident(incident)
+                    .inspectionTeam(team)
+                    .inspector(inspector)
+                    .notes(req.getNotes())
+                    .build();
+        } else {
+            inspection.setInspectionTeam(team);
+            inspection.setInspector(inspector);
+            if (req.getNotes() != null) inspection.setNotes(req.getNotes());
+        }
+        incidentInspectionRepository.save(inspection);
+        incident.setInspection(inspection);
+
+        if (inspector != null) {
+            Assignment assignment = incident.getAssignment();
+            if (assignment == null) {
+                assignment = Assignment.builder().incident(incident).build();
+            }
+            assignment.setAssignedByAdmin(admin);
+            assignment.setAssignedToStaff(inspector);
+            assignment.setVerifiedCategory(incident.getCategory() != null ? incident.getCategory().name() : "POTHOLE");
+            assignment.setPriority(req.getPriority() != null ? req.getPriority() : com.roadvision.enums.Priority.NORMAL);
+            assignment.setNotes(req.getNotes());
+            assignment.setAssignedAt(LocalDateTime.now());
+            assignmentRepository.save(assignment);
+            incident.setAssignment(assignment);
+        }
+
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * GIAI ĐOẠN 4: NHÂN VIÊN KHẢO SÁT BẮT ĐẦU DI CHUYỂN / KHẢO SÁT
+     */
+    @Transactional
+    public IncidentResponse startInspecting(Long incidentId, Long staffId) {
+        Incident incident = getIncidentEntity(incidentId);
+        if (incident.getStatus() != IncidentStatus.INSPECTION_ASSIGNED) {
+            throw new BadRequestException("Chỉ có thể bắt đầu khảo sát khi sự cố ở trạng thái INSPECTION_ASSIGNED");
+        }
+        incident.setStatus(IncidentStatus.INSPECTING);
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * GIAI ĐOẠN 4: NHÂN VIÊN GỬI BÁO CÁO KẾT QUẢ KHẢO SÁT & ĐỀ XUẤT PHƯƠNG ÁN
+     */
+    @Transactional
+    public IncidentResponse submitInspectionReport(Long incidentId, InspectionReportRequest req, List<MultipartFile> photos, Long staffId) {
+        if (req == null) {
+            throw new BadRequestException("Dữ liệu biên bản khảo sát hiện trường không được để trống");
+        }
+
+        Incident incident = getIncidentEntity(incidentId);
+        User inspector = userRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên khảo sát"));
+
+        // 1. Kiểm tra tọa độ GPS khảo sát
+        BigDecimal lat = req.getActualLatitude() != null ? req.getActualLatitude() : incident.getLatitude();
+        BigDecimal lng = req.getActualLongitude() != null ? req.getActualLongitude() : incident.getLongitude();
+        if (lat == null || lng == null || !GeoUtil.isWithinGeoBounds(lat, lng)) {
+            throw new BadRequestException("Tọa độ GPS khảo sát không hợp lệ hoặc nằm ngoài phạm vi bảo trì");
+        }
+
+        // 2. Kiểm tra ảnh hiện trường
+        long validPhotosCount = (photos != null) ? photos.stream().filter(p -> p != null && !p.isEmpty()).count() : 0;
+        boolean noDamage = req.getNoDamageFound() != null && req.getNoDamageFound();
+
+        if (noDamage) {
+            if (req.getReasonNoDamage() == null || req.getReasonNoDamage().trim().length() < 10) {
+                throw new BadRequestException("Khi báo cáo không phát hiện hư hỏng, bắt buộc giải trình lý do chi tiết tối thiểu 10 ký tự");
+            }
+            if (validPhotosCount == 0) {
+                throw new BadRequestException("Bắt buộc tải lên ít nhất 1 ảnh chụp hiện trường chứng minh không có hư hỏng");
+            }
+        } else {
+            if (validPhotosCount == 0) {
+                throw new BadRequestException("Bắt buộc tải lên ít nhất 1 ảnh chụp hiện trạng khảo sát thực tế tại hiện trường");
+            }
+            if (req.getConfirmedCategory() == null) {
+                throw new BadRequestException("Vui lòng xác nhận loại hư hỏng thực tế (ổ gà, vết nứt, ngập úng...)");
+            }
+            if (req.getActualSeverity() == null) {
+                throw new BadRequestException("Vui lòng đánh giá mức độ nghiêm trọng thực tế (Cao, Trung bình, Thấp)");
+            }
+            if (req.getEstimatedSize() == null || req.getEstimatedSize().trim().isEmpty() || req.getEstimatedSize().trim().equals("0 x 0 x 0")) {
+                throw new BadRequestException("Vui lòng cung cấp số liệu kích thước đo đạc thực tế (Dài x Rộng x Sâu)");
+            }
+            if (req.getProposedSolution() == null || req.getProposedSolution().trim().length() < 10) {
+                throw new BadRequestException("Đề xuất phương án kỹ thuật phải cụ thể tối thiểu 10 ký tự (ví dụ: cào bóc, tưới dính bám, thảm BTN...)");
+            }
+        }
+
+        // Kiểm tra dung lượng và định dạng ảnh
+        if (photos != null) {
+            for (MultipartFile photo : photos) {
+                if (photo != null && !photo.isEmpty()) {
+                    if (photo.getSize() > 15 * 1024 * 1024) {
+                        throw new BadRequestException("Tệp ảnh khảo sát vượt quá kích thước cho phép (tối đa 15MB/ảnh)");
+                    }
+                    String ct = photo.getContentType();
+                    if (ct != null && !ct.startsWith("image/")) {
+                        throw new BadRequestException("Tệp tải lên phải là hình ảnh (JPEG, PNG, WEBP)");
+                    }
+                }
+            }
+        }
+
+        IncidentInspection inspection = incident.getInspection();
+        if (inspection == null) {
+            inspection = IncidentInspection.builder()
+                    .incident(incident)
+                    .inspectionTeam(incident.getInspectionTeam())
+                    .build();
+        }
+
+        inspection.setInspector(inspector);
+        inspection.setActualLatitude(lat);
+        inspection.setActualLongitude(lng);
+        if (req.getConfirmedCategory() != null) inspection.setConfirmedCategory(req.getConfirmedCategory());
+        if (req.getActualSeverity() != null) inspection.setActualSeverity(req.getActualSeverity());
+        inspection.setEstimatedSize(req.getEstimatedSize());
+        inspection.setTrafficImpact(req.getTrafficImpact());
+        inspection.setProposedSolution(req.getProposedSolution());
+        inspection.setNoDamageFound(noDamage);
+        inspection.setReasonNoDamage(req.getReasonNoDamage());
+        inspection.setNotes(req.getNotes());
+        inspection.setInspectedAt(LocalDateTime.now());
+
+        // Lưu các ảnh khảo sát
+        List<String> photoUrls = new java.util.ArrayList<>();
+        if (photos != null && !photos.isEmpty()) {
+            for (MultipartFile photo : photos) {
+                if (!photo.isEmpty()) {
+                    String url = fileStorageService.storeFile(photo, "inspections");
+                    photoUrls.add(url);
+
+                    IncidentEvidence ev = IncidentEvidence.builder()
+                            .incident(incident)
+                            .stage(com.roadvision.enums.EvidenceStage.INSPECTION)
+                            .imageUrl(url)
+                            .uploader(inspector)
+                            .latitude(inspection.getActualLatitude())
+                            .longitude(inspection.getActualLongitude())
+                            .notes("Ảnh khảo sát hiện trường: " + (req.getEstimatedSize() != null ? req.getEstimatedSize() : ""))
+                            .build();
+                    incidentEvidenceRepository.save(ev);
+                }
+            }
+            inspection.setInspectionPhotos(String.join(",", photoUrls));
+        }
+
+        incidentInspectionRepository.save(inspection);
+        incident.setInspection(inspection);
+
+        if (req.getConfirmedCategory() != null) {
+            incident.setCategory(req.getConfirmedCategory());
+        }
+        if (req.getActualSeverity() != null) {
+            incident.setSeverity(req.getActualSeverity());
+        }
+        incident.setLatitude(lat);
+        incident.setLongitude(lng);
+
+        incident.setStatus(IncidentStatus.INSPECTED);
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * GIAI ĐOẠN 5: ADMIN GIAO NHIỆM VỤ THI CÔNG CHO TỔ ĐỘI
+     */
+    @Transactional
+    public IncidentResponse assignConstruction(Long incidentId, ConstructionAssignRequest req, Long adminId) {
+        if (req == null || req.getTeamId() == null) {
+            throw new BadRequestException("Vui lòng chọn tổ đội thi công phụ trách");
+        }
+        if (req.getWorkPlan() == null || req.getWorkPlan().trim().length() < 10) {
+            throw new BadRequestException("Phương án thi công phải chi tiết tối thiểu 10 ký tự");
+        }
+        if (req.getPlannedDeadline() != null && req.getPlannedDeadline().isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("Hạn hoàn thành thi công (Deadline) không được ở trong quá khứ");
+        }
+
+        Incident incident = getIncidentEntity(incidentId);
+        Team team = teamRepository.findById(req.getTeamId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tổ đội thi công ID: " + req.getTeamId()));
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Quản trị viên"));
+
+        User staff = null;
+        if (req.getStaffId() != null) {
+            staff = userRepository.findById(req.getStaffId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên phụ trách ID: " + req.getStaffId()));
+        } else if (team.getLeader() != null) {
+            staff = team.getLeader();
+        }
+
+        incident.setAssignedTeam(team);
+        incident.setWorkPlan(req.getWorkPlan().trim());
+        incident.setPlannedStartDate(req.getPlannedStartDate());
+        incident.setPlannedDeadline(req.getPlannedDeadline());
+        incident.setSafetyNotes(req.getSafetyNotes());
+        incident.setStatus(IncidentStatus.ASSIGNED);
+
+        Assignment assignment = incident.getAssignment();
+        if (assignment == null) {
+            assignment = Assignment.builder().incident(incident).build();
+        }
+        assignment.setAssignedByAdmin(admin);
+        assignment.setAssignedToStaff(staff);
+        assignment.setVerifiedCategory(incident.getCategory() != null ? incident.getCategory().name() : "POTHOLE");
+        assignment.setPriority(req.getPriority() != null ? req.getPriority() : com.roadvision.enums.Priority.NORMAL);
+        assignment.setNotes(req.getInstructions() != null ? req.getInstructions() : req.getWorkPlan());
+        assignment.setAssignedAt(LocalDateTime.now());
+        assignmentRepository.save(assignment);
+        incident.setAssignment(assignment);
+
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * GIAI ĐOẠN 6: BẮT ĐẦU THI CÔNG
+     */
+    @Transactional
+    public IncidentResponse startConstruction(Long incidentId, Long staffId) {
+        Incident incident = getIncidentEntity(incidentId);
+        if (incident.getStatus() != IncidentStatus.ASSIGNED && incident.getStatus() != IncidentStatus.REWORK_REQUIRED) {
+            throw new BadRequestException("Chỉ có thể bắt đầu thi công khi sự cố ở trạng thái ASSIGNED hoặc REWORK_REQUIRED");
+        }
+        incident.setStatus(IncidentStatus.IN_PROGRESS);
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * GIAI ĐOẠN 6: NỘP BẰNG CHỨNG THEO TỪNG GIAI ĐOẠN (BEFORE_WORK, PROGRESS, AFTER_WORK, REWORK)
+     * Tự động quét AI thẩm định nếu nộp ảnh hoàn thành (AFTER_WORK hoặc REWORK)
+     */
+    @Transactional
+    public EvidenceResponse uploadEvidence(Long incidentId, com.roadvision.enums.EvidenceStage stage, MultipartFile file, String notes, BigDecimal lat, BigDecimal lng, Long staffId) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Vui lòng đính kèm tệp ảnh chụp hiện trường");
+        }
+        if (file.getSize() > 15 * 1024 * 1024) {
+            throw new BadRequestException("Tệp ảnh không được vượt quá dung lượng 15MB");
+        }
+        String contentType = file.getContentType();
+        if (contentType != null && !contentType.startsWith("image/")) {
+            throw new BadRequestException("Tệp tải lên phải là hình ảnh (JPEG, PNG, WEBP)");
+        }
+        if (notes != null && !notes.isBlank() && notes.trim().length() < 5) {
+            throw new BadRequestException("Ghi chú mô tả công việc phải có ít nhất 5 ký tự");
+        }
+
+        Incident incident = getIncidentEntity(incidentId);
+        User uploader = userRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên"));
+
+        String url = fileStorageService.storeFile(file, "evidences");
+
+        IncidentEvidence ev = IncidentEvidence.builder()
+                .incident(incident)
+                .stage(stage)
+                .imageUrl(url)
+                .uploader(uploader)
+                .notes(notes != null ? notes.trim() : null)
+                .latitude(lat != null ? lat : incident.getLatitude())
+                .longitude(lng != null ? lng : incident.getLongitude())
+                .reworkIteration(incident.getReworkCount() != null ? incident.getReworkCount() : 0)
+                .build();
+
+        IncidentEvidence saved = incidentEvidenceRepository.save(ev);
+
+        String aiStatus = null;
+        String aiNotes = null;
+
+        // Nếu là ảnh hoàn thành thi công (AFTER_WORK hoặc REWORK), tự động cập nhật Resolution và quét AI
+        if (stage == com.roadvision.enums.EvidenceStage.AFTER_WORK || stage == com.roadvision.enums.EvidenceStage.REWORK) {
+            Resolution resolution = incident.getResolution();
+            if (resolution == null) {
+                resolution = Resolution.builder()
+                        .incident(incident)
+                        .staff(uploader)
+                        .proofImageUrl(url)
+                        .notes(notes)
+                        .resolvedAt(LocalDateTime.now())
+                        .build();
+            } else {
+                resolution.setStaff(uploader);
+                resolution.setProofImageUrl(url);
+                if (notes != null && !notes.isBlank()) resolution.setNotes(notes);
+                resolution.setResolvedAt(LocalDateTime.now());
+            }
+
+            verifyResolutionWithAi(resolution, incident, file);
+            resolutionRepository.save(resolution);
+            incident.setResolution(resolution);
+            incidentRepository.save(incident);
+
+            aiStatus = resolution.getAiVerificationStatus();
+            aiNotes = resolution.getAiVerificationNotes();
+        }
+
+        return EvidenceResponse.builder()
+                .id(saved.getId())
+                .incidentId(incident.getId())
+                .stage(saved.getStage())
+                .imageUrl(saved.getImageUrl())
+                .uploaderId(uploader.getId())
+                .uploaderName(uploader.getFullName())
+                .notes(saved.getNotes())
+                .latitude(saved.getLatitude())
+                .longitude(saved.getLongitude())
+                .reworkIteration(saved.getReworkIteration())
+                .aiVerificationStatus(aiStatus)
+                .aiVerificationNotes(aiNotes)
+                .createdAt(saved.getCreatedAt())
+                .build();
+    }
+
+    /**
+     * GIAI ĐOẠN 6: TỔ ĐỘI HOÀN TẤT VÀ NỘP HỒ SƠ CHỜ NGHIỆM THU
+     * Gồm ảnh chụp hoàn thành sau thi công + ghi chú kết quả + AI YOLOv8 tự động thẩm định chất lượng
+     */
+    @Transactional
+    public IncidentResponse submitForAcceptance(Long incidentId, MultipartFile file, String notes, BigDecimal lat, BigDecimal lng, Long staffId) {
+        Incident incident = getIncidentEntity(incidentId);
+
+        // 1. Kiểm tra trạng thái sự cố
+        if (incident.getStatus() != IncidentStatus.IN_PROGRESS && incident.getStatus() != IncidentStatus.REWORK_REQUIRED) {
+            throw new BadRequestException("Chỉ có thể nộp nghiệm thu khi công trình đang ở trạng thái Đang thi công (IN_PROGRESS) hoặc Cần sửa lại (REWORK_REQUIRED)");
+        }
+
+        // 2. Kiểm tra ảnh hoàn thành nghiệm thu (Bắt buộc)
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Bắt buộc phải tải lên ảnh chụp hiện trường sau khi thi công hoàn thành để AI thẩm định chất lượng");
+        }
+        if (file.getSize() > 15 * 1024 * 1024) {
+            throw new BadRequestException("Dung lượng tệp ảnh nghiệm thu không được vượt quá 15MB");
+        }
+        String contentType = file.getContentType();
+        if (contentType != null && !contentType.startsWith("image/")) {
+            throw new BadRequestException("Tệp tải lên phải là hình ảnh (JPEG, PNG, WEBP)");
+        }
+
+        // 3. Kiểm tra nội dung báo cáo nghiệm thu
+        if (notes == null || notes.trim().length() < 15) {
+            throw new BadRequestException("Báo cáo hoàn thành & ghi chú nghiệm thu phải chi tiết tối thiểu 15 ký tự (mô tả kết quả khắc phục, độ êm thuận...)");
+        }
+
+        User staff = userRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên"));
+
+        incident.setStatus(IncidentStatus.PENDING_ACCEPTANCE);
+
+        String proofUrl = fileStorageService.storeFile(file, "proofs");
+
+        // Lưu thêm vào bảng nhật ký bằng chứng (IncidentEvidence)
+        com.roadvision.enums.EvidenceStage stage = (incident.getReworkCount() != null && incident.getReworkCount() > 0)
+                ? com.roadvision.enums.EvidenceStage.REWORK
+                : com.roadvision.enums.EvidenceStage.AFTER_WORK;
+
+        IncidentEvidence ev = IncidentEvidence.builder()
+                .incident(incident)
+                .stage(stage)
+                .imageUrl(proofUrl)
+                .uploader(staff)
+                .notes(notes.trim())
+                .latitude(lat != null ? lat : incident.getLatitude())
+                .longitude(lng != null ? lng : incident.getLongitude())
+                .reworkIteration(incident.getReworkCount() != null ? incident.getReworkCount() : 0)
+                .build();
+        incidentEvidenceRepository.save(ev);
+
+        Resolution resolution = incident.getResolution();
+        if (resolution == null) {
+            resolution = Resolution.builder()
+                    .incident(incident)
+                    .build();
+        }
+        resolution.setStaff(staff);
+        resolution.setProofImageUrl(proofUrl);
+        resolution.setNotes(notes.trim());
+        resolution.setResolvedAt(LocalDateTime.now());
+
+        // 🌟 CHẠY MÔ HÌNH AI YOLOV8 QUÉT THẨM ĐỊNH ẢNH HOÀN THÀNH
+        verifyResolutionWithAi(resolution, incident, file);
+
+        resolutionRepository.save(resolution);
+        incident.setResolution(resolution);
+
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    @Transactional
+    public IncidentResponse submitForAcceptance(Long incidentId, String notes, Long staffId) {
+        return submitForAcceptance(incidentId, null, notes, null, null, staffId);
+    }
+
+    /**
+     * Helper: Dùng mô hình AI YOLOv8 để quét ảnh hiện trường sau thi công
+     * Đánh giá xem còn tồn tại vết nứt, ổ gà, lún nứt nào không
+     */
+    private void verifyResolutionWithAi(Resolution resolution, Incident incident, MultipartFile file) {
+        if (file == null || file.isEmpty()) return;
+        try {
+            byte[] proofBytes = file.getBytes();
+            List<ImageTensorUtil.BoundingBox> proofBoxes = aiInferenceService.runInferenceList(
+                    new java.io.ByteArrayInputStream(proofBytes), 0.22f);
+
+            if (!proofBoxes.isEmpty()) {
+                resolution.setAiVerificationStatus("AI_WARNING_DEFECT_REMAINS");
+                float maxConf = 0.0f;
+                for (ImageTensorUtil.BoundingBox b : proofBoxes) {
+                    if (b.getConfidence() > maxConf) maxConf = b.getConfidence();
+                }
+                resolution.setAiVerificationConfidence(BigDecimal.valueOf(maxConf));
+                resolution.setAiVerificationDetectionsJson(objectMapper.writeValueAsString(proofBoxes));
+                resolution.setAiVerificationNotes(String.format("Cảnh báo AI: Phát hiện %d vị trí hư hỏng còn sót lại sau thi công!", proofBoxes.size()));
+                log.warn("Nghiệm thu sự cố #{} có cảnh báo từ AI: {}", incident.getTicketCode(), resolution.getAiVerificationNotes());
+            } else {
+                resolution.setAiVerificationStatus("AI_VERIFIED_CLEAN");
+                resolution.setAiVerificationConfidence(BigDecimal.ZERO);
+                resolution.setAiVerificationDetectionsJson("[]");
+                resolution.setAiVerificationNotes("Nghiệm thu đạt chuẩn: AI quét ảnh sau thi công không phát hiện khuyết tật còn sót lại.");
+                log.info("Nghiệm thu sự cố #{} đạt chuẩn qua thẩm định AI (0 khuyết tật sót lại)", incident.getTicketCode());
+            }
+        } catch (Exception e) {
+            log.warn("Không thể chạy suy luận AI trên ảnh nghiệm thu: {}", e.getMessage());
+            resolution.setAiVerificationStatus("MANUAL_VERIFIED");
+            resolution.setAiVerificationNotes("Nghiệm thu thủ công (Không thể khởi chạy AI thẩm định: " + e.getMessage() + ")");
+        }
+    }
+
+    /**
+     * GIAI ĐOẠN 7: ADMIN THẨM ĐỊNH NGHIỆM THU (ĐẠT -> CLOSED, KHÔNG ĐẠT -> REWORK_REQUIRED)
+     */
+    @Transactional
+    public IncidentResponse reviewAcceptance(Long incidentId, AcceptanceReviewRequest req, Long adminId) {
+        Incident incident = getIncidentEntity(incidentId);
+        if (req.getApproved() != null && req.getApproved()) {
+            incident.setStatus(IncidentStatus.CLOSED);
+            incident.setClosedAt(LocalDateTime.now());
+            incident.setResolvedAt(LocalDateTime.now());
+        } else {
+            if (req.getReworkReason() == null || req.getReworkReason().trim().length() < 10) {
+                throw new BadRequestException("Bắt buộc ghi rõ lý do cụ thể (tối thiểu 10 ký tự) khi nghiệm thu không đạt yêu cầu");
+            }
+            incident.setStatus(IncidentStatus.REWORK_REQUIRED);
+            incident.setReworkReason(req.getReworkReason().trim());
+            incident.setReworkCount(incident.getReworkCount() != null ? incident.getReworkCount() + 1 : 1);
+        }
+        return mapToResponse(incidentRepository.save(incident));
     }
 
     /**
@@ -865,6 +1415,10 @@ public class IncidentService {
         Incident incident = getIncidentEntity(incidentId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với ID: " + userId));
+
+        if (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_STAFF) {
+            throw new BadRequestException("Chức năng đồng tình phản ánh chỉ dành cho người dân");
+        }
 
         boolean alreadyUpvoted = incidentUpvoteRepository.existsByIncidentIdAndUserId(incidentId, userId);
         if (alreadyUpvoted) {

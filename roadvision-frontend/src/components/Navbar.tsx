@@ -16,6 +16,9 @@ import {
   ChevronRight,
   Video,
   BarChart3,
+  Users,
+  Compass,
+  HardHat,
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 
@@ -111,10 +114,16 @@ export const Navbar: React.FC = () => {
 
             {/* Phân quyền kỹ thuật viên / admin */}
             {(user?.role === 'ROLE_STAFF' || user?.role === 'ROLE_ADMIN') && (
-              <Link to="/tasks" className={navLinkClass('/tasks')}>
-                <Wrench className="w-3.5 h-3.5 text-slate-500" />
-                <span>Nhiệm vụ kỹ thuật</span>
-              </Link>
+              <>
+                <Link to="/inspection-tasks" className={navLinkClass('/inspection-tasks')}>
+                  <Compass className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Khảo sát</span>
+                </Link>
+                <Link to="/construction-tasks" className={navLinkClass('/construction-tasks')}>
+                  <HardHat className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Thi công</span>
+                </Link>
+              </>
             )}
 
             {/* Phân quyền Admin duy nhất */}
@@ -130,6 +139,13 @@ export const Navbar: React.FC = () => {
                 >
                   <BarChart3 className="w-3.5 h-3.5 text-slate-500" />
                   <span>Báo cáo KPI</span>
+                </Link>
+                <Link
+                  to="/admin/teams"
+                  className={navLinkClass('/admin/teams')}
+                >
+                  <Users className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Tổ đội & Nhân sự</span>
                 </Link>
               </>
             )}
@@ -297,19 +313,35 @@ export const Navbar: React.FC = () => {
                 )}
 
                 {(user?.role === 'ROLE_STAFF' || user?.role === 'ROLE_ADMIN') && (
-                  <Link
-                    to="/tasks"
-                    onClick={closeMobile}
-                    className={`flex items-center justify-between p-2.5 rounded-md text-xs font-medium ${
-                      isActive('/tasks') ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Wrench className="w-4 h-4 text-slate-500" />
-                      <span>Nhiệm vụ kỹ thuật</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  </Link>
+                  <>
+                    <Link
+                      to="/inspection-tasks"
+                      onClick={closeMobile}
+                      className={`flex items-center justify-between p-2.5 rounded-md text-xs font-medium ${
+                        isActive('/inspection-tasks') ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Compass className="w-4 h-4 text-slate-500" />
+                        <span>Nhiệm vụ Khảo sát</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </Link>
+
+                    <Link
+                      to="/construction-tasks"
+                      onClick={closeMobile}
+                      className={`flex items-center justify-between p-2.5 rounded-md text-xs font-medium ${
+                        isActive('/construction-tasks') ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <HardHat className="w-4 h-4 text-slate-500" />
+                        <span>Nhiệm vụ Thi công</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </Link>
+                  </>
                 )}
 
                 {user?.role === 'ROLE_ADMIN' && (
@@ -339,6 +371,19 @@ export const Navbar: React.FC = () => {
                         <span>Báo cáo KPI</span>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </Link>
+                    <Link
+                      to="/admin/teams"
+                      onClick={closeMobile}
+                      className={`flex items-center justify-between p-2.5 rounded-md text-xs font-medium ${
+                        isActive('/admin/teams') ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-slate-500" />
+                        <span>Tổ đội & Nhân sự</span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                     </Link>
                   </>
                 )}

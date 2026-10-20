@@ -64,8 +64,13 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/tasks" className="hover:text-blue-600 transition-colors">
-                  Nhiệm vụ kỹ thuật (Kỹ thuật viên)
+                <Link to="/inspection-tasks" className="hover:text-blue-600 transition-colors">
+                  Khảo sát hiện trường (Kỹ thuật viên)
+                </Link>
+              </li>
+              <li>
+                <Link to="/construction-tasks" className="hover:text-blue-600 transition-colors">
+                  Thi công sửa chữa (Kỹ thuật viên)
                 </Link>
               </li>
               <li>
