@@ -564,6 +564,22 @@ public class IncidentService {
             incident.setFeedback(feedback);
         }
 
+        // 🌟 Thưởng điểm uy tín (+10 điểm) cho người dân khi sự cố hoàn thành nghiệm thu đóng hồ sơ
+        if (citizen != null) {
+            int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
+            int newScore = Math.min(100, currentScore + 10);
+            citizen.setReputationScore(newScore);
+            userRepository.save(citizen);
+            log.info("Thưởng +10 điểm uy tín cho người dân ID {}. Điểm mới: {}", citizen.getId(), newScore);
+            notificationService.notifyUser(
+                citizen.getId(),
+                "Thưởng điểm uy tín: +10 điểm ⭐",
+                "Phản ánh " + incident.getTicketCode() + " đã hoàn thành nghiệm thu đóng hồ sơ! Bạn được cộng +10 điểm uy tín (Tổng điểm: " + newScore + ").",
+                "SUCCESS",
+                incident
+            );
+        }
+
         log.info("Sự cố #{} đã được đóng hồ sơ (CLOSED) thành công bởi user ID {}", incident.getTicketCode(), userId);
         return mapToResponse(incidentRepository.save(incident));
     }
@@ -701,7 +717,11 @@ public class IncidentService {
     }
 
     @Transactional(readOnly = true)
-    public Page<IncidentResponse> getFilteredIncidents(IncidentStatus status, Category category, String search, Pageable pageable) {
+    public Page<IncidentResponse> getFilteredIncidents(IncidentStatus status, List<IncidentStatus> statuses, Category category, String search, Pageable pageable) {
+        if (statuses != null && !statuses.isEmpty()) {
+            return incidentRepository.findWithStatuses(statuses, category, search, pageable)
+                    .map(this::mapToResponse);
+        }
         return incidentRepository.findWithFilters(status, category, search, pageable)
                 .map(this::mapToResponse);
     }
@@ -855,7 +875,8 @@ public class IncidentService {
                 .workPlan(i.getWorkPlan())
                 .safetyNotes(i.getSafetyNotes())
                 .plannedStartDate(i.getPlannedStartDate())
-                .plannedDeadline(i.getPlannedDeadline());
+                .plannedDeadline(i.getPlannedDeadline())
+                .delayReason(i.getDelayReason());
 
         // Mapping báo cáo khảo sát hiện trường (Giai đoạn 4)
         if (i.getInspection() != null) {
@@ -881,6 +902,13 @@ public class IncidentService {
                     .noDamageFound(insp.getNoDamageFound())
                     .reasonNoDamage(insp.getReasonNoDamage())
                     .notes(insp.getNotes())
+                    .inspectionStatus(insp.getInspectionStatus())
+                    .version(insp.getVersion())
+                    .revisionReason(insp.getRevisionReason())
+                    .gpsAccuracy(insp.getGpsAccuracy())
+                    .approvedByAdminId(insp.getApprovedByAdmin() != null ? insp.getApprovedByAdmin().getId() : null)
+                    .approvedByAdminName(insp.getApprovedByAdmin() != null ? insp.getApprovedByAdmin().getFullName() : null)
+                    .approvedAt(insp.getApprovedAt())
                     .inspectionPhotos(photos)
                     .inspectedAt(insp.getInspectedAt())
                     .build());
@@ -1122,13 +1150,28 @@ public class IncidentService {
         incident.setLatitude(lat);
         incident.setLongitude(lng);
 
-        incident.setStatus(IncidentStatus.INSPECTED);
-        notificationService.notifyAdmins(
-            "Biên bản khảo sát hoàn tất: " + incident.getTicketCode(),
-            "Tổ kỹ thuật đã nộp biên bản đo đạc và đề xuất phương án thi công. Sẵn sàng điều phối giao việc.",
-            "SUCCESS",
-            incident
-        );
+        inspection.setGpsAccuracy(req.getGpsAccuracy());
+        boolean isDraft = "DRAFT".equalsIgnoreCase(req.getInspectionStatus());
+        if (isDraft) {
+            inspection.setInspectionStatus("DRAFT");
+            incident.setStatus(IncidentStatus.INSPECTING);
+        } else {
+            inspection.setInspectionStatus("SUBMITTED");
+            if (inspection.getVersion() == null) {
+                inspection.setVersion(1);
+            } else {
+                inspection.setVersion(inspection.getVersion() + 1);
+            }
+            incident.setStatus(IncidentStatus.INSPECTED);
+            incident.setRejectionReason(null); // Đã chỉnh sửa bổ sung, xóa lý do yêu cầu sửa đổi cũ
+            notificationService.notifyAdmins(
+                "Biên bản khảo sát hoàn tất: " + incident.getTicketCode(),
+                "Tổ kỹ thuật đã nộp biên bản đo đạc và đề xuất phương án thi công. Sẵn sàng điều phối giao việc.",
+                "SUCCESS",
+                incident
+            );
+        }
+        incidentInspectionRepository.save(inspection);
         return mapToResponse(incidentRepository.save(incident));
     }
 
@@ -1168,6 +1211,15 @@ public class IncidentService {
         incident.setSafetyNotes(req.getSafetyNotes());
         incident.setStatus(IncidentStatus.ASSIGNED);
 
+        // Đánh dấu biên bản khảo sát đã được Admin phê duyệt phương án thi công
+        if (incident.getInspection() != null) {
+            IncidentInspection insp = incident.getInspection();
+            insp.setInspectionStatus("APPROVED");
+            insp.setApprovedByAdmin(admin);
+            insp.setApprovedAt(LocalDateTime.now());
+            incidentInspectionRepository.save(insp);
+        }
+
         Assignment assignment = incident.getAssignment();
         if (assignment == null) {
             assignment = Assignment.builder().incident(incident).build();
@@ -1198,6 +1250,72 @@ public class IncidentService {
         }
 
         return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * GIAI ĐOẠN 5: ADMIN TỪ CHỐI PHƯƠNG ÁN KHẢO SÁT / YÊU CẦU BỔ SUNG SỐ LIỆU
+     */
+    @Transactional
+    public IncidentResponse requestInspectionRevision(Long incidentId, String reason, Long adminId) {
+        if (reason == null || reason.trim().length() < 10) {
+            throw new BadRequestException("Lý do yêu cầu khảo sát lại / bổ sung phải chi tiết tối thiểu 10 ký tự");
+        }
+        Incident incident = getIncidentEntity(incidentId);
+        if (incident.getStatus() != IncidentStatus.INSPECTED) {
+            throw new BadRequestException("Chỉ có thể yêu cầu khảo sát lại khi hồ sơ ở trạng thái ĐÃ KHẢO SÁT (INSPECTED)");
+        }
+        userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Quản trị viên"));
+
+        incident.setStatus(IncidentStatus.INSPECTING);
+        incident.setRejectionReason(reason.trim());
+
+        if (incident.getInspection() != null) {
+            IncidentInspection insp = incident.getInspection();
+            insp.setInspectionStatus("REVISE_REQUESTED");
+            insp.setRevisionReason(reason.trim());
+            incidentInspectionRepository.save(insp);
+        }
+
+        incident = incidentRepository.save(incident);
+
+        // Bắn thông báo cho tổ khảo sát
+        if (incident.getInspectionTeam() != null) {
+            notificationService.notifyStaff(
+                "Yêu cầu khảo sát lại: " + incident.getTicketCode(),
+                "Ban Quản lý từ chối phương án khảo sát và yêu cầu đo đạc/bổ sung: \"" + reason.trim() + "\"",
+                "WARNING",
+                incident
+            );
+        }
+
+        return mapToResponse(incident);
+    }
+
+    /**
+     * GIAI ĐOẠN 6: KỸ THUẬT VIÊN GIẢI TRÌNH LÝ DO CHẬM TIẾN ĐỘ THI CÔNG
+     */
+    @Transactional
+    public IncidentResponse reportDelayReason(Long incidentId, String delayReason, Long staffId) {
+        if (delayReason == null || delayReason.trim().length() < 10) {
+            throw new BadRequestException("Lý do giải trình chậm tiến độ phải chi tiết tối thiểu 10 ký tự");
+        }
+        Incident incident = getIncidentEntity(incidentId);
+        if (incident.getStatus() != IncidentStatus.ASSIGNED && incident.getStatus() != IncidentStatus.IN_PROGRESS) {
+            throw new BadRequestException("Chỉ có thể báo cáo chậm tiến độ khi đang trong giai đoạn thi công");
+        }
+
+        incident.setDelayReason(delayReason.trim());
+        incident = incidentRepository.save(incident);
+
+        notificationService.notifyAdmins(
+            "Báo cáo chậm tiến độ: " + incident.getTicketCode(),
+            "Đội thi công báo cáo nguyên nhân chậm tiến độ: \"" + delayReason.trim() + "\"",
+            "WARNING",
+            incident
+        );
+
+        return mapToResponse(incident);
     }
 
     /**

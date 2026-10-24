@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
 import { AdminAnalyticsResponse } from '../types';
 import { useToast } from '../components/Toast';
+import { useNotifications } from '../context/NotificationContext';
 import {
   Activity,
   AlertTriangle,
@@ -38,9 +39,9 @@ export const AdminAnalyticsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [timeframe, setTimeframe] = useState<string>('30d');
   const [district, setDistrict] = useState<string>('ALL');
-  const [broadcastAlert, setBroadcastAlert] = useState<boolean>(() => {
-    return localStorage.getItem('roadcare_broadcast_alert') === 'true';
-  });
+  const { emergencyBroadcast, triggerEmergencyBroadcast } = useNotifications();
+  const broadcastAlert = !!emergencyBroadcast?.active;
+  const [isBroadcasting, setIsBroadcasting] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const fetchAnalytics = () => {
@@ -82,14 +83,15 @@ export const AdminAnalyticsPage: React.FC = () => {
     }
   };
 
-  const handleToggleBroadcast = () => {
+  const handleToggleBroadcast = async () => {
     const next = !broadcastAlert;
-    setBroadcastAlert(next);
-    localStorage.setItem('roadcare_broadcast_alert', String(next));
-    if (next) {
-      toast.warning('Đã kích hoạt chế độ Phát Sóng Cảnh Báo Khẩn Cấp trên toàn mạng lưới đô thị!', 'Báo Động Hạ Tầng');
-    } else {
-      toast.info('Đã tắt chế độ Phát Sóng Cảnh Báo Khẩn Cấp.');
+    setIsBroadcasting(true);
+    try {
+      await triggerEmergencyBroadcast(next);
+    } catch {
+      toast.error('Không thể phát lệnh khẩn cấp. Vui lòng thử lại!');
+    } finally {
+      setIsBroadcasting(false);
     }
   };
 
@@ -217,14 +219,15 @@ export const AdminAnalyticsPage: React.FC = () => {
           <button
             type="button"
             onClick={handleToggleBroadcast}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+            disabled={isBroadcasting}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
               broadcastAlert
                 ? 'bg-rose-600 text-white border-rose-700 shadow-sm animate-pulse'
                 : 'bg-surface-container text-on-surface border-outline-variant/30 hover:bg-rose-500/10 hover:text-rose-600'
             }`}
           >
             <Radio className="w-3.5 h-3.5" />
-            <span>{broadcastAlert ? 'Báo Động Bật' : 'Phát Lệnh Khẩn'}</span>
+            <span>{isBroadcasting ? 'Đang gửi...' : broadcastAlert ? 'Báo Động Bật' : 'Phát Lệnh Khẩn'}</span>
           </button>
 
           {/* Export GIS GeoJSON */}

@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Builder
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(value = {"hibernateLazyInitializer", "handler"}, ignoreUnknown = true)
 public class User {
 
     @Id
@@ -23,6 +24,7 @@ public class User {
     private String email;
 
     @Column(name = "password_hash", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private String password;
 
     @Column(name = "full_name", nullable = false, length = 150)
@@ -58,7 +60,7 @@ public class User {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id")
-    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"members", "leader", "hibernateLazyInitializer"})
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Team team;
 
     @Column(name = "is_team_leader")

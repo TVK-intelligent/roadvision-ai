@@ -49,6 +49,7 @@ public class IncidentResponse {
     private String safetyNotes;
     private LocalDateTime plannedStartDate;
     private LocalDateTime plannedDeadline;
+    private String delayReason;
 
     // Hồ sơ khảo sát hiện trường (Giai đoạn 4)
     private InspectionResponse inspection;

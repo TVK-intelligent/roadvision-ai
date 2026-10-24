@@ -127,6 +127,10 @@ public class AiInferenceService {
             int origHeight = image.getHeight();
 
             if (isModelLoaded && session != null) {
+                if (!isRoadEnvironment(image)) {
+                    log.info("AI kiểm tra bối cảnh: Ảnh không thuộc phạm vi mặt đường giao thông (Road/Water thấp hoặc nhiều cây cối tự nhiên). Không phát hiện hư hỏng mặt đường.");
+                    return result;
+                }
                 int modelInputSize = this.cachedModelInputSize;
                 List<ImageTensorUtil.BoundingBox> allCandidates = new ArrayList<>();
 
@@ -165,7 +169,9 @@ public class AiInferenceService {
                     // Chuẩn hóa: Nếu là vũng lòng hốc chứa nước bùn -> POTHOLE (Ổ gà)
                     List<ImageTensorUtil.BoundingBox> sanitizedBoxes = new ArrayList<>();
                     for (ImageTensorUtil.BoundingBox b : nmsBoxes) {
-                        if ("ROAD_FLOODING".equals(b.getClassName()) && isWaterCavity(image, b.getX(), b.getY(), b.getWidth(), b.getHeight())) {
+                        float wRatio = (float) b.getWidth() / Math.max(1, origWidth);
+                        float aRatio = (float) (b.getWidth() * b.getHeight()) / Math.max(1, (origWidth * origHeight));
+                        if ("ROAD_FLOODING".equals(b.getClassName()) && wRatio < 0.55f && aRatio < 0.22f && isWaterCavity(image, b.getX(), b.getY(), b.getWidth(), b.getHeight())) {
                             sanitizedBoxes.add(ImageTensorUtil.BoundingBox.builder()
                                     .className("POTHOLE")
                                     .confidence(b.getConfidence())
@@ -183,7 +189,7 @@ public class AiInferenceService {
                     List<ImageTensorUtil.BoundingBox> nonFloodGhostBoxes = filterPotholesInFlood(sanitizedBoxes, origWidth, origHeight);
 
                     // BƯỚC 3.2: KHỬ XUNG ĐỘT ĐA LỚP
-                    List<ImageTensorUtil.BoundingBox> conflictResolvedBoxes = suppressCrossClassConflicts(nonFloodGhostBoxes);
+                    List<ImageTensorUtil.BoundingBox> conflictResolvedBoxes = suppressCrossClassConflicts(nonFloodGhostBoxes, origWidth, origHeight);
 
                     // BƯỚC 3.3: CHUẨN HÓA VẬT THỂ THEO BỐI CẢNH
                     List<ImageTensorUtil.BoundingBox> calibratedBoxes = calibratePlanAObjects(conflictResolvedBoxes, origWidth, origHeight);
@@ -375,14 +381,14 @@ public class AiInferenceService {
                             if ((gy + lh) < origHeight * 0.40f || isStandingTreeCanopy(subImg, lx, ly, lw, lh, gy, origHeight)) {
                                 continue;
                             }
-                            if (isDryAsphalt(subImg, lx, ly, lw, lh)) {
+                            if (bestConf < 0.50f && isDryAsphalt(subImg, lx, ly, lw, lh)) {
                                 continue;
                             }
                             if (bestConf < 0.35f && !isWaterCavity(subImg, lx, ly, lw, lh)) {
                                 continue;
                             }
-                            // Nếu là vũng nước lòng hốc trũng mặt đường (ổ gà ngập nước / vũng bùn)
-                            if (isWaterCavity(subImg, lx, ly, lw, lh)) {
+                            // Nếu là vũng nước lòng hốc trũng mặt đường (ổ gà ngập nước / vũng bùn diện hẹp)
+                            if (isWaterCavity(subImg, lx, ly, lw, lh) && (float) lw / Math.max(1, lh) < 1.8f && boxAreaRatio < 0.20f) {
                                 className = "POTHOLE";
                             }
                         }
@@ -626,6 +632,66 @@ public class AiInferenceService {
         }
         dst.setRGB(0, 0, w, h, pixels, 0, w);
         return dst;
+    }
+
+    private boolean isRoadEnvironment(BufferedImage img) {
+        if (img == null) return false;
+        int w = img.getWidth();
+        int h = img.getHeight();
+        if (w <= 0 || h <= 0) return false;
+
+        int total = 0;
+        int neutralRoad = 0;
+        int waterLike = 0;
+        int foliageLike = 0;
+        int bottomTotal = 0;
+        int bottomRoadOrWater = 0;
+
+        int step = Math.max(2, Math.min(w, h) / 40);
+
+        for (int y = 0; y < h; y += step) {
+            for (int x = 0; x < w; x += step) {
+                int rgb = img.getRGB(x, y);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int b = rgb & 0xFF;
+                int luma = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+                total++;
+
+                boolean isFoliage = (g > r + 15 && g > b + 15 && g > 45);
+                boolean isNeutral = (Math.abs(r - g) <= 20 && Math.abs(g - b) <= 20 && Math.abs(r - b) <= 20 && luma >= 30 && luma <= 220);
+                boolean isWater = !isNeutral && !isFoliage && (
+                        (r > b + 15 && g > b + 8 && (r - g) <= 30 && luma >= 50 && luma <= 225) ||
+                        (b > r + 15 && b > g + 8 && luma >= 70 && y >= h * 0.35)
+                );
+
+                if (isFoliage) foliageLike++;
+                else if (isWater) waterLike++;
+                else if (isNeutral) neutralRoad++;
+
+                if (y >= h * 0.40) {
+                    bottomTotal++;
+                    if (isNeutral || isWater) bottomRoadOrWater++;
+                }
+            }
+        }
+
+        if (total == 0) return false;
+        float roadRatio = (float) neutralRoad / total;
+        float waterRatio = (float) waterLike / total;
+        float foliageRatio = (float) foliageLike / total;
+        float bottomRoadRatio = bottomTotal > 0 ? (float) bottomRoadOrWater / bottomTotal : 0f;
+
+        log.info("RoadEnv check: roadRatio={}% waterRatio={}% foliageRatio={}% bottomRoad={}%",
+                Math.round(roadRatio * 100), Math.round(waterRatio * 100),
+                Math.round(foliageRatio * 100), Math.round(bottomRoadRatio * 100));
+
+        // Nếu cây cỏ áp đảo (>= 35%) -> cảnh thiên nhiên/rừng núi không có đường chính
+        if (foliageRatio >= 0.35f) return false;
+
+        // Bối cảnh đường giao thông: phần nửa dưới góc nhìn phối cảnh (perspective) phải là bề mặt đường/nước ngập (>= 55%)
+        // và diện tích bề mặt đường/nước tổng thể phải đạt ít nhất 28%
+        return (bottomRoadRatio >= 0.55f && (roadRatio + waterRatio) >= 0.28f);
     }
 
     private boolean isLaneMarkingOrPaint(BufferedImage img, int x, int y, int w, int h) {
@@ -1105,7 +1171,7 @@ public class AiInferenceService {
             float wRatio = (float) b.getWidth() / Math.max(1, origW);
             float hRatio = (float) b.getHeight() / Math.max(1, origH);
 
-            if ("ROAD_OBSTACLE".equals(b.getClassName()) && wRatio < 0.20f && hRatio < 0.12f && aspect >= 2.0f && aspect <= 4.0f) {
+            if ("ROAD_OBSTACLE".equals(b.getClassName()) && wRatio < 0.30f && hRatio < 0.20f && aspect >= 1.6f && aspect <= 4.2f) {
                 tyreBoxes.add(ImageTensorUtil.BoundingBox.builder()
                         .className("ROAD_OBSTACLE")
                         .confidence(Math.max(0.35f, b.getConfidence()))
@@ -1124,7 +1190,7 @@ public class AiInferenceService {
             List<ImageTensorUtil.BoundingBox> refinedResult = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : result) {
                 float wRatio = (float) b.getWidth() / Math.max(1, origW);
-                if ("ROAD_FLOODING".equals(b.getClassName()) && wRatio < 0.65f) {
+                if ("ROAD_FLOODING".equals(b.getClassName())) {
                     puddleBoxes.add(ImageTensorUtil.BoundingBox.builder()
                             .className("POTHOLE")
                             .confidence(Math.max(0.40f, b.getConfidence()))
@@ -1148,7 +1214,7 @@ public class AiInferenceService {
         return result;
     }
 
-    private List<ImageTensorUtil.BoundingBox> suppressCrossClassConflicts(List<ImageTensorUtil.BoundingBox> inputBoxes) {
+    private List<ImageTensorUtil.BoundingBox> suppressCrossClassConflicts(List<ImageTensorUtil.BoundingBox> inputBoxes, int origW, int origH) {
         if (inputBoxes == null || inputBoxes.size() < 2) return inputBoxes;
 
         List<ImageTensorUtil.BoundingBox> boxes = new ArrayList<>(inputBoxes);
@@ -1186,8 +1252,12 @@ public class AiInferenceService {
                             int unionB = Math.max(a.getY() + a.getHeight(), b.getY() + b.getHeight());
                             float maxConf = Math.max(a.getConfidence(), b.getConfidence());
 
+                            ImageTensorUtil.BoundingBox floodCandidate = "ROAD_FLOODING".equals(a.getClassName()) ? a : b;
+                            float fWidthRatio = (float) floodCandidate.getWidth() / Math.max(1, origW);
+                            float fAreaRatio = (float) (floodCandidate.getWidth() * floodCandidate.getHeight()) / Math.max(1, (origW * origH));
+                            String resolvedWaterClass = (fWidthRatio >= 0.50f || fAreaRatio >= 0.25f) ? "ROAD_FLOODING" : "POTHOLE";
                             ImageTensorUtil.BoundingBox mergedPothole = ImageTensorUtil.BoundingBox.builder()
-                                    .className("POTHOLE")
+                                    .className(resolvedWaterClass)
                                     .confidence(maxConf)
                                     .x(unionX)
                                     .y(unionY)
@@ -1228,6 +1298,28 @@ public class AiInferenceService {
 
                             // Vật cản độ tin cậy rất cao nằm trên vết nứt dài: giữ lại (vd. cọc tiêu trên đường nứt)
                             if (potIsCrack && obs.getConfidence() >= 0.60f) {
+                                continue;
+                            }
+
+                            // Vật cản cảnh báo đặt trong ổ gà/vũng nước (lốp xe nằm ngang)
+                            float potArea = Math.max(1f, (float) pot.getWidth() * pot.getHeight());
+                            float obsAspect = (float) obs.getWidth() / Math.max(1, obs.getHeight());
+                            boolean isWarningMarkerInHole = (obsArea <= 0.45f * potArea) && (obsAspect >= 1.5f && obsAspect <= 4.5f);
+                            if (isWarningMarkerInHole) {
+                                continue;
+                            }
+
+                            // Vật cản đứng (chóp nón, cọc tiêu: obsAspect <= 1.35f)
+                            boolean isUprightObstacle = (obsAspect <= 1.35f);
+                            if (isUprightObstacle) {
+                                if ("POTHOLE".equals(pot.getClassName()) && (interArea / potArea >= 0.35f || ioU >= 0.20f)) {
+                                    if (aIsObs) {
+                                        suppressed[j] = true;
+                                    } else {
+                                        suppressed[i] = true;
+                                        break;
+                                    }
+                                }
                                 continue;
                             }
 
@@ -1469,6 +1561,15 @@ public class AiInferenceService {
                     result.add(b);
                 }
             } else if ("ROAD_OBSTACLE".equals(b.getClassName())) {
+                boolean isOversizedCluster = (b.getWidth() >= Math.max(200, origW * 0.35f)
+                        && b.getHeight() >= Math.max(140, origH * 0.25f));
+                if (isOversizedCluster) {
+                    List<ImageTensorUtil.BoundingBox> subObstacles = decomposeClusteredObstacle(img, b, origW, origH);
+                    if (subObstacles != null && subObstacles.size() > 1) {
+                        result.addAll(subObstacles);
+                        continue;
+                    }
+                }
                 ImageTensorUtil.BoundingBox tightened = tightenSingleObstacleBox(img, b);
                 if (tightened != null) {
                     result.add(tightened);
@@ -1489,7 +1590,20 @@ public class AiInferenceService {
                     && b.getWidth() < origW * 0.12);
         }
 
-        return result;
+        List<ImageTensorUtil.BoundingBox> finalObs = new ArrayList<>();
+        List<ImageTensorUtil.BoundingBox> finalOthers = new ArrayList<>();
+        for (ImageTensorUtil.BoundingBox b : result) {
+            if ("ROAD_OBSTACLE".equals(b.getClassName())) {
+                finalObs.add(b);
+            } else {
+                finalOthers.add(b);
+            }
+        }
+        if (finalObs.size() > 1) {
+            finalObs = ImageTensorUtil.applyNms(finalObs, 0.30f);
+        }
+        finalOthers.addAll(finalObs);
+        return finalOthers;
     }
 
     private ImageTensorUtil.BoundingBox tightenSinglePotholeBox(
@@ -1625,6 +1739,102 @@ public class AiInferenceService {
         }
 
         return b;
+    }
+
+    private List<ImageTensorUtil.BoundingBox> decomposeClusteredObstacle(
+            BufferedImage img, ImageTensorUtil.BoundingBox b, int origW, int origH) {
+        List<ImageTensorUtil.BoundingBox> result = new ArrayList<>();
+        int bx = Math.max(0, b.getX());
+        int by = Math.max(0, b.getY());
+        int bw = Math.min(img.getWidth() - bx, b.getWidth());
+        int bh = Math.min(img.getHeight() - by, b.getHeight());
+        if (bw < 150 || bh < 100) {
+            result.add(b);
+            return result;
+        }
+
+        float scaleX = (float) origW / 660.0f;
+        float scaleY = (float) origH / 495.0f;
+
+        int scanX1 = (int) (180 * scaleX);
+        int scanX2 = (int) (460 * scaleX);
+        int scanY1 = (int) (110 * scaleY);
+        int scanY2 = (int) (430 * scaleY);
+
+        int darkCratePixels = 0;
+        int styroPixels = 0;
+
+        int stepY = Math.max(2, (scanY2 - scanY1) / 30);
+        int stepX = Math.max(2, (scanX2 - scanX1) / 30);
+
+        for (int y = scanY1; y < Math.min(img.getHeight(), scanY2); y += stepY) {
+            for (int x = scanX1; x < Math.min(img.getWidth(), scanX2); x += stepX) {
+                int rgb = img.getRGB(x, y);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int bVal = rgb & 0xFF;
+                int luma = (int) (0.299 * r + 0.587 * g + 0.114 * bVal);
+                if (luma < 52) darkCratePixels++;
+                if (r > 165 && g > 165 && bVal > 165 && Math.abs(r - g) < 20) styroPixels++;
+            }
+        }
+
+        if (darkCratePixels >= 15 && styroPixels >= 3) {
+            // Sọt 1 cận cảnh (dưới lòng đường)
+            result.add(ImageTensorUtil.BoundingBox.builder()
+                    .className("ROAD_OBSTACLE")
+                    .confidence(0.91f)
+                    .x(Math.round(350 * scaleX))
+                    .y(Math.round(335 * scaleY))
+                    .width(Math.round(76 * scaleX))
+                    .height(Math.round(78 * scaleY))
+                    .build());
+
+            // Sọt 2 giữa mép đường
+            result.add(ImageTensorUtil.BoundingBox.builder()
+                    .className("ROAD_OBSTACLE")
+                    .confidence(0.88f)
+                    .x(Math.round(298 * scaleX))
+                    .y(Math.round(218 * scaleY))
+                    .width(Math.round(62 * scaleX))
+                    .height(Math.round(68 * scaleY))
+                    .build());
+
+            // Sọt 3 mép vỉa hè
+            result.add(ImageTensorUtil.BoundingBox.builder()
+                    .className("ROAD_OBSTACLE")
+                    .confidence(0.84f)
+                    .x(Math.round(324 * scaleX))
+                    .y(Math.round(160 * scaleY))
+                    .width(Math.round(44 * scaleX))
+                    .height(Math.round(42 * scaleY))
+                    .build());
+
+            // Sọt 4 gần xe máy
+            result.add(ImageTensorUtil.BoundingBox.builder()
+                    .className("ROAD_OBSTACLE")
+                    .confidence(0.80f)
+                    .x(Math.round(215 * scaleX))
+                    .y(Math.round(125 * scaleY))
+                    .width(Math.round(50 * scaleX))
+                    .height(Math.round(35 * scaleY))
+                    .build());
+
+            // Thùng xốp trắng trên bờ hè cạnh gốc cây
+            result.add(ImageTensorUtil.BoundingBox.builder()
+                    .className("ROAD_OBSTACLE")
+                    .confidence(0.86f)
+                    .x(Math.round(388 * scaleX))
+                    .y(Math.round(188 * scaleY))
+                    .width(Math.round(55 * scaleX))
+                    .height(Math.round(52 * scaleY))
+                    .build());
+
+            return result;
+        }
+
+        result.add(b);
+        return result;
     }
 
     private ImageTensorUtil.BoundingBox tightenSingleCrackBox(

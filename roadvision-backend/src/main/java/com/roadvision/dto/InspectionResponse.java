@@ -32,6 +32,13 @@ public class InspectionResponse {
     private Boolean noDamageFound;
     private String reasonNoDamage;
     private String notes;
+    private String inspectionStatus; // DRAFT, SUBMITTED, APPROVED, REVISE_REQUESTED
+    private Integer version;
+    private String revisionReason;
+    private BigDecimal gpsAccuracy;
+    private Long approvedByAdminId;
+    private String approvedByAdminName;
+    private LocalDateTime approvedAt;
     private List<String> inspectionPhotos;
     private LocalDateTime inspectedAt;
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { incidentApi } from '../services/incidentApi';
 import { Incident, IncidentStatus, EvidenceStage } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
@@ -18,12 +19,20 @@ import {
   Camera,
   Send,
   Calendar,
-  ShieldAlert,
   Sparkles,
   ShieldCheck,
+  Eye,
+  AlertTriangle,
+  RotateCcw,
+  Check,
+  ExternalLink,
+  Layers,
+  FileCheck,
 } from 'lucide-react';
 
 export const ConstructionTasksPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ROLE_ADMIN';
   const toast = useToast();
   const [tasks, setTasks] = useState<Incident[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -49,6 +58,73 @@ export const ConstructionTasksPage: React.FC = () => {
   const [acceptanceNotes, setAcceptanceNotes] = useState<string>('Đã thi công xong theo đúng hồ sơ thiết kế, bề mặt êm thuận và an toàn giao thông.');
   const [isSubmittingAcceptance, setIsSubmittingAcceptance] = useState<boolean>(false);
 
+  // Modal Báo cáo chậm tiến độ (Giai đoạn 6)
+  const [selectedDelayTask, setSelectedDelayTask] = useState<Incident | null>(null);
+  const [delayReasonText, setDelayReasonText] = useState<string>('');
+  const [isSubmittingDelay, setIsSubmittingDelay] = useState<boolean>(false);
+
+  // Modal Thẩm định Nghiệm thu (Admin Review Modal)
+  const [reviewAcceptanceTask, setReviewAcceptanceTask] = useState<Incident | null>(null);
+  const [adminDecision, setAdminDecision] = useState<'APPROVE' | 'REWORK'>('APPROVE');
+  const [reworkInstructions, setReworkInstructions] = useState<string>('');
+  const [acceptanceNotesAdmin, setAcceptanceNotesAdmin] = useState<string>('Nghiệm thu đạt yêu cầu kỹ thuật và an toàn giao thông.');
+  const [isSubmittingAdminReview, setIsSubmittingAdminReview] = useState<boolean>(false);
+
+  // Modal Thư viện ảnh / Bằng chứng công trường (Gallery Modal)
+  const [galleryTask, setGalleryTask] = useState<Incident | null>(null);
+
+  const handleAdminReviewAcceptance = async () => {
+    if (!reviewAcceptanceTask) return;
+    if (adminDecision === 'REWORK' && (!reworkInstructions || reworkInstructions.trim().length < 5)) {
+      toast.warning('Vui lòng chỉ rõ hạng mục cần thi công lại (tối thiểu 5 ký tự)!', 'Thiếu chỉ dẫn sửa chữa');
+      return;
+    }
+
+    setIsSubmittingAdminReview(true);
+    try {
+      await incidentApi.reviewAcceptance(reviewAcceptanceTask.id, {
+        approved: adminDecision === 'APPROVE',
+        reworkReason: adminDecision === 'REWORK' ? reworkInstructions.trim() : undefined,
+        notes: acceptanceNotesAdmin.trim(),
+      });
+
+      if (adminDecision === 'APPROVE') {
+        toast.success('Đã nghiệm thu đạt chuẩn! Hồ sơ sự cố được đóng hoàn tất (CLOSED).', 'Nghiệm thu thành công');
+      } else {
+        toast.info('Đã ban hành lệnh yêu cầu thi công lại (REWORK_REQUIRED) cho Đội thi công.', 'Yêu cầu làm lại');
+      }
+
+      setReviewAcceptanceTask(null);
+      setReworkInstructions('');
+      fetchTasks(page, pageSize);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Lỗi khi thẩm định nghiệm thu', 'Lỗi thẩm định');
+    } finally {
+      setIsSubmittingAdminReview(false);
+    }
+  };
+
+  const handleDelaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDelayTask) return;
+    if (!delayReasonText || delayReasonText.trim().length < 10) {
+      toast.warning('Lý do giải trình chậm tiến độ phải cụ thể tối thiểu 10 ký tự!');
+      return;
+    }
+    setIsSubmittingDelay(true);
+    try {
+      await incidentApi.reportDelayReason(selectedDelayTask.id, { delayReason: delayReasonText.trim() });
+      toast.success('Đã gửi báo cáo giải trình chậm tiến độ cho Ban Quản lý!', 'Báo cáo chậm tiến độ');
+      setSelectedDelayTask(null);
+      setDelayReasonText('');
+      fetchTasks(page, pageSize);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Lỗi khi gửi giải trình', 'Lỗi');
+    } finally {
+      setIsSubmittingDelay(false);
+    }
+  };
+
   const handleCloseAcceptanceModal = () => {
     setSelectedAcceptanceTask(null);
     setAcceptanceFile(null);
@@ -58,29 +134,52 @@ export const ConstructionTasksPage: React.FC = () => {
 
   const fetchTasks = (targetPage = page, targetSize = pageSize) => {
     setLoading(true);
-    incidentApi
-      .getAssignedToMe(targetPage, targetSize)
-      .then((res) => {
-        if (res.data?.content) {
-          // Lọc các nhiệm vụ thuộc phạm vi Thi công
-          const constructionOnly = res.data.content.filter((i) =>
-            ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED'].includes(i.status) ||
-            i.assignedTeamName
-          );
-          setTasks(constructionOnly);
-          setTotalPages(res.data.totalPages || 0);
-          setTotalElements(constructionOnly.length);
-        }
-      })
-      .catch((err) => {
-        console.warn('Lỗi lấy danh sách thi công:', err);
-      })
-      .finally(() => setLoading(false));
+    if (isAdmin) {
+      // Admin: Lấy toàn bộ các công trình thi công trên hệ thống
+      incidentApi
+        .getIncidents({
+          size: 100,
+        })
+        .then((res) => {
+          if (res.data?.content) {
+            const constructionOnly = res.data.content.filter((i) =>
+              ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED'].includes(i.status) ||
+              i.assignedTeamName
+            );
+            setTasks(constructionOnly);
+            setTotalPages(Math.ceil(constructionOnly.length / pageSize) || 1);
+            setTotalElements(constructionOnly.length);
+          }
+        })
+        .catch((err) => {
+          console.warn('Lỗi lấy danh sách thi công Admin:', err);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      // Staff: Chỉ lấy các nhiệm vụ được giao cho chính mình
+      incidentApi
+        .getAssignedToMe(0, 100)
+        .then((res) => {
+          if (res.data?.content) {
+            const constructionOnly = res.data.content.filter((i) =>
+              ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED'].includes(i.status) ||
+              i.assignedTeamName
+            );
+            setTasks(constructionOnly);
+            setTotalPages(Math.ceil(constructionOnly.length / pageSize) || 1);
+            setTotalElements(constructionOnly.length);
+          }
+        })
+        .catch((err) => {
+          console.warn('Lỗi lấy danh sách thi công Staff:', err);
+        })
+        .finally(() => setLoading(false));
+    }
   };
 
   useEffect(() => {
     fetchTasks(page, pageSize);
-  }, [page, pageSize]);
+  }, [page, pageSize, isAdmin]);
 
   // Bắt đầu thi công
   const handleStartConstruction = async (taskId: number) => {
@@ -180,13 +279,15 @@ export const ConstructionTasksPage: React.FC = () => {
   };
 
   const filteredTasks = tasks.filter((t) => {
-    if (filter === 'ASSIGNED') return t.status === 'ASSIGNED';
-    if (filter === 'IN_PROGRESS') return t.status === 'IN_PROGRESS';
+    if (filter === 'IN_PROGRESS') return ['ASSIGNED', 'IN_PROGRESS'].includes(t.status);
+    if (filter === 'OVERDUE') return Boolean(t.plannedDeadline && new Date() > new Date(t.plannedDeadline) && ['ASSIGNED', 'IN_PROGRESS', 'REWORK_REQUIRED'].includes(t.status));
     if (filter === 'REWORK_REQUIRED') return t.status === 'REWORK_REQUIRED';
     if (filter === 'PENDING_ACCEPTANCE') return ['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(t.status);
     if (filter === 'DONE') return ['RESOLVED', 'CLOSED'].includes(t.status);
     return true;
   });
+
+  const paginatedTasks = filteredTasks.slice(page * pageSize, (page + 1) * pageSize);
 
   return (
     <div className="flex flex-col gap-6 py-4">
@@ -195,19 +296,21 @@ export const ConstructionTasksPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold uppercase tracking-wide">
             <HardHat className="w-4 h-4 text-amber-600" />
-            <span>Giai đoạn 6 • Tổ Đội Thi Công Sửa Chữa</span>
+            <span>{isAdmin ? 'Chế độ Giám sát toàn diện • Quản trị viên (Admin)' : 'Giai đoạn 6 • Tổ Đội Thi Công Sửa Chữa'}</span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900 mt-1">
-            Nhiệm vụ Thi công Hiện trường
+            {isAdmin ? 'Giám sát Thi công sửa chữa & Tiến độ công trình' : 'Nhiệm vụ Thi công Hiện trường'}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Tiếp nhận nhiệm vụ thi công, tuân thủ phương án kỹ thuật đã phê duyệt, đảm bảo an toàn giao thông, nộp bằng chứng đa mốc và gửi nghiệm thu.
+            {isAdmin
+              ? 'Theo dõi toàn bộ các công trình sửa chữa đang thi công, kiểm soát tiến độ SLA, xử lý công trình quá hạn và thẩm định nghiệm thu hoàn công.'
+              : 'Tiếp nhận nhiệm vụ thi công, tuân thủ phương án kỹ thuật đã phê duyệt, đảm bảo an toàn giao thông, nộp bằng chứng đa mốc và gửi nghiệm thu.'}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-2 rounded-md bg-amber-50 border border-amber-200 flex items-center gap-2">
-            <span className="text-xs text-amber-800">Công trình cần thực hiện:</span>
+            <span className="text-xs text-amber-800">{isAdmin ? 'Tổng số công trình:' : 'Công trình cần thực hiện:'}</span>
             <span className="text-sm font-bold text-amber-900 leading-none">{totalElements}</span>
           </div>
         </div>
@@ -217,15 +320,18 @@ export const ConstructionTasksPage: React.FC = () => {
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {[
           { id: 'ALL', label: 'Tất cả công trình', count: tasks.length },
-          { id: 'ASSIGNED', label: 'Chờ triển khai', count: tasks.filter((t) => t.status === 'ASSIGNED').length },
-          { id: 'IN_PROGRESS', label: 'Đang thi công', count: tasks.filter((t) => t.status === 'IN_PROGRESS').length },
-          { id: 'REWORK_REQUIRED', label: 'Yêu cầu làm lại', count: tasks.filter((t) => t.status === 'REWORK_REQUIRED').length },
+          { id: 'IN_PROGRESS', label: 'Đang thi công', count: tasks.filter((t) => ['ASSIGNED', 'IN_PROGRESS'].includes(t.status)).length },
+          { id: 'OVERDUE', label: 'Quá hạn SLA', count: tasks.filter((t) => Boolean(t.plannedDeadline && new Date() > new Date(t.plannedDeadline) && ['ASSIGNED', 'IN_PROGRESS', 'REWORK_REQUIRED'].includes(t.status))).length },
           { id: 'PENDING_ACCEPTANCE', label: 'Chờ nghiệm thu', count: tasks.filter((t) => ['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(t.status)).length },
+          { id: 'REWORK_REQUIRED', label: 'Yêu cầu làm lại', count: tasks.filter((t) => t.status === 'REWORK_REQUIRED').length },
           { id: 'DONE', label: 'Đã hoàn tất', count: tasks.filter((t) => ['RESOLVED', 'CLOSED'].includes(t.status)).length },
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setFilter(tab.id)}
+            onClick={() => {
+              setFilter(tab.id);
+              setPage(0);
+            }}
             className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
               filter === tab.id
                 ? 'bg-amber-600 text-white shadow-xs'
@@ -261,7 +367,7 @@ export const ConstructionTasksPage: React.FC = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredTasks.map((task) => (
+            {paginatedTasks.map((task) => (
               <div
                 key={task.id}
                 className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col justify-between gap-4 hover:border-slate-300 transition-colors"
@@ -284,13 +390,20 @@ export const ConstructionTasksPage: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-600 mt-1">
-                      {task.assignedTeamName && (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                          Tổ thi công: {task.assignedTeamName}
+                      <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                        Đội: {task.assignedTeamName || task.assignment?.assignedToStaffName || 'Đội Thi công'}
+                      </span>
+                      {isAdmin && task.assignment?.assignedToStaffName && (
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                          Phụ trách: {task.assignment.assignedToStaffName}
                         </span>
                       )}
                       {task.plannedDeadline && (
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                        <span className={`px-1.5 py-0.5 rounded border flex items-center gap-1 font-mono ${
+                          new Date() > new Date(task.plannedDeadline) && ['ASSIGNED', 'IN_PROGRESS', 'REWORK_REQUIRED'].includes(task.status)
+                            ? 'bg-rose-50 text-rose-700 border-rose-200 font-bold'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}>
                           <Calendar className="w-3 h-3 text-slate-500" />
                           Hạn: {new Date(task.plannedDeadline).toLocaleDateString('vi-VN')}
                         </span>
@@ -299,11 +412,58 @@ export const ConstructionTasksPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Kích thước đo đạc khảo sát thực địa */}
+                {task.inspection?.estimatedSize && (
+                  <div className="text-xs text-blue-900 bg-blue-50/70 p-2.5 rounded-md border border-blue-200 flex items-center justify-between flex-wrap gap-2">
+                    <span>Khối lượng khảo sát: <strong>{task.inspection.estimatedSize}</strong></span>
+                    {task.inspection.trafficImpact && (
+                      <span className="text-[11px] text-blue-700">Mức ảnh hưởng: {task.inspection.trafficImpact}</span>
+                    )}
+                  </div>
+                )}
+
                 {/* Phương án thi công đã duyệt */}
                 {task.workPlan && (
                   <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 text-xs">
                     <span className="font-semibold text-slate-800">Phương án thi công: </span>
                     <span className="text-slate-600">{task.workPlan}</span>
+                  </div>
+                )}
+
+                {/* Lưu ý an toàn giao thông */}
+                {task.safetyNotes && (
+                  <div className="p-2 rounded-md bg-amber-50/60 border border-amber-200 text-xs text-amber-900">
+                    <span className="font-semibold">Lưu ý ATGT: </span>
+                    <span>{task.safetyNotes}</span>
+                  </div>
+                )}
+
+                {/* Cảnh báo quá hạn thi công (SLA Overdue) */}
+                {task.plannedDeadline && new Date() > new Date(task.plannedDeadline) && ['ASSIGNED', 'IN_PROGRESS', 'REWORK_REQUIRED'].includes(task.status) && (
+                  <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-md text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-rose-800">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <span>Đã quá hạn thi công ({new Date(task.plannedDeadline).toLocaleDateString('vi-VN')})</span>
+                    </div>
+                    {!task.delayReason && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDelayTask(task);
+                          setDelayReasonText('');
+                        }}
+                        className="px-2 py-1 rounded bg-rose-600 text-white text-[11px] font-medium hover:bg-rose-700 transition-colors shadow-xs"
+                      >
+                        Giải trình chậm
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Hiển thị lý do giải trình chậm tiến độ */}
+                {task.delayReason && (
+                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-md text-[11px] text-slate-700">
+                    <strong>Giải trình chậm tiến độ:</strong> "{task.delayReason}"
                   </div>
                 )}
 
@@ -328,58 +488,90 @@ export const ConstructionTasksPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {task.status === 'ASSIGNED' && (
-                      <button
-                        onClick={() => handleStartConstruction(task.id)}
-                        className="px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
-                      >
-                        <Hammer className="w-3.5 h-3.5" />
-                        <span>Bắt đầu thi công</span>
-                      </button>
-                    )}
-
-                    {['IN_PROGRESS', 'REWORK_REQUIRED'].includes(task.status) && (
+                    {/* Hành động dành riêng cho ADMIN */}
+                    {isAdmin ? (
                       <>
+                        {['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(task.status) && (
+                          <button
+                            onClick={() => {
+                              setReviewAcceptanceTask(task);
+                              setAdminDecision('APPROVE');
+                              setReworkInstructions('');
+                              setAcceptanceNotesAdmin('Nghiệm thu đạt yêu cầu kỹ thuật và an toàn giao thông.');
+                            }}
+                            className="px-3.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Thẩm định nghiệm thu</span>
+                          </button>
+                        )}
+
                         <button
-                          onClick={() => {
-                            setSelectedEvidenceTask(task);
-                            setEvidenceStage('PROGRESS');
-                          }}
+                          onClick={() => setGalleryTask(task)}
                           className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1 transition-colors"
-                          title="Chụp ảnh lưu vết nhật ký thi công lúc chuẩn bị hoặc đang làm"
+                          title="Xem toàn bộ ảnh Before, Progress, After của công trình"
                         >
-                          <Camera className="w-3.5 h-3.5 text-blue-600" />
-                          <span>Ảnh tiến độ</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedAcceptanceTask(task);
-                            setAcceptanceNotes('Đã thi công xong theo đúng hồ sơ thiết kế, bề mặt êm thuận và an toàn giao thông.');
-                          }}
-                          className="px-3.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>Nộp nghiệm thu & Quét AI</span>
+                          <Camera className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Xem bằng chứng</span>
                         </button>
                       </>
-                    )}
+                    ) : (
+                      /* Hành động dành cho Kỹ thuật viên (STAFF) */
+                      <>
+                        {task.status === 'ASSIGNED' && (
+                          <button
+                            onClick={() => handleStartConstruction(task.id)}
+                            className="px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                          >
+                            <Hammer className="w-3.5 h-3.5" />
+                            <span>Bắt đầu thi công</span>
+                          </button>
+                        )}
 
-                    {['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(task.status) && (
-                      <span className="text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-200">
-                        Chờ Admin thẩm định
-                      </span>
-                    )}
+                        {['IN_PROGRESS', 'REWORK_REQUIRED'].includes(task.status) && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setSelectedEvidenceTask(task);
+                                setEvidenceStage('PROGRESS');
+                              }}
+                              className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1 transition-colors"
+                              title="Chụp ảnh lưu vết nhật ký thi công lúc chuẩn bị hoặc đang làm"
+                            >
+                              <Camera className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Ảnh tiến độ</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedAcceptanceTask(task);
+                                setAcceptanceNotes('Đã thi công xong theo đúng hồ sơ thiết kế, bề mặt êm thuận và an toàn giao thông.');
+                              }}
+                              className="px-3.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Nộp nghiệm thu & Quét AI</span>
+                            </button>
+                          </>
+                        )}
 
-                    {['RESOLVED', 'CLOSED'].includes(task.status) && (
-                      <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200">
-                        Đã đóng phiếu
-                      </span>
+                        {['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(task.status) && (
+                          <span className="text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-200">
+                            Chờ Admin thẩm định
+                          </span>
+                        )}
+
+                        {['RESOLVED', 'CLOSED'].includes(task.status) && (
+                          <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200">
+                            Đã đóng phiếu
+                          </span>
+                        )}
+                      </>
                     )}
 
                     <Link
                       to={`/incidents/${task.id}`}
                       className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
-                      title="Xem chi tiết hồ sơ"
+                      title="Xem chi tiết toàn văn hồ sơ"
                     >
                       <ArrowUpRight className="w-4 h-4" />
                     </Link>
@@ -391,8 +583,8 @@ export const ConstructionTasksPage: React.FC = () => {
 
           <Pagination
             currentPage={page}
-            totalPages={totalPages}
-            totalElements={totalElements}
+            totalPages={Math.ceil(filteredTasks.length / pageSize) || 1}
+            totalElements={filteredTasks.length}
             pageSize={pageSize}
             onPageChange={(newPage) => setPage(newPage)}
             onPageSizeChange={(newSize) => {
@@ -592,6 +784,314 @@ export const ConstructionTasksPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Báo Cáo Chậm Tiến Độ (Overdue SLA) */}
+      {selectedDelayTask && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg border border-slate-200 max-w-lg w-full p-5 shadow-xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-rose-700">
+                <Clock className="w-4 h-4" />
+                <h3 className="font-semibold text-sm">Báo cáo lý do chậm tiến độ thi công</h3>
+              </div>
+              <button
+                onClick={() => setSelectedDelayTask(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleDelaySubmit} className="flex flex-col gap-3.5 text-xs">
+              <div className="p-3 bg-rose-50 rounded-md border border-rose-200 text-rose-900 text-xs">
+                Công trình đã vượt quá hạn chót hoàn thành theo kế hoạch đã duyệt. Vui lòng giải trình nguyên nhân khách quan để Ban Quản lý nắm bắt và hỗ trợ điều phối.
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Nguyên nhân chậm tiến độ * (Tối thiểu 10 ký tự)</label>
+                <textarea
+                  value={delayReasonText}
+                  onChange={(e) => setDelayReasonText(e.target.value)}
+                  rows={3}
+                  required
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent leading-relaxed text-slate-900 font-medium"
+                  placeholder="Ví dụ: Hiện trường mưa lớn kéo dài không thể thảm nhựa nóng, hoặc vướng công trình ngầm cấp thoát nước..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDelayTask(null)}
+                  className="px-3.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors font-medium cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDelay}
+                  className="px-4 py-1.5 rounded-md bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSubmittingDelay ? 'Đang gửi...' : 'Gửi báo cáo giải trình'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Thẩm định Nghiệm thu Hoàn công (Dành cho Admin) */}
+      {reviewAcceptanceTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Thẩm định Nghiệm thu Công trình #{reviewAcceptanceTask.ticketCode}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Đối chiếu hiện trạng Trước / Sau thi công & Quyết định đóng hồ sơ hoặc thi công lại
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReviewAcceptanceTask(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4 text-xs">
+              {/* So sánh ảnh Trước vs Sau */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="font-semibold text-slate-700">Ảnh hiện trường ban đầu (Before):</span>
+                  <img
+                    src={reviewAcceptanceTask.imageUrl}
+                    alt="Hiện trường ban đầu"
+                    className="w-full h-44 object-cover rounded-lg border border-slate-200"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="font-semibold text-slate-700">Ảnh nghiệm thu hoàn thành (After):</span>
+                  <img
+                    src={reviewAcceptanceTask.resolution?.proofImageUrl || reviewAcceptanceTask.imageUrl}
+                    alt="Nghiệm thu hoàn thành"
+                    className="w-full h-44 object-cover rounded-lg border border-slate-200"
+                  />
+                </div>
+              </div>
+
+              {/* Thông tin thi công & Ghi chú từ đội thi công */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex flex-col gap-1.5">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Đội thi công: <strong className="text-slate-900">{reviewAcceptanceTask.assignedTeamName || 'Đội Thi công'}</strong></span>
+                  <span>Phụ trách: <strong className="text-slate-900">{reviewAcceptanceTask.assignment?.assignedToStaffName || 'Kỹ thuật viên'}</strong></span>
+                </div>
+                {reviewAcceptanceTask.resolution?.aiVerificationStatus && (
+                  <div className={`p-2 rounded font-medium flex items-center gap-1.5 ${
+                    reviewAcceptanceTask.resolution.aiVerificationStatus === 'AI_VERIFIED_CLEAN'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-amber-50 text-amber-800 border border-amber-200'
+                  }`}>
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>Kiểm định AI YOLOv8: {reviewAcceptanceTask.resolution.aiVerificationNotes || reviewAcceptanceTask.resolution.aiVerificationStatus}</span>
+                  </div>
+                )}
+                <div className="text-slate-700 mt-1">
+                  <strong>Ghi chú hoàn thành từ đội thi công:</strong>
+                  <p className="italic mt-0.5">"{reviewAcceptanceTask.resolution?.notes || 'Đã thi công hoàn thành đạt chuẩn mặt đường.'}"</p>
+                </div>
+              </div>
+
+              {/* Lựa chọn quyết định của Admin */}
+              <div className="flex flex-col gap-2">
+                <label className="font-bold text-slate-800">Quyết định thẩm định của Quản trị viên:</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAdminDecision('APPROVE')}
+                    className={`p-3 rounded-lg border flex items-center gap-2.5 transition-all text-left ${
+                      adminDecision === 'APPROVE'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-400'
+                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${adminDecision === 'APPROVE' ? 'bg-emerald-600 text-white' : 'border border-slate-300'}`}>
+                      {adminDecision === 'APPROVE' && <Check className="w-3 h-3" />}
+                    </div>
+                    <div>
+                      <span className="font-bold block text-xs">Đạt nghiệm thu</span>
+                      <span className="text-[10px] text-slate-500">Đóng hồ sơ hoàn tất (CLOSED)</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdminDecision('REWORK')}
+                    className={`p-3 rounded-lg border flex items-center gap-2.5 transition-all text-left ${
+                      adminDecision === 'REWORK'
+                        ? 'border-rose-500 bg-rose-50 text-rose-900 ring-2 ring-rose-400'
+                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${adminDecision === 'REWORK' ? 'bg-rose-600 text-white' : 'border border-slate-300'}`}>
+                      {adminDecision === 'REWORK' && <Check className="w-3 h-3" />}
+                    </div>
+                    <div>
+                      <span className="font-bold block text-xs">Yêu cầu thi công lại</span>
+                      <span className="text-[10px] text-slate-500">Bắt buộc sửa chữa (REWORK)</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Chỉ dẫn làm lại nếu REWORK */}
+              {adminDecision === 'REWORK' && (
+                <div className="p-3 bg-rose-50 rounded-lg border border-rose-300 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5 font-semibold text-rose-900">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span>Chỉ dẫn khắc phục & Lý do yêu cầu thi công lại *:</span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={reworkInstructions}
+                    onChange={(e) => setReworkInstructions(e.target.value)}
+                    placeholder="Ví dụ: Mép vá chưa phẳng êm thuận, nhựa đường đầm lèn chưa đủ độ chặt K98..."
+                    className="w-full px-2.5 py-1.5 rounded bg-white border border-rose-300 text-xs text-slate-900 focus:outline-hidden"
+                  />
+                </div>
+              )}
+
+              {/* Ý kiến thẩm định */}
+              <div>
+                <label className="font-medium text-slate-700 block mb-1">Ghi chú kết luận thẩm định:</label>
+                <input
+                  type="text"
+                  value={acceptanceNotesAdmin}
+                  onChange={(e) => setAcceptanceNotesAdmin(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-md border border-slate-300 text-xs"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
+                <Link
+                  to={`/incidents/${reviewAcceptanceTask.id}`}
+                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium text-xs"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Xem chi tiết hồ sơ gốc</span>
+                </Link>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReviewAcceptanceTask(null)}
+                    className="px-3.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmittingAdminReview}
+                    onClick={handleAdminReviewAcceptance}
+                    className={`px-4 py-1.5 rounded-md text-white font-medium text-xs shadow-xs flex items-center gap-1.5 ${
+                      adminDecision === 'APPROVE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>{isSubmittingAdminReview ? 'Đang xử lý...' : adminDecision === 'APPROVE' ? 'Xác nhận Nghiệm thu Đạt' : 'Xác nhận Bắt làm lại'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Thư viện Bằng chứng ảnh & Tiến độ công trình (Gallery) */}
+      {galleryTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Thư viện Bằng chứng Hiện trường #{galleryTask.ticketCode}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Theo dõi đầy đủ chuỗi ảnh hiện trạng Before, Progress, After và Rework
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setGalleryTask(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4 text-xs">
+              {/* Ảnh người dân ban đầu */}
+              <div>
+                <span className="font-semibold text-slate-800 block mb-1.5">1. Ảnh người dân phản ánh ban đầu:</span>
+                <a href={galleryTask.imageUrl} target="_blank" rel="noreferrer" className="inline-block">
+                  <img src={galleryTask.imageUrl} alt="Ảnh người dân" className="w-44 h-32 object-cover rounded-lg border border-slate-200 hover:opacity-90" />
+                </a>
+              </div>
+
+              {/* Ảnh khảo sát nếu có */}
+              {galleryTask.inspection?.inspectionPhotos && galleryTask.inspection.inspectionPhotos.length > 0 && (
+                <div>
+                  <span className="font-semibold text-slate-800 block mb-1.5">
+                    2. Ảnh đo đạc thực tế của Tổ Khảo sát ({galleryTask.inspection.inspectionPhotos.length} ảnh):
+                  </span>
+                  <div className="flex gap-2.5 overflow-x-auto pb-1">
+                    {galleryTask.inspection.inspectionPhotos.map((photo, idx) => (
+                      <a key={idx} href={photo} target="_blank" rel="noreferrer" className="shrink-0">
+                        <img src={photo} alt={`Ảnh khảo sát ${idx + 1}`} className="w-32 h-24 object-cover rounded-lg border border-slate-200 hover:opacity-90" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ảnh hoàn thành nghiệm thu */}
+              {galleryTask.resolution?.proofImageUrl && (
+                <div>
+                  <span className="font-semibold text-slate-800 block mb-1.5">3. Ảnh nghiệm thu hoàn thành (After):</span>
+                  <a href={galleryTask.resolution.proofImageUrl} target="_blank" rel="noreferrer" className="inline-block">
+                    <img
+                      src={galleryTask.resolution.proofImageUrl}
+                      alt="Ảnh nghiệm thu"
+                      className="w-44 h-32 object-cover rounded-lg border border-emerald-300 hover:opacity-90"
+                    />
+                  </a>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setGalleryTask(null)}
+                  className="px-4 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

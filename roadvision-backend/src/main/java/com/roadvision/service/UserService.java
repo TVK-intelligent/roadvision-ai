@@ -58,6 +58,7 @@ public class UserService {
                 .email(savedUser.getEmail())
                 .fullName(savedUser.getFullName())
                 .role(savedUser.getRole())
+                .reputationScore(savedUser.getReputationScore() != null ? savedUser.getReputationScore() : 50)
                 .build();
     }
 
@@ -78,6 +79,19 @@ public class UserService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role(user.getRole())
+                .reputationScore(user.getReputationScore() != null ? user.getReputationScore() : 50)
+                .build();
+    }
+
+    public AuthResponse getUserProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+        return AuthResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .role(user.getRole())
+                .reputationScore(user.getReputationScore() != null ? user.getReputationScore() : 50)
                 .build();
     }
 

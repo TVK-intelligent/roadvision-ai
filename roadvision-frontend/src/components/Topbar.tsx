@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   Info,
   MapPin,
+  Star,
+  Radio,
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 
@@ -38,7 +40,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, isConnected, emergencyBroadcast, triggerEmergencyBroadcast, markAsRead, markAllAsRead } = useNotifications();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
   const [isNotiOpen, setIsNotiOpen] = useState<boolean>(false);
@@ -163,6 +165,29 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   return (
     <>
+      {/* BANNER BÁO ĐỘNG KHẨN CẤP TOÀN MẠNG LƯỚI ĐÔ THỊ */}
+      {emergencyBroadcast?.active && (
+        <div className="bg-rose-600 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold shadow-md border-b border-rose-700 animate-pulse sticky top-0 z-40">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <Radio className="w-4 h-4 text-white shrink-0 animate-ping" />
+            <span className="font-bold tracking-wide uppercase text-[10px] bg-rose-800 px-2 py-0.5 rounded shrink-0">
+              {emergencyBroadcast.title || 'LỆNH BÁO ĐỘNG KHẨN CẤP'}
+            </span>
+            <span className="truncate">
+              {emergencyBroadcast.message || 'Ban Quản Lý yêu cầu các tổ tuần kiểm và thi công ưu tiên xử lý khẩn các sự cố sụt lún, ngập úng nguy hiểm!'}
+            </span>
+          </div>
+          {user?.role === 'ROLE_ADMIN' && (
+            <button
+              onClick={() => triggerEmergencyBroadcast(false)}
+              className="ml-3 px-2.5 py-1 bg-white text-rose-700 text-[11px] font-bold rounded-lg hover:bg-rose-50 transition shadow-xs shrink-0 cursor-pointer"
+            >
+              Hạ Cảnh Báo
+            </button>
+          )}
+        </div>
+      )}
+
       <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-30 px-4 md:px-6 flex items-center justify-between shadow-xs">
         {/* 1. Bên Trái: Nút Toggle & Tìm kiếm & Breadcrumb */}
         <div className="flex items-center gap-3 md:gap-4 flex-1 max-w-xl">
@@ -181,10 +206,9 @@ export const Topbar: React.FC<TopbarProps> = ({
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Tiêu đề trang & Breadcrumb trên Desktop */}
-          <div className="hidden sm:flex flex-col">
-            <span className="text-[11px] font-medium text-slate-400">RoadVision / Quản lý</span>
-            <h1 className="text-sm font-semibold text-slate-800 leading-tight">
+          {/* Tiêu đề trang trên Desktop */}
+          <div className="hidden sm:flex flex-col justify-center">
+            <h1 className="text-base font-semibold text-slate-800 leading-tight">
               {getPageTitle(location.pathname)}
             </h1>
           </div>
@@ -432,9 +456,17 @@ export const Topbar: React.FC<TopbarProps> = ({
                   {user.fullName ? user.fullName.charAt(0).toUpperCase() : <UserCircle className="w-5 h-5" />}
                 </div>
                 <div className="hidden sm:flex flex-col text-left">
-                  <span className="text-xs font-semibold text-slate-900 leading-tight truncate max-w-[120px]">
-                    {user.fullName}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-slate-900 leading-tight truncate max-w-[120px]">
+                      {user.fullName}
+                    </span>
+                    {user.role === 'ROLE_CITIZEN' && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Điểm uy tín người dân">
+                        <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                        {user.reputationScore ?? 50}
+                      </span>
+                    )}
+                  </div>
                   <span className={`text-[9px] font-medium px-1.5 py-0.2 rounded w-fit mt-0.5 ${getRoleBadge(user.role).className}`}>
                     {getRoleBadge(user.role).label}
                   </span>
@@ -450,6 +482,17 @@ export const Topbar: React.FC<TopbarProps> = ({
                     <div className="px-3.5 py-2 border-b border-slate-100">
                       <p className="font-semibold text-slate-900 truncate">{user.fullName}</p>
                       <p className="text-slate-500 text-[11px] font-mono truncate">{user.phone || user.email}</p>
+                      {user.role === 'ROLE_CITIZEN' && (
+                        <div className="mt-2 p-2 bg-gradient-to-r from-amber-50 to-orange-50 rounded-md border border-amber-200/60 flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-amber-900 flex items-center gap-1">
+                            <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                            Điểm uy tín
+                          </span>
+                          <span className="text-xs font-bold text-amber-700 bg-white/80 px-2 py-0.5 rounded shadow-xs">
+                            {user.reputationScore ?? 50} / 100
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => {

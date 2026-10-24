@@ -172,14 +172,36 @@ public class PatrolVideoAiService {
 
                     if (lw <= 8 || lh <= 8) continue;
 
+                    float potholeConf = (numClasses > 0) ? output[0][4][i] : 0f;
+                    float crackConf = (numClasses > 1) ? output[0][5][i] : 0f;
+                    float floodingConf = (numClasses > 2) ? output[0][6][i] : 0f;
+
+                    // PHÂN BIỆT THÔNG MINH GIỮA Ổ GÀ (POTHOLE) VÀ NGẬP ÚNG (ROAD_FLOODING):
+                    // Ổ gà đọng nước/vũng trũng là hư hại cục bộ (chiều rộng < 48% ảnh, diện tích < 12% ảnh).
+                    // Ngập úng (ROAD_FLOODING) là hiện tượng ngập lụt diện rộng (ngập băng qua làn đường, diện tích lớn).
+                    float boxAreaRatio = ((float) lw * lh) / (origWidth * origHeight);
+                    boolean isLocalizedCavity = (boxAreaRatio < 0.12f) && (lw < origWidth * 0.48f);
+
+                    if (bestClassId == 2 && isLocalizedCavity) {
+                        // Nếu vũng nước cục bộ bị model nhận nhầm thành ngập úng
+                        if (potholeConf >= 0.08f || potholeConf >= floodingConf * 0.45f) {
+                            bestClassId = 0; // Chuyển về POTHOLE (Ổ gà chứa nước)
+                            bestConf = Math.max(potholeConf, floodingConf * 0.95f);
+                        }
+                    } else if (bestClassId == 1 && isLocalizedCavity) {
+                        // Vết nứt vỡ dạng ổ gà rỗ mặt đường
+                        if (potholeConf >= 0.12f && potholeConf >= crackConf * 0.65f) {
+                            float aspect = (float) Math.max(lw, lh) / Math.max(1, Math.min(lw, lh));
+                            if (aspect < 2.5f) {
+                                bestClassId = 0;
+                                bestConf = Math.max(potholeConf, crackConf);
+                            }
+                        }
+                    }
+
                     String className = (bestClassId < CLASS_NAMES.length)
                             ? CLASS_NAMES[bestClassId]
                             : "ROAD_DAMAGE_" + bestClassId;
-
-                    // Kiểm tra lòng hốc chứa nước bùn / vũng trũng
-                    if (isWaterCavity(image, lx, ly, lw, lh)) {
-                        className = "POTHOLE";
-                    }
 
                     // Ngưỡng thu thập gợi ý ban đầu để không bỏ lỡ vết nứt/vật cản trước khi truy vết
                     float minThresh;
@@ -212,21 +234,26 @@ public class PatrolVideoAiService {
             // 1. Áp dụng NMS
             List<ImageTensorUtil.BoundingBox> nmsBoxes = ImageTensorUtil.applyNms(rawCandidates, iouThreshold);
 
-            // 2. Chuyển đổi, bảo toàn và tinh chỉnh ôm sát lòng ổ gà (Contour Snapping)
+            // 2. Bảo toàn và mở rộng nhẹ để ôm trọn toàn bộ ổ gà (không co rúm méo mó)
             List<ImageTensorUtil.BoundingBox> convertedBoxes = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : nmsBoxes) {
-                if ("ROAD_CRACK".equals(b.getClassName()) && isWaterCavity(image, b.getX(), b.getY(), b.getWidth(), b.getHeight())) {
-                    ImageTensorUtil.BoundingBox pot = ImageTensorUtil.BoundingBox.builder()
+                if ("POTHOLE".equals(b.getClassName())) {
+                    // Mở rộng nhẹ 5% để ôm trọn cả thành hố và gờ miệng ổ gà
+                    int padX = Math.max(3, (int) (b.getWidth() * 0.05));
+                    int padY = Math.max(3, (int) (b.getHeight() * 0.05));
+                    int nx = Math.max(0, b.getX() - padX);
+                    int ny = Math.max(0, b.getY() - padY);
+                    int nw = Math.min(origWidth - nx, b.getWidth() + padX * 2);
+                    int nh = Math.min(origHeight - ny, b.getHeight() + padY * 2);
+
+                    convertedBoxes.add(ImageTensorUtil.BoundingBox.builder()
                             .className("POTHOLE")
                             .confidence(b.getConfidence())
-                            .x(b.getX())
-                            .y(b.getY())
-                            .width(b.getWidth())
-                            .height(b.getHeight())
-                            .build();
-                    convertedBoxes.add(tightenPotholeBox(image, pot));
-                } else if ("POTHOLE".equals(b.getClassName())) {
-                    convertedBoxes.add(tightenPotholeBox(image, b));
+                            .x(nx)
+                            .y(ny)
+                            .width(nw)
+                            .height(nh)
+                            .build());
                 } else {
                     convertedBoxes.add(b);
                 }

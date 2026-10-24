@@ -3,6 +3,7 @@ import { Incident, IncidentStatus, Category } from '../types';
 
 export interface IncidentFilterParams {
   status?: IncidentStatus;
+  statuses?: IncidentStatus[] | string;
   category?: Category;
   search?: string;
   page?: number;
@@ -187,6 +188,16 @@ export const incidentApi = {
     return axiosClient.post<Incident>(`/incidents/${id}/assign-construction`, data);
   },
 
+  // Giai đoạn 5: Admin từ chối phương án khảo sát / yêu cầu đo đạc bổ sung
+  rejectInspectionReport: (id: number | string, data: { reason: string }) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/reject-inspection-report`, data);
+  },
+
+  // Giai đoạn 6: Kỹ thuật viên báo cáo giải trình lý do chậm tiến độ thi công
+  reportDelayReason: (id: number | string, data: { delayReason: string }) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/report-delay`, data);
+  },
+
   // Giai đoạn 6: Tổ đội bắt đầu triển khai thi công (IN_PROGRESS)
   startConstruction: (id: number | string) => {
     return axiosClient.post<Incident>(`/incidents/${id}/start-construction`);
@@ -340,6 +351,14 @@ export const incidentApi = {
 
   markAllNotificationsRead: () => {
     return axiosClient.put('/notifications/read-all');
+  },
+
+  broadcastEmergency: (data: { active: boolean; title?: string; message?: string }) => {
+    return axiosClient.post<import('../types').NotificationItem>('/notifications/broadcast-emergency', data);
+  },
+
+  getEmergencyStatus: () => {
+    return axiosClient.get<{ active: boolean; title?: string; message?: string; timestamp?: string }>('/notifications/emergency-status');
   },
 };
 

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final UserService userService;
+    private final com.roadvision.security.JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/register")
     @Operation(summary = "Đăng ký tài khoản người dân hoặc nhân viên mới")
@@ -30,5 +31,13 @@ public class AuthController {
     @Operation(summary = "Đăng nhập hệ thống và nhận Bearer Token")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(userService.login(request));
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Lấy thông tin người dùng hiện tại kèm điểm uy tín mới nhất")
+    public ResponseEntity<AuthResponse> getCurrentUser(@RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.substring(7);
+        Long userId = jwtTokenProvider.extractUserId(token);
+        return ResponseEntity.ok(userService.getUserProfile(userId));
     }
 }

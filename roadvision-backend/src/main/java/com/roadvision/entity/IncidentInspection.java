@@ -75,6 +75,28 @@ public class IncidentInspection {
     @Column(name = "notes", length = 1000)
     private String notes;
 
+    @Column(name = "inspection_status", length = 30)
+    @Builder.Default
+    private String inspectionStatus = "SUBMITTED"; // DRAFT, SUBMITTED, APPROVED, REVISE_REQUESTED
+
+    @Column(name = "version")
+    @Builder.Default
+    private Integer version = 1;
+
+    @Column(name = "revision_reason", length = 1000)
+    private String revisionReason;
+
+    @Column(name = "gps_accuracy", precision = 6, scale = 2)
+    private BigDecimal gpsAccuracy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by_admin_id")
+    @JsonIgnoreProperties({"password", "team", "hibernateLazyInitializer"})
+    private User approvedByAdmin;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
     @Column(name = "inspected_at")
     private LocalDateTime inspectedAt;
 

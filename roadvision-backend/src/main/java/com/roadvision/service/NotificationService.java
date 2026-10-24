@@ -12,6 +12,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -19,6 +23,64 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
+
+    private volatile boolean emergencyActive = false;
+    private volatile String emergencyTitle = null;
+    private volatile String emergencyMessage = null;
+    private volatile LocalDateTime emergencyTime = null;
+
+    /**
+     * Phát lệnh khẩn cấp toàn hệ thống (Emergency Broadcast) từ Ban Quản Lý (Admin)
+     */
+    @Transactional
+    public NotificationDTO broadcastEmergency(String title, String message, boolean active) {
+        this.emergencyActive = active;
+        this.emergencyTime = LocalDateTime.now();
+        String type = active ? "URGENT" : "INFO";
+        String actualTitle = (title != null && !title.isBlank())
+                ? title
+                : (active ? "LỆNH BÁO ĐỘNG KHẨN CẤP ĐÔ THỊ" : "HỦY LỆNH BÁO ĐỘNG KHẨN CẤP");
+        String actualMsg = (message != null && !message.isBlank())
+                ? message
+                : (active ? "Ban Quản lý phát lệnh khẩn: Yêu cầu mọi tổ tuần kiểm và đội thi công ưu tiên xử lý ngay các sự cố sụt lún, ngập úng nguy hiểm (CRITICAL)!"
+                          : "Ban Quản lý thông báo: Chế độ báo động khẩn cấp đô thị đã được dỡ bỏ. Các tổ đội quay lại tiến độ tiêu chuẩn.");
+
+        this.emergencyTitle = active ? actualTitle : null;
+        this.emergencyMessage = active ? actualMsg : null;
+
+        Notification noti = Notification.builder()
+                .title(actualTitle)
+                .message(actualMsg)
+                .type(type)
+                .targetRole("ALL")
+                .targetUserId(null)
+                .build();
+        noti = notificationRepository.save(noti);
+
+        NotificationDTO dto = toDTO(noti);
+        try {
+            messagingTemplate.convertAndSend("/topic/notifications/all", dto);
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("active", active);
+            payload.put("title", actualTitle);
+            payload.put("message", actualMsg);
+            payload.put("timestamp", emergencyTime.toString());
+            messagingTemplate.convertAndSend("/topic/emergency-broadcast", payload);
+            log.info("Đã phát lệnh khẩn cấp qua WebSocket toàn hệ thống: {} (Active: {})", actualTitle, active);
+        } catch (Exception e) {
+            log.warn("Lỗi khi gửi WebSocket broadcast khẩn cấp: {}", e.getMessage());
+        }
+        return dto;
+    }
+
+    public Map<String, Object> getEmergencyStatus() {
+        Map<String, Object> res = new HashMap<>();
+        res.put("active", emergencyActive);
+        res.put("title", emergencyTitle);
+        res.put("message", emergencyMessage);
+        res.put("timestamp", emergencyTime != null ? emergencyTime.toString() : null);
+        return res;
+    }
 
     /**
      * Gửi thông báo đến Quản trị viên (ROLE_ADMIN)

@@ -46,6 +46,7 @@ public class SecurityConfig {
                     "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/uploads/**",
+                    "/ws",
                     "/ws/**"
                 ).permitAll()
 
@@ -56,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/incidents/public-stats").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/incidents/public-map").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/incidents/check-nearby").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/notifications/emergency-status").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/incidents/analyze").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/incidents/analyze-video-frame").permitAll()
                 .requestMatchers("/api/v1/ai/chat/**").permitAll()

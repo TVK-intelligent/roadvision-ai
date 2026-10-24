@@ -43,10 +43,10 @@ export const AiChatWidget: React.FC = () => {
     },
   ]);
   const [suggestions, setSuggestions] = useState<string[]>([
+    'Hôm nay có bao nhiêu sự cố?',
+    'Tổng số sự cố đang xử lý?',
     'Kiểm tra sự cố mới nhất',
     'Hướng dẫn quy trình 5 pha xử lý',
-    'Quy chuẩn vá ổ gà bê tông nhựa',
-    'Thông tin 4 Khu Quản lý Đường bộ',
   ]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);

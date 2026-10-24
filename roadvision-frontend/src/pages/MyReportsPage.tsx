@@ -1,12 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { incidentApi } from '../services/incidentApi';
 import { Incident } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { Pagination } from '../components/Pagination';
-import { PlusCircle, Clock, MapPin, ArrowRight, FileText, AlertCircle } from 'lucide-react';
+import {
+  PlusCircle,
+  Clock,
+  MapPin,
+  ArrowRight,
+  FileText,
+  AlertCircle,
+  Star,
+  Award,
+  ShieldCheck,
+  TrendingUp,
+  CheckCircle2,
+} from 'lucide-react';
+
+const getReputationTier = (score: number) => {
+  if (score >= 80) {
+    return {
+      tier: 'Hạng Vàng',
+      title: 'Công dân gương mẫu',
+      badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+      barClass: 'bg-gradient-to-r from-amber-400 to-amber-500',
+      description: 'Phản ánh của bạn có độ tin cậy rất cao và luôn được ưu tiên tiếp nhận xử lý nhanh nhất.',
+    };
+  }
+  if (score >= 60) {
+    return {
+      tier: 'Hạng Bạc',
+      title: 'Công dân tích cực',
+      badgeClass: 'bg-sky-100 text-sky-800 border-sky-300',
+      barClass: 'bg-gradient-to-r from-sky-400 to-blue-500',
+      description: 'Đóng góp tích cực và đáng tin cậy trong việc giám sát chất lượng hạ tầng giao thông đô thị.',
+    };
+  }
+  if (score >= 40) {
+    return {
+      tier: 'Hạng Đồng',
+      title: 'Thành viên tiêu chuẩn',
+      badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
+      barClass: 'bg-gradient-to-r from-slate-400 to-slate-500',
+      description: 'Tài khoản hoạt động tiêu chuẩn. Tiếp tục gửi các phản ánh chính xác để nâng hạng uy tín.',
+    };
+  }
+  return {
+    tier: 'Cần lưu ý',
+    title: 'Điểm uy tín hạn chế',
+    badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
+    barClass: 'bg-gradient-to-r from-rose-400 to-rose-500',
+    description: 'Tài khoản từng bị ghi nhận phản ánh không khớp hiện trường hoặc không hợp lệ. Hãy kiểm tra kỹ ảnh chụp.',
+  };
+};
 
 export const MyReportsPage: React.FC = () => {
+  const { user, refreshUserProfile } = useAuth();
   const [reports, setReports] = useState<Incident[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -15,6 +66,9 @@ export const MyReportsPage: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(6);
   const [totalPages, setTotalPages] = useState<number>(0);
   const [totalElements, setTotalElements] = useState<number>(0);
+
+  const reputationScore = user?.reputationScore ?? 50;
+  const tierInfo = getReputationTier(reputationScore);
 
   const fetchReports = (targetPage = page, targetSize = pageSize) => {
     setLoading(true);
@@ -35,6 +89,7 @@ export const MyReportsPage: React.FC = () => {
 
   useEffect(() => {
     fetchReports(page, pageSize);
+    refreshUserProfile();
   }, [page, pageSize]);
 
   return (
@@ -60,6 +115,72 @@ export const MyReportsPage: React.FC = () => {
             <PlusCircle className="w-4 h-4" />
             <span>Gửi phản ánh mới</span>
           </Link>
+        </div>
+      </div>
+
+      {/* Thẻ Điểm Uy Tín Công Dân & Gamification */}
+      <div className="bg-gradient-to-br from-amber-50/70 via-white to-sky-50/50 p-5 rounded-xl border border-amber-200/80 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          {/* Cột trái: Điểm số & Xếp hạng */}
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-200 shrink-0">
+              <Star className="w-7 h-7 fill-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-amber-900 uppercase tracking-wide">Điểm uy tín công dân</span>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${tierInfo.badgeClass}`}>
+                  <Award className="w-3.5 h-3.5" />
+                  {tierInfo.tier} — {tierInfo.title}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-3xl font-black text-slate-900 font-mono">{reputationScore}</span>
+                <span className="text-sm font-semibold text-slate-400">/ 100 điểm</span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 max-w-xl">
+                {tierInfo.description}
+              </p>
+            </div>
+          </div>
+
+          {/* Cột giữa: Thanh tiến trình */}
+          <div className="lg:w-72 flex flex-col gap-1.5 justify-center">
+            <div className="flex justify-between items-center text-xs font-medium text-slate-600">
+              <span>Mức độ tín nhiệm</span>
+              <span className="font-bold text-amber-700">{reputationScore}%</span>
+            </div>
+            <div className="w-full h-2.5 bg-slate-200/80 rounded-full overflow-hidden p-0.5">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${tierInfo.barClass}`}
+                style={{ width: `${Math.min(100, Math.max(5, reputationScore))}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+              <span>0 (Thấp)</span>
+              <span>50 (Tiêu chuẩn)</span>
+              <span>100 (Xuất sắc)</span>
+            </div>
+          </div>
+
+          {/* Cột phải: Quy tắc cộng/trừ điểm */}
+          <div className="flex flex-col sm:flex-row lg:flex-col gap-2 text-xs bg-white/80 p-3 rounded-lg border border-amber-100">
+            <div className="flex items-center gap-2 text-slate-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Sự cố nghiệm thu hoàn tất:</span>
+              <span className="font-bold text-emerald-600 ml-auto">+10đ ⭐</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-700">
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              <span>Khảo sát hiện trường duyệt:</span>
+              <span className="font-bold text-blue-600 ml-auto">+5đ 🔍</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-700">
+              <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+              <span>Phản ánh sai / spam bị từ chối:</span>
+              <span className="font-bold text-rose-600 ml-auto">-10đ ⚠️</span>
+            </div>
+          </div>
         </div>
       </div>
 

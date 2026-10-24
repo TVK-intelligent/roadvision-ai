@@ -19,6 +19,12 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
 
     Optional<Incident> findByTicketCode(String ticketCode);
 
+    @Query("SELECT COUNT(i) FROM Incident i WHERE i.createdAt >= :since")
+    long countIncidentsSince(@Param("since") LocalDateTime since);
+
+    @Query("SELECT i.status, COUNT(i) FROM Incident i GROUP BY i.status")
+    List<Object[]> countGroupedByStatus();
+
     boolean existsByImageSha256(String imageSha256);
 
     @Query("SELECT COUNT(i) FROM Incident i WHERE i.citizen.id = :citizenId AND i.createdAt >= :since")
@@ -58,6 +64,19 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
     Page<Incident> findByStatus(IncidentStatus status, Pageable pageable);
 
     Page<Incident> findByCategory(Category category, Pageable pageable);
+
+    @Query("SELECT i FROM Incident i WHERE " +
+           "(:statuses IS NULL OR i.status IN :statuses) AND " +
+           "(:category IS NULL OR i.category = :category) AND " +
+           "(:search IS NULL OR LOWER(i.ticketCode) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(i.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(i.address) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR (i.flag IS NOT NULL AND LOWER(i.flag) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "OR (i.reworkReason IS NOT NULL AND LOWER(i.reworkReason) LIKE LOWER(CONCAT('%', :search, '%'))))")
+    Page<Incident> findWithStatuses(@Param("statuses") List<IncidentStatus> statuses,
+                                   @Param("category") Category category,
+                                   @Param("search") String search,
+                                   Pageable pageable);
 
     @Query("SELECT i FROM Incident i WHERE " +
            "(:status IS NULL OR i.status = :status) AND " +

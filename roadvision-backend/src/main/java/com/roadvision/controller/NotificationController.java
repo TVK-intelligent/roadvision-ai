@@ -74,4 +74,28 @@ public class NotificationController {
         }
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/broadcast-emergency")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin phát lệnh báo động khẩn cấp tới toàn mạng lưới (Staff & Citizens)")
+    public ResponseEntity<NotificationDTO> broadcastEmergency(
+            @RequestBody(required = false) Map<String, Object> body) {
+        boolean active = true;
+        String title = null;
+        String message = null;
+        if (body != null) {
+            if (body.get("active") != null) {
+                active = Boolean.parseBoolean(String.valueOf(body.get("active")));
+            }
+            if (body.get("title") != null) title = String.valueOf(body.get("title"));
+            if (body.get("message") != null) message = String.valueOf(body.get("message"));
+        }
+        return ResponseEntity.ok(notificationService.broadcastEmergency(title, message, active));
+    }
+
+    @GetMapping("/emergency-status")
+    @Operation(summary = "Lấy trạng thái cảnh báo khẩn cấp hiện tại của hệ thống")
+    public ResponseEntity<Map<String, Object>> getEmergencyStatus() {
+        return ResponseEntity.ok(notificationService.getEmergencyStatus());
+    }
 }

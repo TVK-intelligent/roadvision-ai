@@ -33,7 +33,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/incidents")
 @RequiredArgsConstructor
-@Tag(name = "Incident Management", description = "Các API cốt lõi trong quy trình 5 pha xử lý sự cố hạ tầng RoadVision")
+@Tag(name = "Incident Management", description = "Các API cốt lõi trong chu trình 7 giai đoạn xử lý sự cố hạ tầng đường bộ RoadVision")
 public class IncidentController {
 
     private final IncidentService incidentService;
@@ -234,13 +234,14 @@ public class IncidentController {
     @Operation(summary = "Pha 3: Quản trị viên lấy danh sách sự cố theo bộ lọc (Hàng đợi điều phối)")
     public ResponseEntity<Page<IncidentResponse>> getIncidents(
             @RequestParam(value = "status", required = false) IncidentStatus status,
+            @RequestParam(value = "statuses", required = false) java.util.List<IncidentStatus> statuses,
             @RequestParam(value = "category", required = false) Category category,
             @RequestParam(value = "search", required = false) String search,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return ResponseEntity.ok(incidentService.getFilteredIncidents(status, category, search, pageable));
+        return ResponseEntity.ok(incidentService.getFilteredIncidents(status, statuses, category, search, pageable));
     }
 
     /**
@@ -539,6 +540,30 @@ public class IncidentController {
             @Valid @RequestBody ConstructionAssignRequest request) {
         Long adminId = getUserIdFromHeader(authHeader);
         return ResponseEntity.ok(incidentService.assignConstruction(id, request, adminId));
+    }
+
+    @PostMapping("/{id}/reject-inspection-report")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Giai đoạn 5: Admin từ chối phương án khảo sát và yêu cầu đo đạc/bổ sung số liệu")
+    public ResponseEntity<IncidentResponse> rejectInspectionReport(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @RequestBody Map<String, String> request) {
+        Long adminId = getUserIdFromHeader(authHeader);
+        String reason = request != null ? request.get("reason") : null;
+        return ResponseEntity.ok(incidentService.requestInspectionRevision(id, reason, adminId));
+    }
+
+    @PostMapping("/{id}/report-delay")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @Operation(summary = "Giai đoạn 6: Kỹ thuật viên giải trình lý do chậm tiến độ thi công")
+    public ResponseEntity<IncidentResponse> reportDelay(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @RequestBody Map<String, String> request) {
+        Long staffId = getUserIdFromHeader(authHeader);
+        String delayReason = request != null ? request.get("delayReason") : null;
+        return ResponseEntity.ok(incidentService.reportDelayReason(id, delayReason, staffId));
     }
 
     @PostMapping("/{id}/start-construction")

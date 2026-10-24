@@ -120,6 +120,13 @@ export interface InspectionResponse {
   noDamageFound?: boolean;
   reasonNoDamage?: string;
   notes?: string;
+  inspectionStatus?: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REVISE_REQUESTED';
+  version?: number;
+  revisionReason?: string;
+  gpsAccuracy?: number;
+  approvedByAdminId?: number;
+  approvedByAdminName?: string;
+  approvedAt?: string;
   inspectionPhotos?: string[];
   inspectedAt?: string;
 }
@@ -158,6 +165,8 @@ export interface InspectionReportRequest {
   noDamageFound?: boolean;
   reasonNoDamage?: string;
   notes?: string;
+  gpsAccuracy?: number;
+  inspectionStatus?: 'DRAFT' | 'SUBMITTED';
 }
 
 export interface ConstructionAssignRequest {
@@ -219,6 +228,7 @@ export interface Incident {
   safetyNotes?: string;
   plannedStartDate?: string;
   plannedDeadline?: string;
+  delayReason?: string;
   inspection?: InspectionResponse;
   evidences?: EvidenceResponse[];
 
@@ -242,6 +252,7 @@ export interface AuthResponse {
   email: string;
   fullName: string;
   role: Role;
+  reputationScore?: number;
 }
 
 export interface StreamPoint {

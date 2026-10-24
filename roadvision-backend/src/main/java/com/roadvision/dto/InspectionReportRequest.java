@@ -25,6 +25,9 @@ public class InspectionReportRequest {
     @DecimalMax(value = "180.0", message = "Kinh độ không hợp lệ")
     private BigDecimal actualLongitude;
 
+    private BigDecimal gpsAccuracy;      // Độ chính xác GPS (mét, ví dụ: 3.5m)
+    private String inspectionStatus;     // DRAFT hoặc SUBMITTED
+
     private Category confirmedCategory; // Xác nhận loại hư hỏng thực tế
     private Severity actualSeverity;       // Đánh giá mức độ nghiêm trọng thực tế
 

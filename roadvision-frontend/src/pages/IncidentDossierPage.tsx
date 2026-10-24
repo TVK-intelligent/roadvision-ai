@@ -10,7 +10,29 @@ import { ImageCanvasWithBBox } from '../components/ImageCanvasWithBBox';
 import { LeafletMap } from '../components/LeafletMap';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, CheckCircle2, Check, Star, Upload, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock, Compass, HardHat, Camera, FileCheck, X, Send, ClipboardList } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Star, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock, Compass, HardHat, Camera, FileCheck, X, Send, Ruler, Calendar, MapPin, Calculator } from 'lucide-react';
+
+const parseBoQFromEstimatedSize = (sizeStr?: string) => {
+  if (!sizeStr) return null;
+  const match = sizeStr.match(/([\d.]+)\s*m\s*[xX*]\s*([\d.]+)\s*m\s*[xX*]\s*([\d.]+)\s*cm/);
+  if (match) {
+    const l = parseFloat(match[1]);
+    const w = parseFloat(match[2]);
+    const d = parseFloat(match[3]);
+    const area = l * w;
+    const volume = area * (d / 100);
+    const asphalt = volume * 2.4;
+    return {
+      length: l,
+      width: w,
+      depth: d,
+      area: area.toFixed(2),
+      volume: volume.toFixed(3),
+      asphaltTons: asphalt.toFixed(2),
+    };
+  }
+  return null;
+};
 
 export const IncidentDossierPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +47,7 @@ export const IncidentDossierPage: React.FC = () => {
   const [feedbackComments, setFeedbackComments] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [isUpvoting, setIsUpvoting] = useState<boolean>(false);
+  const [previewInspectionPhoto, setPreviewInspectionPhoto] = useState<string | null>(null);
 
   // Trạng thái Khiếu nại (Citizen) & Lệnh thi công lại (Admin)
   const [adminDecision, setAdminDecision] = useState<'APPROVE' | 'REWORK'>('APPROVE');
@@ -51,6 +74,10 @@ export const IncidentDossierPage: React.FC = () => {
   const [constructionPriority, setConstructionPriority] = useState<Priority>('HIGH');
   const [workPlan, setWorkPlan] = useState<string>('Tiến hành cào bóc, tưới nhựa dính bám và thảm bù BTN hoàn trả mặt đường an toàn.');
   const [plannedDeadline, setPlannedDeadline] = useState<string>('');
+  const [isRejectInspectionOpen, setIsRejectInspectionOpen] = useState<boolean>(false);
+  const [inspectionRevisionReason, setInspectionRevisionReason] = useState<string>('');
+  const [isDelayModalOpen, setIsDelayModalOpen] = useState<boolean>(false);
+  const [delayReasonInput, setDelayReasonInput] = useState<string>('');
   const [safetyNotes, setSafetyNotes] = useState<string>('Bố trí cọc tiêu, biển báo công trường và đèn chớp cảnh báo phương tiện.');
 
   // Form từ chối
@@ -304,6 +331,45 @@ export const IncidentDossierPage: React.FC = () => {
   };
 
   // Admin thẩm định xác nhận sự cố hợp lệ (chuyển AI_ANALYZED -> VERIFIED)
+  const handleRejectInspectionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!incident) return;
+    if (!inspectionRevisionReason || inspectionRevisionReason.trim().length < 10) {
+      toast.warning('Lý do yêu cầu khảo sát lại / bổ sung phương án phải chi tiết tối thiểu 10 ký tự!', 'Lý do chưa đủ');
+      return;
+    }
+    setIsSubmittingDispatch(true);
+    try {
+      await incidentApi.rejectInspectionReport(incident.id, { reason: inspectionRevisionReason.trim() });
+      toast.warning(`Đã yêu cầu tổ khảo sát đo đạc / bổ sung lại phương án cho ${incident.ticketCode}`, 'Yêu cầu khảo sát lại');
+      setIsRejectInspectionOpen(false);
+      setInspectionRevisionReason('');
+      fetchDossier();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Lỗi khi yêu cầu khảo sát lại', 'Lỗi');
+    } finally {
+      setIsSubmittingDispatch(false);
+    }
+  };
+
+  const handleDelaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!incident) return;
+    if (!delayReasonInput || delayReasonInput.trim().length < 10) {
+      toast.warning('Lý do giải trình chậm tiến độ phải chi tiết tối thiểu 10 ký tự!', 'Lý do chưa đủ');
+      return;
+    }
+    try {
+      await incidentApi.reportDelayReason(incident.id, { delayReason: delayReasonInput.trim() });
+      toast.success('Đã gửi báo cáo giải trình chậm tiến độ cho Ban Quản lý!', 'Báo cáo chậm tiến độ');
+      setIsDelayModalOpen(false);
+      setDelayReasonInput('');
+      fetchDossier();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Lỗi khi gửi báo cáo giải trình', 'Lỗi');
+    }
+  };
+
   const handleVerifyIncident = async () => {
     if (!incident) return;
     try {
@@ -402,18 +468,29 @@ export const IncidentDossierPage: React.FC = () => {
 
           {/* GIAI ĐOẠN 5: Đã khảo sát xong (INSPECTED) -> Admin duyệt kết quả và Giao thi công */}
           {user?.role === 'ROLE_ADMIN' && incident.status === 'INSPECTED' && (
-            <button
-              onClick={() => {
-                const date = new Date(Date.now() + 48 * 3600 * 1000);
-                setPlannedDeadline(date.toISOString().slice(0, 16));
-                setIsAssignConstructionOpen(true);
-              }}
-              className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
-              title="Đã khảo sát xong, bấm để chỉ định Tổ Thi Công (Giai đoạn 5)"
-            >
-              <HardHat className="w-3.5 h-3.5" />
-              <span>Giao Thi công</span>
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  const date = new Date(Date.now() + 48 * 3600 * 1000);
+                  setPlannedDeadline(date.toISOString().slice(0, 16));
+                  setIsAssignConstructionOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                title="Duyệt phương án kỹ thuật và Giao Tổ Thi Công (Giai đoạn 5)"
+              >
+                <HardHat className="w-3.5 h-3.5" />
+                <span>Duyệt & Giao Thi công</span>
+              </button>
+
+              <button
+                onClick={() => setIsRejectInspectionOpen(true)}
+                className="px-2.5 py-1.5 rounded-md bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                title="Từ chối phương án khảo sát, yêu cầu đo đạc lại hoặc bổ sung số liệu"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Yêu cầu khảo sát lại</span>
+              </button>
+            </>
           )}
 
           {/* GIAI ĐOẠN 6: Đang trong quá trình thi công */}
@@ -517,13 +594,368 @@ export const IncidentDossierPage: React.FC = () => {
               className="h-72 w-full rounded-md border border-slate-200 overflow-hidden"
             />
 
-            <div className="flex items-center justify-between text-xs font-mono text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100">
-              <span>Người báo cáo: {incident.reporterName || 'Ẩn danh'}</span>
+            <div className="flex items-center justify-between text-xs font-mono text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span>Người báo cáo: <b className="text-slate-900 font-sans">{incident.reporterName || 'Ẩn danh'}</b></span>
+                {incident.reporterReputationScore !== undefined && incident.reporterReputationScore !== null && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Điểm uy tín công dân theo hệ thống Gamification">
+                    <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                    {incident.reporterReputationScore} điểm uy tín
+                  </span>
+                )}
+              </div>
               <span>SĐT: {incident.reporterPhone || 'Chưa cung cấp'}</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* GIAI ĐOẠN 4: BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG & ĐO ĐẠC THỰC ĐỊA */}
+      {(incident.inspection || ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'RESOLVED', 'CLOSED'].includes(incident.status)) && (
+        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                <Compass className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Giai đoạn 4: Biên bản Khảo sát hiện trường & Đo đạc thực tế
+                  </h3>
+                  {incident.inspection?.version && (
+                    <span className="px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                      Phiên bản #{incident.inspection.version}
+                    </span>
+                  )}
+                  {incident.inspection?.inspectionStatus === 'REVISE_REQUESTED' ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-300 animate-pulse">
+                      Yêu cầu khảo sát lại / Bổ sung
+                    </span>
+                  ) : incident.inspection?.inspectionStatus === 'APPROVED' ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" /> Đã duyệt phương án
+                    </span>
+                  ) : incident.inspection ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      Đã nộp biên bản
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 animate-pulse">
+                      Đang khảo sát hiện trường
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Đơn vị khảo sát: <span className="font-medium text-slate-700">{incident.inspection?.inspectionTeamName || incident.inspectionTeamName || 'Tổ Khảo Sát Hiện Trường'}</span>
+                  {incident.inspection?.inspectorName && (
+                    <span> • Cán bộ: <span className="font-medium text-slate-700">{incident.inspection.inspectorName}</span></span>
+                  )}
+                  {incident.inspection?.inspectedAt && (
+                    <span> • Thời gian: <span className="font-mono text-slate-600">{new Date(incident.inspection.inspectedAt).toLocaleString('vi-VN')}</span></span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {incident.status === 'INSPECTED' && user?.role === 'ROLE_ADMIN' && (
+              <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Số liệu sẵn sàng để Giao thi công</span>
+              </span>
+            )}
+          </div>
+
+          {/* Cảnh báo nếu Ban Quản lý đã yêu cầu khảo sát lại / bổ sung số liệu */}
+          {(incident.inspection?.inspectionStatus === 'REVISE_REQUESTED' || (incident.rejectionReason && incident.status === 'INSPECTING')) && (
+            <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 text-xs flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <strong className="font-semibold text-amber-900">Ban Quản lý yêu cầu đo đạc lại hoặc bổ sung phương án:</strong>
+                <p className="mt-1 italic font-medium text-amber-900">"{incident.inspection?.revisionReason || incident.rejectionReason}"</p>
+                <div className="text-[11px] text-amber-700 mt-1">
+                  Tổ khảo sát vui lòng kiểm tra lại hiện trường, cập nhật số liệu kích thước chính xác và nộp lại biên bản hoàn chỉnh.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {incident.inspection ? (
+            <div className="flex flex-col gap-4">
+              {/* 4 Thẻ chỉ số kỹ thuật */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* 1. Kích thước đo đạc */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                    <Ruler className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Kích thước (D x R x S)</span>
+                  </div>
+                  <span className="font-mono text-sm font-bold text-blue-800">
+                    {incident.inspection.estimatedSize || '1.2m x 0.8m x 6cm'}
+                  </span>
+                  <span className="text-[10px] text-slate-500">Số đo thực tế tại lòng đường</span>
+                </div>
+
+                {/* 2. Phân loại & Mức độ */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                    <FileCheck className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Xác nhận hiện trường</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-semibold text-slate-900">
+                      {incident.inspection.confirmedCategory === 'POTHOLE' && 'Ổ gà'}
+                      {incident.inspection.confirmedCategory === 'ROAD_CRACK' && 'Vết nứt mặt đường'}
+                      {incident.inspection.confirmedCategory === 'ROAD_FLOODING' && 'Điểm ngập úng'}
+                      {incident.inspection.confirmedCategory === 'ROAD_OBSTACLE' && 'Chướng ngại vật'}
+                      {incident.inspection.confirmedCategory === 'COMPLEX_DAMAGE' && 'Đa sự cố'}
+                      {!['POTHOLE', 'ROAD_CRACK', 'ROAD_FLOODING', 'ROAD_OBSTACLE', 'COMPLEX_DAMAGE'].includes(incident.inspection.confirmedCategory || '') && (incident.inspection.confirmedCategory || incident.category)}
+                    </span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                      incident.inspection.actualSeverity === 'CRITICAL' ? 'bg-rose-100 text-rose-800' :
+                      incident.inspection.actualSeverity === 'HIGH' ? 'bg-amber-100 text-amber-800' :
+                      incident.inspection.actualSeverity === 'MEDIUM' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {incident.inspection.actualSeverity || incident.severity}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500">Đối chiếu và kiểm chứng AI</span>
+                </div>
+
+                {/* 3. Mức độ ảnh hưởng giao thông */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Ảnh hưởng giao thông</span>
+                  </div>
+                  <span className={`text-xs font-bold ${
+                    incident.inspection.trafficImpact === 'CRITICAL' ? 'text-rose-700' :
+                    incident.inspection.trafficImpact === 'HIGH' ? 'text-amber-700' : 'text-slate-800'
+                  }`}>
+                    {incident.inspection.trafficImpact === 'CRITICAL' ? 'Nguy hiểm cao' :
+                     incident.inspection.trafficImpact === 'HIGH' ? 'Ùn tắc / Nguy hiểm' :
+                     incident.inspection.trafficImpact === 'MEDIUM' ? 'Ảnh hưởng vừa' : 'Ít ảnh hưởng'}
+                  </span>
+                  <span className="text-[10px] text-slate-500">Cơ sở ưu tiên vật tư</span>
+                </div>
+
+                {/* 4. Tọa độ thực địa & Độ chính xác */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Tọa độ thực địa</span>
+                  </div>
+                  <span className="font-mono text-xs font-semibold text-slate-800">
+                    {incident.inspection.actualLatitude ? `${Number(incident.inspection.actualLatitude).toFixed(4)}, ${Number(incident.inspection.actualLongitude).toFixed(4)}` : `${Number(incident.latitude).toFixed(4)}, ${Number(incident.longitude).toFixed(4)}`}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Sai số GPS: ±{incident.inspection.gpsAccuracy || incident.gpsAccuracy || 3.5}m
+                  </span>
+                </div>
+              </div>
+
+              {/* Bảng tính diện tích & khối lượng vật tư tự động (BoQ) */}
+              {(() => {
+                const boq = parseBoQFromEstimatedSize(incident.inspection.estimatedSize);
+                if (!boq) return null;
+                return (
+                  <div className="p-3 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-slate-50 rounded-lg border border-blue-200/80 text-xs shadow-2xs">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                      <div className="flex items-center gap-1.5 font-semibold text-blue-900">
+                        <Calculator className="w-4 h-4 text-blue-600" />
+                        <span>Dự toán khối lượng & vật tư tự động từ biên bản khảo sát (BoQ Estimate):</span>
+                      </div>
+                      <span className="text-[10px] text-slate-600 font-mono bg-white/80 px-2 py-0.5 rounded border border-blue-100">
+                        Kích thước: {boq.length}m (Dài) × {boq.width}m (Rộng) × {boq.depth}cm (Sâu)
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center">
+                      <div className="bg-white p-2.5 rounded-md border border-blue-100 shadow-2xs">
+                        <span className="text-[10px] text-slate-500 block">Diện tích cào bóc (S)</span>
+                        <span className="text-sm font-bold text-blue-700 font-mono">{boq.area} m²</span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5">S = Dài × Rộng</span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-md border border-indigo-100 shadow-2xs">
+                        <span className="text-[10px] text-slate-500 block">Thể tích đào bù hoàn trả (V)</span>
+                        <span className="text-sm font-bold text-indigo-700 font-mono">{boq.volume} m³</span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5">V = S × (Sâu / 100)</span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-md border border-emerald-100 shadow-2xs">
+                        <span className="text-[10px] text-slate-500 block">Dự toán Bê tông nhựa nóng (BTN)</span>
+                        <span className="text-sm font-bold text-emerald-700 font-mono">~ {boq.asphaltTons} tấn</span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5">Dung trọng BTN γ ≈ 2.4 tấn/m³</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Giải pháp đề xuất & Ghi chú hiện trường */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-md bg-blue-50/60 border border-blue-100 flex flex-col gap-1">
+                  <span className="font-semibold text-blue-900 flex items-center gap-1.5">
+                    <HardHat className="w-3.5 h-3.5 text-blue-700" />
+                    Phương án kỹ thuật đề xuất từ Tổ Khảo sát:
+                  </span>
+                  <p className="text-slate-700 leading-relaxed">
+                    {incident.inspection.proposedSolution || 'Cào bóc lớp hư hỏng, tưới dính bám và thảm bù bê tông nhựa hoàn trả mặt đường.'}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-md bg-slate-50 border border-slate-200 flex flex-col gap-1">
+                  <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-slate-600" />
+                    Ghi chú hiện trường & Đánh giá an toàn:
+                  </span>
+                  <p className="text-slate-600 leading-relaxed">
+                    {incident.inspection.notes || 'Đã kiểm tra hiện trường, các phương tiện đi lại cần giảm tốc độ.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Thư viện ảnh khảo sát thực tế (Độc lập với ảnh người dân) */}
+              {incident.inspection.inspectionPhotos && incident.inspection.inspectionPhotos.length > 0 && (
+                <div className="flex flex-col gap-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                      <Camera className="w-3.5 h-3.5 text-slate-600" />
+                      Ảnh chụp đo đạc và xác minh hiện trường của Tổ Khảo sát ({incident.inspection.inspectionPhotos.length} ảnh):
+                    </span>
+                    <span className="text-[10px] text-slate-500 italic">Lưu trữ riêng biệt với ảnh người dân ban đầu</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+                    {incident.inspection.inspectionPhotos.map((photo, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setPreviewInspectionPhoto(photo)}
+                        className="relative group w-24 h-24 rounded-lg overflow-hidden border border-slate-200 shrink-0 cursor-pointer shadow-xs hover:border-blue-500 transition-colors"
+                      >
+                        <img src={photo} alt={`Khảo sát #${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/60 text-white font-mono text-[9px]">
+                          #{idx + 1}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 rounded-md bg-sky-50 border border-sky-100 flex items-center justify-between text-xs text-sky-800">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-sky-600 shrink-0 animate-spin" />
+                <span>Tổ khảo sát đang di chuyển đến hiện trường để tiến hành đo đạc kích thước thực tế và chụp ảnh đối chứng...</span>
+              </div>
+              <span className="font-mono text-[11px] bg-white px-2 py-0.5 rounded border border-sky-200 text-sky-700 font-medium">
+                SẮP CÓ SỐ LIỆU
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* GIAI ĐOẠN 5 & 6: KẾ HOẠCH & BIỆN PHÁP THI CÔNG SỬA CHỮA */}
+      {(incident.assignedTeamName || incident.workPlan || ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'RESOLVED', 'CLOSED'].includes(incident.status)) && (
+        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <HardHat className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <span>Giai đoạn 5: Kế hoạch & Biện pháp thi công sửa chữa</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Đã duyệt phương án
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Đội thi công: <span className="font-medium text-slate-700">{incident.assignedTeamName || incident.assignment?.assignedToStaffName || 'Đội Thi Công Công Trình Giao Thông'}</span>
+                  {incident.inspection?.approvedByAdminName && (
+                    <span> • Người duyệt: <span className="font-medium text-slate-700">{incident.inspection.approvedByAdminName}</span></span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Hạn chót thi công (Deadline) */}
+            {incident.plannedDeadline && (
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border ${
+                new Date() > new Date(incident.plannedDeadline) && ['ASSIGNED', 'IN_PROGRESS'].includes(incident.status)
+                  ? 'bg-rose-50 border-rose-300 text-rose-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}>
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Hạn chót: <strong className="font-mono">{new Date(incident.plannedDeadline).toLocaleString('vi-VN')}</strong></span>
+              </div>
+            )}
+          </div>
+
+          {/* CẢNH BÁO QUÁ HẠN THI CÔNG (SLA OVERDUE) */}
+          {incident.plannedDeadline && new Date() > new Date(incident.plannedDeadline) && ['ASSIGNED', 'IN_PROGRESS'].includes(incident.status) && (
+            <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-950 flex items-start justify-between flex-wrap gap-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-semibold text-xs text-rose-900 uppercase">Cảnh báo: Đã quá hạn hoàn thành thi công (SLA Overdue)</strong>
+                  <p className="text-xs text-rose-800 mt-0.5">
+                    Hạn chót là <strong>{new Date(incident.plannedDeadline).toLocaleString('vi-VN')}</strong>. Công trình đang bị chậm tiến độ so với kế hoạch đã duyệt.
+                  </p>
+                </div>
+              </div>
+              {user?.role === 'ROLE_STAFF' && !incident.delayReason && (
+                <button
+                  type="button"
+                  onClick={() => setIsDelayModalOpen(true)}
+                  className="px-3 py-1.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Báo cáo lý do chậm tiến độ</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* HIỂN THỊ GIẢI TRÌNH CHẬM TIẾN ĐỘ NẾU CÓ */}
+          {incident.delayReason && (
+            <div className="p-3 rounded-lg bg-slate-100 border border-slate-300 text-slate-800 text-xs flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold flex items-center gap-1.5 text-slate-900">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  Giải trình nguyên nhân chậm tiến độ từ Đội thi công:
+                </span>
+                <span className="font-mono text-[10px] text-slate-500">Đã gửi Ban Quản lý</span>
+              </div>
+              <p className="italic text-slate-700 font-medium">"{incident.delayReason}"</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+            {/* Phương án thi công */}
+            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col gap-1.5">
+              <span className="font-semibold text-slate-900 flex items-center gap-1.5">
+                <Hammer className="w-3.5 h-3.5 text-emerald-600" />
+                Kế hoạch & Biện pháp kỹ thuật thi công:
+              </span>
+              <p className="text-slate-700 leading-relaxed">
+                {incident.workPlan || 'Tiến hành cào bóc phạm vi hư hỏng, vệ sinh lòng hố, tưới nhũ tương dính bám và thảm bù bê tông nhựa hạt mịn hoàn trả êm thuận kết cấu áo đường.'}
+              </p>
+            </div>
+
+            {/* Phương án an toàn lao động & rào chắn */}
+            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col gap-1.5">
+              <span className="font-semibold text-slate-900 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                Biện pháp an toàn & Điều tiết giao thông:
+              </span>
+              <p className="text-slate-700 leading-relaxed">
+                {incident.safetyNotes || 'Bố trí đầy đủ cọc tiêu chóp nón, biển báo hiệu công trường từ cự ly 50m, mặc áo phản quang và bố trí nhân viên hướng dẫn phân luồng phương tiện.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Khu vực Hành Động Nghiệp Vụ Theo Vai Trò */}
       <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-4">
@@ -1516,6 +1948,139 @@ export const IncidentDossierPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Modal Admin Yêu Cầu Khảo Sát Lại / Bổ Sung Số Liệu */}
+      {isRejectInspectionOpen && incident && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg border border-slate-200 max-w-lg w-full p-5 shadow-xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-amber-700">
+                <RotateCcw className="w-4 h-4" />
+                <h3 className="font-semibold text-sm">Yêu cầu khảo sát lại / Bổ sung phương án</h3>
+              </div>
+              <button
+                onClick={() => setIsRejectInspectionOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectInspectionSubmit} className="flex flex-col gap-3.5 text-xs">
+              <div className="p-3 bg-amber-50 rounded-md border border-amber-200 text-amber-900 text-xs">
+                Ý kiến chỉ đạo này sẽ được gửi trực tiếp qua chuông thông báo đến Tổ Khảo sát. Trạng thái sự cố sẽ chuyển về <b>INSPECTING</b> để tổ đội tiến hành đo đạc lại hoặc lập phương án điều chỉnh.
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Lý do từ chối & Yêu cầu chỉnh sửa cụ thể * (Tối thiểu 10 ký tự)</label>
+                <textarea
+                  value={inspectionRevisionReason}
+                  onChange={(e) => setInspectionRevisionReason(e.target.value)}
+                  rows={3}
+                  required
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent leading-relaxed"
+                  placeholder="Ví dụ: Kích thước đo chưa tính phần sụt lún phụ cận, yêu cầu đo lại độ sâu và chuyển phương án sang thảm bê tông nhựa C12.5..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsRejectInspectionOpen(false)}
+                  className="px-3.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors font-medium cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDispatch}
+                  className="px-4 py-1.5 rounded-md bg-amber-600 text-white font-medium hover:bg-amber-700 transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>{isSubmittingDispatch ? 'Đang gửi...' : 'Gửi yêu cầu khảo sát lại'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Modal Báo Cáo Chậm Tiến Độ (Dành cho Kỹ thuật viên khi Overdue) */}
+      {isDelayModalOpen && incident && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg border border-slate-200 max-w-lg w-full p-5 shadow-xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-rose-700">
+                <Clock className="w-4 h-4" />
+                <h3 className="font-semibold text-sm">Báo cáo lý do chậm tiến độ thi công</h3>
+              </div>
+              <button
+                onClick={() => setIsDelayModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleDelaySubmit} className="flex flex-col gap-3.5 text-xs">
+              <div className="p-3 bg-rose-50 rounded-md border border-rose-200 text-rose-900 text-xs">
+                Công trình đã vượt quá hạn chót hoàn thành theo kế hoạch đã duyệt. Vui lòng giải trình nguyên nhân khách quan để Ban Quản lý nắm bắt và hỗ trợ điều phối.
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Nguyên nhân chậm tiến độ * (Tối thiểu 10 ký tự)</label>
+                <textarea
+                  value={delayReasonInput}
+                  onChange={(e) => setDelayReasonInput(e.target.value)}
+                  rows={3}
+                  required
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent leading-relaxed"
+                  placeholder="Ví dụ: Hiện trường mưa lớn kéo dài không thể thảm nhựa nóng, hoặc vướng công trình ngầm cấp thoát nước..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsDelayModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors font-medium cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-md bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Gửi báo cáo giải trình</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Lightbox Xem Ảnh Khảo Sát Phóng To */}
+      {previewInspectionPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setPreviewInspectionPhoto(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] bg-black rounded-lg overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewInspectionPhoto(null)}
+              className="absolute top-3 right-3 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/90 transition-colors z-10 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewInspectionPhoto}
+              alt="Ảnh phóng to"
+              className="max-h-[85vh] w-auto object-contain rounded"
+            />
           </div>
         </div>
       )}

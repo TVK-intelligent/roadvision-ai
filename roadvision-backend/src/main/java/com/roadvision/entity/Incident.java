@@ -88,6 +88,9 @@ public class Incident {
     @Column(name = "planned_deadline")
     private LocalDateTime plannedDeadline;
 
+    @Column(name = "delay_reason", length = 1000)
+    private String delayReason; // Lý do giải trình chậm tiến độ thi công khi vượt quá deadline
+
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)

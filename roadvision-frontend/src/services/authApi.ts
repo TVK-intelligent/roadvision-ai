@@ -8,4 +8,7 @@ export const authApi = {
   register: (data: { email: string; password: string; fullName: string; phone?: string; role?: string }) => {
     return axiosClient.post<AuthResponse>('/auth/register', data);
   },
+  getCurrentUser: () => {
+    return axiosClient.get<AuthResponse>('/auth/me');
+  },
 };

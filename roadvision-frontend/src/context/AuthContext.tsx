@@ -8,6 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (authData: AuthResponse) => void;
   logout: () => void;
+  refreshUserProfile: () => Promise<void>;
   hasRole: (roles: Role | Role[]) => boolean;
   switchRoleWithCredentials: (role: Role) => Promise<void>;
 }
@@ -32,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: authData.email,
       fullName: authData.fullName,
       role: authData.role,
+      reputationScore: authData.reputationScore ?? 50,
     };
     setUser(userData);
     localStorage.setItem('token', authData.token);
@@ -43,6 +45,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+  };
+
+  const refreshUserProfile = async () => {
+    if (!token) return;
+    try {
+      const res = await authApi.getCurrentUser();
+      if (res.data) {
+        setUser((prev) => {
+          const updated: User = {
+            id: res.data.userId,
+            email: res.data.email,
+            fullName: res.data.fullName,
+            role: res.data.role,
+            reputationScore: res.data.reputationScore ?? 50,
+            avatarUrl: prev?.avatarUrl,
+            phone: prev?.phone,
+          };
+          localStorage.setItem('user', JSON.stringify(updated));
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.warn('Làm mới thông tin người dùng thất bại:', err);
+    }
   };
 
   const switchRoleWithCredentials = async (role: Role) => {
@@ -87,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!token,
         login,
         logout,
+        refreshUserProfile,
         hasRole,
         switchRoleWithCredentials,
       }}
