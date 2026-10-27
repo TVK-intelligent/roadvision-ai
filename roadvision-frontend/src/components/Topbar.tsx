@@ -24,6 +24,8 @@ import {
   MapPin,
   Star,
   Radio,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 
@@ -52,6 +54,33 @@ export const Topbar: React.FC<TopbarProps> = ({
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState<boolean>(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Thời gian thực hệ thống
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatCurrentTime = (date: Date) => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+
+    const daysOfWeek = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const dayOfWeek = daysOfWeek[date.getDay()];
+
+    return {
+      time: `${hours}:${minutes}:${seconds}`,
+      date: `${dayOfWeek}, ${day}/${month}/${year}`,
+    };
+  };
 
   const getPageTitle = (pathname: string) => {
     if (pathname === '/') return 'Tổng quan hệ thống';
@@ -328,12 +357,26 @@ export const Topbar: React.FC<TopbarProps> = ({
             <Search className="w-4 h-4" />
           </button>
 
-          {/* Huy hiệu AI Trực tuyến */}
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>AI YOLOv8 Online</span>
-          </div>
+          {/* Đồng hồ Ngày Giờ Hệ Thống Thời Gian Thực */}
+          {(() => {
+            const formatted = formatCurrentTime(currentTime);
+            return (
+              <div
+                className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium shadow-2xs"
+                title="Thời gian thực hệ thống RoadVision AI"
+              >
+                <div className="flex items-center gap-1.5 text-blue-700 font-mono font-bold tracking-tight">
+                  <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>{formatted.time}</span>
+                </div>
+                <span className="text-slate-300">•</span>
+                <div className="flex items-center gap-1.5 text-slate-600">
+                  <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span>{formatted.date}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Chuông thông báo Real-time WebSocket */}
           <div className="relative">

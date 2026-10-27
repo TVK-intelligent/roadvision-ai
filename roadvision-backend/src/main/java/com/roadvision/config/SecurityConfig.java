@@ -63,6 +63,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/ai/chat/**").permitAll()
 
                 // Phân quyền theo tiền tố đường dẫn
+                .requestMatchers("/api/v1/patrol-sessions/**").hasAnyRole("STAFF", "ADMIN")
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/v1/staff/**").hasRole("STAFF")
 

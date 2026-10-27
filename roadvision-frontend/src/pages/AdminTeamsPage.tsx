@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
 import { Team, Staff, TeamType, TeamRequest, StaffCreateRequest, StaffUpdateRequest } from '../types';
 import { useToast } from '../components/Toast';
@@ -33,7 +34,9 @@ import {
   Calendar,
   Lock,
   Unlock,
-  UserPlus
+  UserPlus,
+  ArrowUpRight,
+  Clock,
 } from 'lucide-react';
 
 export const AdminTeamsPage: React.FC = () => {
@@ -46,7 +49,9 @@ export const AdminTeamsPage: React.FC = () => {
 
   // Filters for Teams tab
   const [teamTypeFilter, setTeamTypeFilter] = useState<string>('ALL');
+  const [availabilityFilter, setAvailabilityFilter] = useState<'ALL' | 'READY' | 'BUSY' | 'OVERLOADED' | 'INACTIVE'>('ALL');
   const [teamSearch, setTeamSearch] = useState<string>('');
+  const [viewingTasksTeam, setViewingTasksTeam] = useState<Team | null>(null);
 
   // Filters for Staff tab
   const [staffSearch, setStaffSearch] = useState<string>('');
@@ -113,6 +118,12 @@ export const AdminTeamsPage: React.FC = () => {
   const filteredTeams = useMemo(() => {
     return teams.filter((t) => {
       const matchesType = teamTypeFilter === 'ALL' || t.teamType === teamTypeFilter;
+      const matchesAvailability =
+        availabilityFilter === 'ALL' ||
+        (availabilityFilter === 'READY' && t.isActive && (!t.activeTaskCount || t.activeTaskCount === 0)) ||
+        (availabilityFilter === 'BUSY' && t.isActive && (t.activeTaskCount || 0) > 0 && (t.activeTaskCount || 0) < 3) ||
+        (availabilityFilter === 'OVERLOADED' && t.isActive && (t.activeTaskCount || 0) >= 3) ||
+        (availabilityFilter === 'INACTIVE' && !t.isActive);
       const query = teamSearch.toLowerCase().trim();
       const matchesQuery =
         !query ||
@@ -120,9 +131,9 @@ export const AdminTeamsPage: React.FC = () => {
         (t.corridor && t.corridor.toLowerCase().includes(query)) ||
         (t.zoneName && t.zoneName.toLowerCase().includes(query)) ||
         (t.leaderName && t.leaderName.toLowerCase().includes(query));
-      return matchesType && matchesQuery;
+      return matchesType && matchesAvailability && matchesQuery;
     });
-  }, [teams, teamTypeFilter, teamSearch]);
+  }, [teams, teamTypeFilter, availabilityFilter, teamSearch]);
 
   // Filtered Staff
   const filteredStaff = useMemo(() => {
@@ -157,6 +168,13 @@ export const AdminTeamsPage: React.FC = () => {
     const totalStaff = staffList.length;
     const activeStaff = staffList.filter((s) => s.isActive).length;
     const assignedStaff = staffList.filter((s) => s.teamId).length;
+
+    // Năng lực & Trạng thái thời gian thực
+    const readyTeams = teams.filter((t) => t.isActive && (!t.activeTaskCount || t.activeTaskCount === 0)).length;
+    const busyTeams = teams.filter((t) => t.isActive && (t.activeTaskCount || 0) > 0 && (t.activeTaskCount || 0) < 3).length;
+    const overloadedTeams = teams.filter((t) => t.isActive && (t.activeTaskCount || 0) >= 3).length;
+    const inactiveTeams = teams.filter((t) => !t.isActive).length;
+
     return {
       totalTeams,
       inspectionTeams,
@@ -165,6 +183,10 @@ export const AdminTeamsPage: React.FC = () => {
       totalStaff,
       activeStaff,
       assignedStaff,
+      readyTeams,
+      busyTeams,
+      overloadedTeams,
+      inactiveTeams,
     };
   }, [teams, staffList]);
 
@@ -538,7 +560,95 @@ export const AdminTeamsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Grid hiển thị thẻ Tổ Đội */}
+          {/* Thanh hiển thị năng lực trực ban thời gian thực & Bộ lọc nhanh */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-lg text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Năng lực trực ban thời gian thực:
+              </span>
+              {availabilityFilter !== 'ALL' && (
+                <button
+                  onClick={() => setAvailabilityFilter('ALL')}
+                  className="text-[11px] text-blue-600 hover:text-blue-800 font-medium underline flex items-center gap-0.5 ml-1"
+                >
+                  (Xóa lọc trạng thái)
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setAvailabilityFilter('ALL')}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                  availabilityFilter === 'ALL'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                Tất cả: <strong>{teams.length}</strong>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAvailabilityFilter(availabilityFilter === 'READY' ? 'ALL' : 'READY')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer border ${
+                  availabilityFilter === 'READY'
+                    ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-300 shadow-xs'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/80'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${availabilityFilter === 'READY' ? 'bg-white' : 'bg-emerald-500'}`} />
+                Sẵn sàng: <strong>{kpiStats.readyTeams}</strong>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAvailabilityFilter(availabilityFilter === 'BUSY' ? 'ALL' : 'BUSY')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer border ${
+                  availabilityFilter === 'BUSY'
+                    ? 'bg-amber-600 text-white border-amber-700 ring-2 ring-amber-300 shadow-xs'
+                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100/80'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${availabilityFilter === 'BUSY' ? 'bg-white' : 'bg-amber-500'}`} />
+                Đang làm việc: <strong>{kpiStats.busyTeams}</strong>
+              </button>
+
+              {kpiStats.overloadedTeams > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAvailabilityFilter(availabilityFilter === 'OVERLOADED' ? 'ALL' : 'OVERLOADED')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer border ${
+                    availabilityFilter === 'OVERLOADED'
+                      ? 'bg-rose-600 text-white border-rose-700 ring-2 ring-rose-300 shadow-xs'
+                      : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100/80'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${availabilityFilter === 'OVERLOADED' ? 'bg-white animate-none' : 'bg-rose-500 animate-pulse'}`} />
+                  Quá tải: <strong>{kpiStats.overloadedTeams}</strong>
+                </button>
+              )}
+
+              {kpiStats.inactiveTeams > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAvailabilityFilter(availabilityFilter === 'INACTIVE' ? 'ALL' : 'INACTIVE')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer border ${
+                    availabilityFilter === 'INACTIVE'
+                      ? 'bg-slate-600 text-white border-slate-700 ring-2 ring-slate-300 shadow-xs'
+                      : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${availabilityFilter === 'INACTIVE' ? 'bg-white' : 'bg-slate-400'}`} />
+                  Tạm ngưng: <strong>{kpiStats.inactiveTeams}</strong>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Danh Sách Tổ Đội Gom Theo Mục Đích Chuyên Trách */}
           {filteredTeams.length === 0 ? (
             <div className="bg-white rounded-lg border border-slate-200 p-12 text-center shadow-xs">
               <FolderOpen className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -546,139 +656,281 @@ export const AdminTeamsPage: React.FC = () => {
               <p className="text-xs text-slate-500 mt-1">Vui lòng thay đổi từ khóa tìm kiếm hoặc bấm thêm tổ đội mới.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredTeams.map((team) => (
-                <div
-                  key={team.id}
-                  className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs hover:border-slate-300 transition-colors flex flex-col justify-between"
-                >
-                  <div>
-                    {/* Header thẻ: Loại đội + Trạng thái + Thao tác */}
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {renderTeamTypeBadge(team.teamType)}
-                        {team.isActive ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            Đang hoạt động
-                          </span>
-                        ) : (
-                          <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Tạm ngừng
-                          </span>
-                        )}
-                      </div>
+            <div className="flex flex-col gap-6">
+              {[
+                {
+                  key: 'INSPECTION' as const,
+                  title: '1. NHÓM TỔ KHẢO SÁT & THẨM ĐỊNH HIỆN TRƯỜNG',
+                  desc: 'Tiếp cận thực địa trong 60 phút, đo đạc kích thước rạn nứt/ổ gà, bay Flycam trắc địa và thẩm định tính xác thực của AI',
+                  icon: Compass,
+                  teams: filteredTeams.filter((t) => t.teamType === 'INSPECTION'),
+                  theme: {
+                    border: 'border-l-4 border-l-blue-600',
+                    headerBg: 'bg-blue-50/70 border-blue-200',
+                    titleColor: 'text-blue-950',
+                    iconBg: 'bg-blue-100 text-blue-700 border-blue-200',
+                    pill: 'bg-blue-100 text-blue-800 border-blue-300',
+                  },
+                },
+                {
+                  key: 'CONSTRUCTION' as const,
+                  title: '2. NHÓM TỔ THI CÔNG & DUY TU SỬA CHỮA',
+                  desc: 'Trang bị cơ giới cào bóc thảm nhựa nóng polymer, lu lèn đầm nén vá hố sụt triệt để và hoàn thiện êm thuận mặt đường',
+                  icon: HardHat,
+                  teams: filteredTeams.filter((t) => t.teamType === 'CONSTRUCTION'),
+                  theme: {
+                    border: 'border-l-4 border-l-amber-600',
+                    headerBg: 'bg-amber-50/70 border-amber-200',
+                    titleColor: 'text-amber-950',
+                    iconBg: 'bg-amber-100 text-amber-700 border-amber-200',
+                    pill: 'bg-amber-100 text-amber-800 border-amber-300',
+                  },
+                },
+                {
+                  key: 'EMERGENCY' as const,
+                  title: '3. NHÓM TỔ PHẢN ỨNG KHẨN CẤP & TUẦN TRA CƠ ĐỘNG',
+                  desc: 'Tuần tra video camera hành trình AI, trực chiến 24/7 giải tỏa cây đổ, chướng ngại vật lòng đường, sạt trượt và ngập úng mùa mưa lũ',
+                  icon: AlertTriangle,
+                  teams: filteredTeams.filter((t) => t.teamType === 'EMERGENCY'),
+                  theme: {
+                    border: 'border-l-4 border-l-rose-600',
+                    headerBg: 'bg-rose-50/70 border-rose-200',
+                    titleColor: 'text-rose-950',
+                    iconBg: 'bg-rose-100 text-rose-700 border-rose-200',
+                    pill: 'bg-rose-100 text-rose-800 border-rose-300',
+                  },
+                },
+              ]
+                .filter((cat) => teamTypeFilter === 'ALL' || teamTypeFilter === cat.key)
+                .map((cat) => {
+                  if (cat.teams.length === 0 && teamTypeFilter === 'ALL') return null;
+                  const totalMembers = cat.teams.reduce((acc, t) => acc + (t.members?.length || 0), 0);
+                  const totalTasks = cat.teams.reduce((acc, t) => acc + (t.activeTaskCount || 0), 0);
+                  const IconComp = cat.icon;
 
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleOpenEditTeam(team)}
-                          title="Sửa thông tin tổ đội"
-                          className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTeam(team)}
-                          title="Giải thể tổ đội"
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Tên Tổ Đội */}
-                    <h3 className="text-base font-bold text-slate-900 leading-snug">
-                      {team.name}
-                    </h3>
-
-                    {/* Khu vực & Tuyến đường */}
-                    <div className="mt-2.5 space-y-1 text-xs text-slate-600">
-                      {team.zoneName && (
-                        <div className="flex items-center gap-2">
-                          <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">{team.zoneName}</span>
-                        </div>
-                      )}
-                      {team.corridor && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <span className="font-medium text-blue-800 truncate">{team.corridor}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Mô tả nhiệm vụ */}
-                    {team.description && (
-                      <p className="mt-2.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100 leading-relaxed">
-                        {team.description}
-                      </p>
-                    )}
-
-                    {/* Khối Tổ Trưởng */}
-                    <div className="mt-3.5 p-3 rounded-md bg-amber-50/60 border border-amber-200/80 flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
-                          <Crown className="w-3.5 h-3.5 text-amber-600" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-semibold text-slate-900">
-                            {team.leaderName || 'Chưa chỉ định tổ trưởng'}
+                  return (
+                    <div key={cat.key} className="flex flex-col gap-3">
+                      {/* Tiêu đề nhóm mục đích chuyên trách */}
+                      <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${cat.theme.headerBg} ${cat.theme.border} shadow-2xs`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 ${cat.theme.iconBg}`}>
+                            <IconComp className="w-5 h-5" />
                           </div>
-                          {team.leaderPhone && (
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                              <Phone className="w-3 h-3 text-slate-400" />
-                              <span>{team.leaderPhone}</span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className={`text-sm font-bold ${cat.theme.titleColor}`}>
+                                {cat.title}
+                              </h3>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cat.theme.pill}`}>
+                                {cat.teams.length} tổ đội
+                              </span>
                             </div>
-                          )}
+                            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                              {cat.desc}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Thống kê năng lực nhóm */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto text-xs font-medium">
+                          <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                            👥 <strong>{totalMembers}</strong> nhân sự
+                          </span>
+                          <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-blue-700 shadow-2xs">
+                            💼 <strong>{totalTasks}</strong> việc đang chạy
+                          </span>
                         </div>
                       </div>
-                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded uppercase tracking-wide">
-                        Tổ trưởng
-                      </span>
-                    </div>
 
-                    {/* Danh sách thành viên */}
-                    <div className="mt-3.5">
-                      <div className="text-xs font-medium text-slate-500 mb-1.5 flex items-center justify-between">
-                        <span>Thành viên trong đội:</span>
-                        <span className="font-semibold text-slate-700">{team.members?.length || 0} người</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {team.members && team.members.length > 0 ? (
-                          team.members.map((member) => (
-                            <span
-                              key={member.id}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs border border-slate-200"
-                              title={`${member.fullName} (${member.email})`}
+                      {/* Lưới các tổ đội trong nhóm */}
+                      {cat.teams.length === 0 ? (
+                        <div className="p-5 bg-white rounded-lg border border-dashed border-slate-300 text-center text-xs text-slate-500">
+                          Chưa có tổ đội nào trong nhóm này khớp với từ khóa tìm kiếm.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {cat.teams.map((team) => (
+                            <div
+                              key={team.id}
+                              className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs hover:border-slate-300 transition-colors flex flex-col justify-between"
                             >
-                              {member.isTeamLeader ? (
-                                <Crown className="w-3 h-3 text-amber-600" />
-                              ) : (
-                                <UserCheck className="w-3 h-3 text-slate-400" />
-                              )}
-                              <span>{member.fullName}</span>
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-slate-400 italic">Chưa có thành viên nào gán vào đội này.</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                              <div>
+                                {/* Header thẻ: Loại đội + Trạng thái + Thao tác */}
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {renderTeamTypeBadge(team.teamType)}
+                                    {!team.isActive ? (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                        Tạm ngừng
+                                      </span>
+                                    ) : team.availabilityStatus === 'OVERLOADED' || (team.activeTaskCount && team.activeTaskCount >= 3) ? (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                                        🔴 Quá tải ({team.activeTaskCount} việc)
+                                      </span>
+                                    ) : team.availabilityStatus === 'BUSY' || (team.activeTaskCount && team.activeTaskCount > 0) ? (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                        🟡 Đang thi công ({team.activeTaskCount} việc)
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                        🟢 Sẵn sàng nhận việc
+                                      </span>
+                                    )}
+                                  </div>
 
-                  {/* Footer thẻ: Nhiệm vụ đang thực hiện */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 flex items-center gap-1.5">
-                      <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                      Công việc đang triển khai:
-                    </span>
-                    <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                      {team.activeTaskCount || 0} nhiệm vụ
-                    </span>
-                  </div>
-                </div>
-              ))}
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleOpenEditTeam(team)}
+                                      title="Sửa thông tin tổ đội"
+                                      className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteTeam(team)}
+                                      title="Giải thể tổ đội"
+                                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Tên Tổ Đội */}
+                                <h3 className="text-base font-bold text-slate-900 leading-snug">
+                                  {team.name}
+                                </h3>
+
+                                {/* Khu vực & Tuyến đường */}
+                                <div className="mt-2.5 space-y-1 text-xs text-slate-600">
+                                  {team.zoneName && (
+                                    <div className="flex items-center gap-2">
+                                      <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                      <span className="truncate">{team.zoneName}</span>
+                                    </div>
+                                  )}
+                                  {team.corridor && (
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                      <span className="font-medium text-blue-800 truncate">{team.corridor}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Mô tả nhiệm vụ */}
+                                {team.description && (
+                                  <p className="mt-2.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100 leading-relaxed">
+                                    {team.description}
+                                  </p>
+                                )}
+
+                                {/* Khối Tổ Trưởng */}
+                                <div className="mt-3.5 p-3 rounded-md bg-amber-50/60 border border-amber-200/80 flex items-center justify-between">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                      <Crown className="w-3.5 h-3.5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs font-semibold text-slate-900">
+                                        {team.leaderName || 'Chưa chỉ định tổ trưởng'}
+                                      </div>
+                                      {team.leaderPhone && (
+                                        <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                          <Phone className="w-3 h-3 text-slate-400" />
+                                          <span>{team.leaderPhone}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded uppercase tracking-wide">
+                                    Tổ trưởng
+                                  </span>
+                                </div>
+
+                                {/* Danh sách thành viên kèm theo (Không lặp lại tổ trưởng) */}
+                                <div className="mt-3.5">
+                                  {(() => {
+                                    const regularMembers = (team.members || []).filter(
+                                      (m) => !m.isTeamLeader && m.id !== team.leaderId
+                                    );
+                                    return (
+                                      <>
+                                        <div className="text-xs font-medium text-slate-500 mb-1.5 flex items-center justify-between">
+                                          <span>Tổ viên / Thành viên phối thuộc:</span>
+                                          <span className="font-semibold text-slate-700">{regularMembers.length} người</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {regularMembers.length > 0 ? (
+                                            regularMembers.map((member) => (
+                                              <span
+                                                key={member.id}
+                                                className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs border border-slate-200"
+                                                title={`${member.fullName} (${member.email})`}
+                                              >
+                                                <UserCheck className="w-3 h-3 text-slate-400" />
+                                                <span>{member.fullName}</span>
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-xs text-slate-400 italic">Chưa có tổ viên nào khác ngoài tổ trưởng.</span>
+                                          )}
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+
+                              {/* Footer thẻ: Nhiệm vụ đang thực hiện */}
+                              <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2 text-xs">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-slate-500 flex items-center gap-1.5">
+                                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                                    Nhiệm vụ đang thực hiện:
+                                  </span>
+                                  <span className={`font-semibold px-2 py-0.5 rounded-md border ${
+                                    (team.activeTaskCount || 0) === 0
+                                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                      : (team.activeTaskCount || 0) >= 3
+                                      ? 'text-rose-700 bg-rose-50 border-rose-200'
+                                      : 'text-amber-700 bg-amber-50 border-amber-200'
+                                  }`}>
+                                    {team.activeTaskCount || 0} việc
+                                  </span>
+                                </div>
+                                {team.currentActiveIncidentTicket && (
+                                  <div className="p-2 rounded-md bg-amber-50/70 border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
+                                    <span className="truncate">
+                                      Xử lý: <strong className="font-mono text-amber-950 font-bold">{team.currentActiveIncidentTicket}</strong> - {team.currentActiveIncidentTitle || 'Hư hỏng mặt đường'}
+                                    </span>
+                                    <span className="text-[10px] text-amber-800 font-semibold px-1.5 py-0.5 bg-amber-100 rounded shrink-0 ml-1">
+                                      Hiện trường
+                                    </span>
+                                  </div>
+                                )}
+                                {(team.activeTaskCount || 0) > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingTasksTeam(team)}
+                                    className="w-full mt-1 py-1.5 px-2 bg-blue-50/80 hover:bg-blue-100 text-blue-700 rounded-md border border-blue-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                  >
+                                    <Briefcase className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>Xem chi tiết {team.activeTaskCount} nhiệm vụ đang gánh</span>
+                                    <ArrowUpRight className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
@@ -1170,6 +1422,152 @@ export const AdminTeamsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 8. MODAL XEM CHI TIẾT CÁC NHIỆM VỤ ĐANG THỰC HIỆN CỦA TỔ ĐỘI */}
+      {viewingTasksTeam && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-xl border border-slate-200 shadow-2xl p-6 flex flex-col gap-4 animate-in fade-in max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 leading-snug">
+                    Hàng đợi nhiệm vụ: {viewingTasksTeam.name}
+                  </h3>
+                  <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                    <span>📍 {viewingTasksTeam.zoneName || viewingTasksTeam.corridor || 'Toàn mạng lưới'}</span>
+                    <span>•</span>
+                    <span>👤 {viewingTasksTeam.leaderName || 'Chưa chỉ định tổ trưởng'}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingTasksTeam(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Sub-header status badge */}
+            <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-700">Trạng thái hiện tại:</span>
+                {viewingTasksTeam.availabilityStatus === 'OVERLOADED' ? (
+                  <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                    🔴 Quá tải ({viewingTasksTeam.activeTaskCount} việc)
+                  </span>
+                ) : viewingTasksTeam.availabilityStatus === 'BUSY' ? (
+                  <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    🟡 Đang thi công / khảo sát ({viewingTasksTeam.activeTaskCount} việc)
+                  </span>
+                ) : (
+                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    🟢 Sẵn sàng nhận việc
+                  </span>
+                )}
+              </div>
+              <span className="text-slate-500 font-medium">
+                Tổng cộng {viewingTasksTeam.activeTasks?.length || viewingTasksTeam.activeTaskCount || 0} công việc
+              </span>
+            </div>
+
+            {/* Task list container */}
+            <div className="overflow-y-auto space-y-2.5 max-h-96 pr-1">
+              {viewingTasksTeam.activeTasks && viewingTasksTeam.activeTasks.length > 0 ? (
+                viewingTasksTeam.activeTasks.map((task, idx) => (
+                  <div
+                    key={task.id}
+                    className="p-3.5 rounded-lg border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col gap-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                          #{idx + 1}
+                        </span>
+                        <Link
+                          to={`/incidents/${task.id}`}
+                          target="_blank"
+                          className="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                        >
+                          <span>{task.ticketCode}</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </Link>
+                        <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                          {task.category === 'POTHOLE' ? 'Ổ gà / Hố sụt' : task.category === 'ROAD_CRACK' ? 'Nứt mặt đường' : task.category === 'ROAD_FLOODING' ? 'Ngập úng' : 'Chướng ngại vật'}
+                        </span>
+                        {task.severity && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                            task.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-800' : task.severity === 'HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {task.severity}
+                          </span>
+                        )}
+                      </div>
+
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                        {task.status}
+                      </span>
+                    </div>
+
+                    <div className="text-xs font-semibold text-slate-900">
+                      {task.title}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                      <span className="flex items-center gap-1 truncate">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{task.address || 'Không rõ địa chỉ'}</span>
+                      </span>
+                      {task.plannedDeadline && (
+                        <span className="flex items-center gap-1 text-amber-700 font-medium shrink-0 ml-2">
+                          <Clock className="w-3 h-3 text-amber-600" />
+                          <span>Hạn: {new Date(task.plannedDeadline).toLocaleString('vi-VN')}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : viewingTasksTeam.currentActiveIncidentTicket ? (
+                <div className="p-4 rounded-lg border border-amber-200 bg-amber-50/70 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-amber-950">
+                      {viewingTasksTeam.currentActiveIncidentTicket}
+                    </span>
+                    <span className="text-[11px] font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                      Đang xử lý tại hiện trường
+                    </span>
+                  </div>
+                  <div className="text-xs font-medium text-slate-900">
+                    {viewingTasksTeam.currentActiveIncidentTitle || 'Nhiệm vụ sửa chữa mặt đường'}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-xs text-slate-500">
+                  Tổ đội hiện tại chưa có nhiệm vụ nào đang xử lý.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+              <span className="text-[11px] text-slate-500">
+                Nhấp vào mã phiếu sự cố để mở toàn bộ hồ sơ kỹ thuật & ảnh hiện trường.
+              </span>
+              <button
+                type="button"
+                onClick={() => setViewingTasksTeam(null)}
+                className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

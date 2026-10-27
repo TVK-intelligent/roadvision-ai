@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
+import { patrolApi, PatrolSession } from '../services/patrolApi';
+import { PatrolInspectionReportModal } from '../components/PatrolInspectionReportModal';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { AuthModal } from '../components/AuthModal';
@@ -22,9 +25,29 @@ import {
   Zap,
   Target,
   RotateCcw,
+  FastForward,
+  Rewind,
+  Repeat,
   TrendingUp,
   Hash,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Printer,
+  History,
+  ExternalLink,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
+
+interface RepresentativeSnapshot {
+  blob: Blob;
+  snapshotUrl: string;
+  confidence: number;
+  boxesCount: number;
+  timestamp: string;
+  score: number;
+}
 
 interface CapturedIncident {
   id: string;
@@ -148,6 +171,14 @@ export const PatrolModePage: React.FC = () => {
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.22);
   const [autoDispatch, setAutoDispatch] = useState<boolean>(false);
 
+  // Điều khiển Phát & Dòng Thời Gian Video (Timeline, Scrubbing & Looping)
+  const [videoDuration, setVideoDuration] = useState<number>(0);
+  const [videoCurrentTime, setVideoCurrentTime] = useState<number>(0);
+  const [isLooping, setIsLooping] = useState<boolean>(false);
+  const [currentVideoName, setCurrentVideoName] = useState<string>('Video tuần tra đường bộ');
+  const isUserSeekingRef = useRef<boolean>(false);
+  const lastVideoCurrentTimeRef = useRef<number>(0);
+
   // Chế độ trích xuất frame thích ứng (Adaptive Sampling) - Mặc định SIÊU TỐC 0.2s để bám sát video
   const [samplingMode, setSamplingMode] = useState<SamplingMode>('REALTIME');
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
@@ -222,6 +253,25 @@ export const PatrolModePage: React.FC = () => {
 
   // Danh sách các hư hại đã bắt được từ luồng video
   const [capturedList, setCapturedList] = useState<CapturedIncident[]>([]);
+
+  // Ảnh tiêu biểu nhất của chuyến tuần tra tuyến đường (Tối đa 1-2 ảnh cho toàn bộ video)
+  const [bestSnapshot, setBestSnapshot] = useState<RepresentativeSnapshot | null>(null);
+  const bestSnapshotRef = useRef<RepresentativeSnapshot | null>(null);
+  const [secondarySnapshot, setSecondarySnapshot] = useState<RepresentativeSnapshot | null>(null);
+  const secondarySnapshotRef = useRef<RepresentativeSnapshot | null>(null);
+
+  // Trạng thái gửi báo cáo tuần tra tuyến đường tổng hợp (1 phiếu duy nhất)
+  const [routeReportStatus, setRouteReportStatus] = useState<'IDLE' | 'SENDING' | 'DISPATCHED'>('IDLE');
+  const [dispatchedIncidentId, setDispatchedIncidentId] = useState<string | null>(null);
+  const [lastCreatedSession, setLastCreatedSession] = useState<PatrolSession | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
+
+  // Tab & Lịch sử phiên tuần tra
+  const [activeTab, setActiveTab] = useState<'CAMERA' | 'HISTORY'>('CAMERA');
+  const [patrolSessions, setPatrolSessions] = useState<PatrolSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(false);
+  const [selectedSessionForReport, setSelectedSessionForReport] = useState<PatrolSession | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
 
   // Lấy tọa độ GPS thực tế của thiết bị (có fallback mạng khi chạy trên desktop/PC không có GPS)
   const handleGetCurrentLocation = () => {
@@ -304,13 +354,136 @@ export const PatrolModePage: React.FC = () => {
       capturedList.forEach((item) => {
         URL.revokeObjectURL(item.snapshotUrl);
       });
-      if (videoUrl) {
+      if (bestSnapshotRef.current) {
+        URL.revokeObjectURL(bestSnapshotRef.current.snapshotUrl);
+      }
+      if (secondarySnapshotRef.current) {
+        URL.revokeObjectURL(secondarySnapshotRef.current.snapshotUrl);
+      }
+      if (videoUrl && videoUrl.startsWith('blob:')) {
         URL.revokeObjectURL(videoUrl);
       }
     };
   }, []);
 
-  // Xử lý gửi sự cố tuần tra vào hệ thống trung tâm
+  // Nạp lịch sử các phiên tuần tra của người dùng
+  const loadHistory = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setIsLoadingSessions(true);
+    try {
+      const data = await patrolApi.getMySessions({ size: 30 });
+      setPatrolSessions(data.content || []);
+    } catch (err: any) {
+      console.error('Lỗi nạp lịch sử phiên tuần tra:', err);
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (activeTab === 'HISTORY' || isAuthenticated) {
+      loadHistory();
+    }
+  }, [activeTab, isAuthenticated, loadHistory]);
+
+  // Thiết lập lại toàn bộ phiên tuần tra
+  const resetPatrolSession = useCallback(() => {
+    if (bestSnapshotRef.current) {
+      URL.revokeObjectURL(bestSnapshotRef.current.snapshotUrl);
+      bestSnapshotRef.current = null;
+      setBestSnapshot(null);
+    }
+    if (secondarySnapshotRef.current) {
+      URL.revokeObjectURL(secondarySnapshotRef.current.snapshotUrl);
+      secondarySnapshotRef.current = null;
+      setSecondarySnapshot(null);
+    }
+    capturedList.forEach((item) => URL.revokeObjectURL(item.snapshotUrl));
+    setCapturedList([]);
+    setCounterStats({
+      total: 0,
+      byCategory: { POTHOLE: 0, ROAD_CRACK: 0, ROAD_FLOODING: 0, ROAD_OBSTACLE: 0 },
+    });
+    setRouteReportStatus('IDLE');
+    setDispatchedIncidentId(null);
+    setLastCreatedSession(null);
+    nextTrackNumericIdRef.current = 1;
+    recentCountedLocationsRef.current = [];
+    visualTracksRef.current = [];
+    activeTracksRef.current = [];
+    toast.info('Đã làm mới dữ liệu phiên tuần tra', 'Tuần Tra AI');
+  }, [capturedList]);
+
+  // Xử lý gửi 1 Báo Cáo Tuần Tra Tuyến Đường Tổng Hợp (Lưu vào PatrolSession và tạo Incident điều phối)
+  const handleDispatchRouteReport = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      setIsAuthModalOpen(true);
+      toast.warning('Vui lòng đăng nhập để gửi báo cáo tuần tra vào hệ thống.');
+      return;
+    }
+    const snap = bestSnapshotRef.current;
+    if (!snap) {
+      toast.warning('Chưa có ảnh tiêu biểu nào được ghi nhận để tạo báo cáo.');
+      return;
+    }
+
+    setRouteReportStatus('SENDING');
+    try {
+      const potholeCount = counterStats.byCategory.POTHOLE || 0;
+      const crackCount = counterStats.byCategory.ROAD_CRACK || 0;
+      const floodCount = counterStats.byCategory.ROAD_FLOODING || 0;
+      const obstacleCount = counterStats.byCategory.ROAD_OBSTACLE || 0;
+      const totalCount = counterStats.total || (potholeCount + crackCount + floodCount + obstacleCount);
+
+      const severity: 'NORMAL' | 'MEDIUM' | 'HIGH' | 'CRITICAL' =
+        totalCount >= 5 || potholeCount >= 4 ? 'CRITICAL' : totalCount >= 2 ? 'HIGH' : 'MEDIUM';
+
+      const detailsList = [];
+      if (potholeCount > 0) detailsList.push(`${potholeCount} ổ gà`);
+      if (crackCount > 0) detailsList.push(`${crackCount} vết nứt`);
+      if (floodCount > 0) detailsList.push(`${floodCount} điểm ngập`);
+      if (obstacleCount > 0) detailsList.push(`${obstacleCount} vật cản`);
+      const detailsStr = detailsList.join(', ') || `${totalCount} hư hại`;
+
+      const formData = new FormData();
+      formData.append('routeName', patrolLocation.address || 'Tuyến đường tuần tra');
+      formData.append('keyframe1', snap.blob, 'patrol_keyframe_1.jpg');
+      if (secondarySnapshotRef.current?.blob) {
+        formData.append('keyframe2', secondarySnapshotRef.current.blob, 'patrol_keyframe_2.jpg');
+      }
+      formData.append('startLatitude', patrolLocation.lat.toString());
+      formData.append('startLongitude', patrolLocation.lng.toString());
+      formData.append('totalDistanceKm', '1.2');
+      formData.append('totalPotholesDetected', totalCount.toString());
+      formData.append('routeHealthRating', severity);
+      formData.append('videoName', currentVideoName || 'Video tuần tra đường bộ');
+      formData.append('notes', `Phát hiện: ${detailsStr}. Mức độ đánh giá: ${severity}`);
+
+      const session = await patrolApi.createSession(formData);
+      setRouteReportStatus('DISPATCHED');
+      setDispatchedIncidentId(session.sessionCode);
+      setLastCreatedSession(session);
+
+      if (session.hasNearbyDuplicate) {
+        toast.warning(
+          `Cảnh báo đối chiếu: Đã có phản ánh [${session.duplicateTicketCode}] lân cận (${session.duplicateDistanceMeters}m). Hệ thống đã tự động liên kết!`,
+          'Chống Trùng Lặp PostGIS'
+        );
+      } else {
+        toast.success(
+          `Đã tạo thành công Phiên Tuần Tra [${session.sessionCode}] & Hồ sơ điều phối [${session.incidentTicketCode}]!`,
+          'Tuần Tra AI'
+        );
+      }
+
+      loadHistory();
+    } catch (e: any) {
+      setRouteReportStatus('IDLE');
+      toast.error('Lỗi khi gửi báo cáo tuần tra: ' + (e.response?.data?.message || e.message));
+    }
+  }, [isAuthenticated, user, patrolLocation, counterStats, currentVideoName, loadHistory]);
+
+  // Xử lý gửi sự cố tuần tra riêng lẻ vào hệ thống trung tâm
   const handleDispatchIncident = useCallback(async (incident: CapturedIncident, isAuto = false) => {
     if (!isAuthenticated || !user) {
       setIsAuthModalOpen(true);
@@ -355,7 +528,7 @@ export const PatrolModePage: React.FC = () => {
     } catch (e: any) {
       toast.error('Lỗi khi gửi sự cố: ' + (e.response?.data?.message || e.message));
     }
-  }, []);
+  }, [isAuthenticated, user]);
 
   // Vòng lặp Render 60 FPS GPU-accelerated Overlay Canvas với thuật toán nội suy & ngoại suy quán tính
   useEffect(() => {
@@ -522,27 +695,41 @@ export const PatrolModePage: React.FC = () => {
                 }
               }
 
-              // KIỂM TRA CHÍNH XÁC: CHỈ ĐẾM KHI VẬT THỂ THỰC SỰ TIẾN TỪ TRÊN XUỐNG VÀ CẮT QUA VẠCH ĐẾM AI
+              // KIỂM TRA CHÍNH XÁC: ĐẾM ĐA ĐIỂM ĐỒNG THỜI (SIMULTANEOUS MULTI-OBJECT COUNTING)
               const lineY = countingLineYRef.current;
               const touchesLine = (boxTop <= lineY && boxBottom >= lineY);
               const centroidCrossed = (prevCenterY < lineY && currCenterY >= lineY);
-              const wasAboveLine = (track.spawnY !== undefined ? track.spawnY <= lineY : prevCenterY <= lineY) ||
-                                   (track.history.length > 0 && track.history[0].y <= lineY);
-              const isCrossingAction = centroidCrossed || (touchesLine && wasAboveLine);
+              // Mở rộng dải kiểm soát qua vạch: [lineY - 0.04, lineY + 0.08]
+              const inGateZone = (currCenterY >= lineY - 0.04 && currCenterY <= lineY + 0.08);
+              const wasAboveOrAtLine = (track.spawnY !== undefined ? track.spawnY <= lineY + 0.06 : prevCenterY <= lineY + 0.06) ||
+                                       (track.history.length > 0 && track.history[0].y <= lineY + 0.06);
+              const isCrossingAction = centroidCrossed || (touchesLine && wasAboveOrAtLine) || (inGateZone && wasAboveOrAtLine);
 
               if (showCountingLineRef.current && !track.hasCrossedLine && isCrossingAction) {
-                // Khóa chống đếm trùng theo không gian (Spatial Debounce):
-                // Cùng 1 vị trí đường X (+/- 10%) trong vòng 1.8 giây chỉ đếm duy nhất 1 lần
+                // Khóa chống đếm trùng 2D cục bộ (Local 2D Debounce):
+                // - Nếu 2 hay nhiều ổ gà cùng cắt vạch trong cùng 1 frame hoặc cùng thời điểm (dt < 120ms):
+                //   Chỉ coi là trùng nếu 2 box gần như đè khít lên nhau (dx < 0.025 && dy < 0.025). Mọi ổ gà khác vị trí ĐỀU ĐƯỢC ĐẾM ĐỒNG THỜI!
+                // - Nếu là frame kế tiếp (120ms -> 800ms): Chặn nếu cùng 1 vị trí (dx < 0.04 && dy < 0.045) để chống detector bị giật frame.
+                // - Sau 800ms: Xe đã chạy được 7-14 mét, các ổ gà tiếp theo luôn được đếm đầy đủ!
                 const recent = recentCountedLocationsRef.current;
-                const isDuplicate = recent.some(c => (now - c.time < 1800) && Math.abs(c.x - currCenterX) < 0.10);
+                const isDuplicate = recent.some(c => {
+                  const dt = now - c.time;
+                  if (dt >= 800) return false;
+                  const dx = Math.abs(c.x - currCenterX);
+                  const dy = Math.abs(c.y - currCenterY);
+                  if (dt < 120) {
+                    return dx < 0.025 && dy < 0.025;
+                  }
+                  return dx < 0.04 && dy < 0.045;
+                });
 
                 track.hasCrossedLine = true;
 
                 if (!isDuplicate) {
-                  recentCountedLocationsRef.current.push({ x: currCenterX, y: lineY, time: now });
-                  recentCountedLocationsRef.current = recentCountedLocationsRef.current.filter(c => now - c.time < 3500);
+                  recentCountedLocationsRef.current.push({ x: currCenterX, y: currCenterY, time: now });
+                  recentCountedLocationsRef.current = recentCountedLocationsRef.current.filter(c => now - c.time < 2000);
 
-                  lineFlashUntilRef.current = now + 500;
+                  lineFlashUntilRef.current = now + 400;
 
                   const catKey = track.category.includes('POTHOLE')
                     ? 'POTHOLE'
@@ -568,7 +755,7 @@ export const PatrolModePage: React.FC = () => {
                     maxRadius: 44,
                     alpha: 1.0,
                     color: '#22c55e',
-                    label: `+1 ĐÃ ĐẾM #${track.numericId || 1}`,
+                    label: '+1 ĐÃ QUA VẠCH',
                   });
                 }
               }
@@ -904,6 +1091,35 @@ export const PatrolModePage: React.FC = () => {
                 normH: b.height / targetH,
               }));
 
+              // Tự động chọn lọc 1–2 ảnh hiện trường tiêu biểu nhất cho toàn bộ chuyến tuần tra video
+              if (normalizedBoxes.length > 0) {
+                const boxCount = normalizedBoxes.length;
+                const maxConf = Math.max(...normalizedBoxes.map((b: any) => b.confidence || 0));
+                const totalBoxArea = normalizedBoxes.reduce((acc: number, b: any) => acc + (b.width * b.height), 0) / Math.max(1, (targetW * targetH));
+                const frameScore = (boxCount * 3.0) + (maxConf * 2.5) + (totalBoxArea * 4.0);
+
+                if (!bestSnapshotRef.current || frameScore > (bestSnapshotRef.current.score || 0)) {
+                  if (bestSnapshotRef.current) {
+                    if (secondarySnapshotRef.current) {
+                      URL.revokeObjectURL(secondarySnapshotRef.current.snapshotUrl);
+                    }
+                    secondarySnapshotRef.current = bestSnapshotRef.current;
+                    setSecondarySnapshot(bestSnapshotRef.current);
+                  }
+                  const snapUrl = URL.createObjectURL(blob);
+                  const newBest: RepresentativeSnapshot = {
+                    blob,
+                    snapshotUrl: snapUrl,
+                    confidence: maxConf,
+                    boxesCount: boxCount,
+                    timestamp: new Date().toLocaleTimeString('vi-VN'),
+                    score: frameScore,
+                  };
+                  bestSnapshotRef.current = newBest;
+                  setBestSnapshot(newBest);
+                }
+              }
+
               // Đồng bộ ngay lập tức vào Bộ Theo Dõi Trực Quan 60 FPS (Visual Motion Tracker)
               const vNow = performance.now();
               const curVisuals = visualTracksRef.current;
@@ -1158,10 +1374,109 @@ export const PatrolModePage: React.FC = () => {
     };
   }, [isPlaying, samplingMode, confidenceThreshold, patrolLocation, autoDispatch, handleDispatchIncident]);
 
+  // Đồng bộ thời lượng video khi video được nạp
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const updateMeta = () => {
+      if (v.duration && !isNaN(v.duration)) {
+        setVideoDuration(v.duration);
+      }
+      setVideoCurrentTime(v.currentTime || 0);
+    };
+    v.addEventListener('loadedmetadata', updateMeta);
+    v.addEventListener('durationchange', updateMeta);
+    if (v.duration && !isNaN(v.duration)) {
+      setVideoDuration(v.duration);
+      setVideoCurrentTime(v.currentTime || 0);
+    }
+    return () => {
+      v.removeEventListener('loadedmetadata', updateMeta);
+      v.removeEventListener('durationchange', updateMeta);
+    };
+  }, [videoUrl]);
+
+  // Định dạng thời gian mm:ss
+  const formatVideoTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds < 0) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Xử lý tua trực tiếp bằng thanh trượt thời gian
+  const handleSeek = (newTime: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const maxDur = v.duration || videoDuration || 0;
+    const clampedTime = Math.max(0, Math.min(newTime, maxDur > 0 ? maxDur : newTime));
+    v.currentTime = clampedTime;
+    setVideoCurrentTime(clampedTime);
+
+    // Khi tua ngược về trước, reset cache dấu vết để AI bắt đầu quét lại chính xác đoạn đó
+    if (clampedTime < lastVideoCurrentTimeRef.current) {
+      visualTracksRef.current = [];
+      recentCountedLocationsRef.current = [];
+    }
+    lastVideoCurrentTimeRef.current = clampedTime;
+  };
+
+  // Xử lý nhảy thời gian (-5s hoặc +5s)
+  const handleSkip = (deltaSeconds: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    handleSeek(v.currentTime + deltaSeconds);
+  };
+
+  // Tua về đầu video (0:00) và tiếp tục phát
+  const handleRestartVideo = () => {
+    handleSeek(0);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackSpeed;
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
+    }
+  };
+
+  // Lắng nghe cập nhật thời gian từ video element
+  const handleVideoLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const v = e.currentTarget;
+    if (v.duration && !isNaN(v.duration)) {
+      setVideoDuration(v.duration);
+    }
+    setVideoCurrentTime(v.currentTime || 0);
+  };
+
+  const handleVideoTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    if (!isUserSeekingRef.current) {
+      const v = e.currentTarget;
+      setVideoCurrentTime(v.currentTime || 0);
+      lastVideoCurrentTimeRef.current = v.currentTime || 0;
+    }
+  };
+
+  // Xử lý khi video phát hết
+  const handleVideoEnded = () => {
+    if (isLooping) {
+      visualTracksRef.current = [];
+      recentCountedLocationsRef.current = [];
+      return;
+    }
+    setIsPlaying(false);
+    toast.info('Đã hoàn tất quét toàn bộ video tuần tra!', 'Tuần Tra AI');
+    if (autoDispatch && bestSnapshotRef.current && routeReportStatus !== 'DISPATCHED') {
+      handleDispatchRouteReport();
+    }
+  };
+
   // Xử lý nạp tệp video hành trình
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      resetPatrolSession();
+      setVideoDuration(0);
+      setVideoCurrentTime(0);
+      setCurrentVideoName(file.name);
       if (videoUrl && videoUrl.startsWith('blob:')) {
         URL.revokeObjectURL(videoUrl);
       }
@@ -1180,6 +1495,10 @@ export const PatrolModePage: React.FC = () => {
 
   // Nạp video tuần tra mẫu tích hợp sẵn để kiểm thử nhanh
   const handleLoadSampleVideo = (samplePath = '/sample-videos/video_tuan_tra_o_ga.mp4', label = 'Tuyến đường có ổ gà') => {
+    resetPatrolSession();
+    setVideoDuration(0);
+    setVideoCurrentTime(0);
+    setCurrentVideoName(label);
     if (videoUrl && videoUrl.startsWith('blob:')) {
       URL.revokeObjectURL(videoUrl);
     }
@@ -1261,8 +1580,43 @@ export const PatrolModePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Bố Cục Chính: Màn hình Video bên trái (7 cột) & Bản đồ + Feed bắt lỗi bên phải (5 cột) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      {/* Tab Điều Hướng Nghiệp Vụ: Tuần Tra Trực Tiếp vs Lịch Sử Phiên Tuần Tra */}
+      <div className="flex items-center gap-2 border-b border-outline-variant/20 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('CAMERA')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'CAMERA'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          <span>Thực Hiện Tuần Tra (AI Video)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('HISTORY')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'HISTORY'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>Lịch Sử Phiên Tuần Tra Của Tôi</span>
+          {patrolSessions.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
+              {patrolSessions.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'CAMERA' ? (
+        /* Bố Cục Chính: Màn hình Video bên trái (7 cột) & Bản đồ + Feed bắt lỗi bên phải (5 cột) */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* CỘT TRÁI: MÀN HÌNH VIDEO & ĐIỀU KHIỂN (7 CỘT) */}
         <div className="lg:col-span-7 flex flex-col gap-4">
           <div className="relative aspect-video w-full rounded-3xl bg-slate-950 border border-outline-variant/30 overflow-hidden shadow-md flex items-center justify-center">
@@ -1271,7 +1625,10 @@ export const PatrolModePage: React.FC = () => {
               ref={videoRef}
               playsInline
               muted
-              loop
+              loop={isLooping}
+              onLoadedMetadata={handleVideoLoadedMetadata}
+              onTimeUpdate={handleVideoTimeUpdate}
+              onEnded={handleVideoEnded}
               className="w-full h-full object-contain"
             />
 
@@ -1360,6 +1717,152 @@ export const PatrolModePage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* THANH ĐIỀU KHIỂN & DÒNG THỜI GIAN VIDEO (TIMELINE & SCRUBBER BAR) */}
+          {sourceMode === 'UPLOAD' && (
+            <div className="bg-surface-container-lowest p-4 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-3">
+              {/* Tiêu đề & Thông số thời gian */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-2.5 h-2.5 rounded-full ${isPlaying ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                  <span className="font-bold text-on-surface truncate max-w-[280px]" title={currentVideoName}>
+                    {currentVideoName || 'Video Tuần Tra'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 font-mono text-xs">
+                  <div className="flex items-center gap-1 font-bold bg-surface-container-low px-2.5 py-1 rounded-xl border border-outline-variant/30">
+                    <span className="text-primary font-mono">{formatVideoTime(videoCurrentTime)}</span>
+                    <span className="text-on-surface-variant/50">/</span>
+                    <span className="text-on-surface-variant font-mono">{formatVideoTime(videoDuration)}</span>
+                  </div>
+                  {videoDuration > 0 && (
+                    <span className="text-[11px] text-on-surface-variant font-semibold">
+                      ({Math.round((videoCurrentTime / videoDuration) * 100)}%)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Thanh trượt tua thời gian (Scrubber Bar) */}
+              <div className="relative flex items-center group w-full py-0.5">
+                <input
+                  type="range"
+                  min={0}
+                  max={videoDuration > 0 ? videoDuration : 100}
+                  step={0.05}
+                  value={videoCurrentTime}
+                  disabled={!videoUrl || videoDuration === 0}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    handleSeek(val);
+                  }}
+                  onMouseDown={() => {
+                    isUserSeekingRef.current = true;
+                  }}
+                  onMouseUp={() => {
+                    isUserSeekingRef.current = false;
+                  }}
+                  onTouchStart={() => {
+                    isUserSeekingRef.current = true;
+                  }}
+                  onTouchEnd={() => {
+                    isUserSeekingRef.current = false;
+                  }}
+                  className="w-full h-2.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary hover:bg-surface-container-high transition-all disabled:opacity-40"
+                  title="Kéo hoặc nhấp để tua nhanh/chậm đến bất kỳ giây nào của video"
+                />
+              </div>
+
+              {/* Hàng nút điều khiển Tua & Chế độ Lặp lại */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-outline-variant/20">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Nút Tua về đầu 0:00 */}
+                  <button
+                    type="button"
+                    onClick={handleRestartVideo}
+                    disabled={!videoUrl}
+                    title="Tua về đầu video (0:00) và bắt đầu phát lại"
+                    className="px-2.5 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-40 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-primary" />
+                    <span>0:00</span>
+                  </button>
+
+                  {/* Nút Tua lùi -5s */}
+                  <button
+                    type="button"
+                    onClick={() => handleSkip(-5)}
+                    disabled={!videoUrl || videoCurrentTime <= 0}
+                    title="Tua lùi lại 5 giây"
+                    className="px-2.5 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-40 cursor-pointer"
+                  >
+                    <Rewind className="w-3.5 h-3.5 text-primary" />
+                    <span>-5s</span>
+                  </button>
+
+                  {/* Nút Play / Pause */}
+                  <button
+                    type="button"
+                    onClick={togglePlay}
+                    disabled={!videoUrl}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-40 cursor-pointer ${
+                      isPlaying
+                        ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
+                        : 'bg-primary hover:bg-primary/90 text-on-primary'
+                    }`}
+                  >
+                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    <span>{isPlaying ? 'Tạm Dừng' : 'Phát Tiếp'}</span>
+                  </button>
+
+                  {/* Nút Tua tới +5s */}
+                  <button
+                    type="button"
+                    onClick={() => handleSkip(5)}
+                    disabled={!videoUrl || (videoDuration > 0 && videoCurrentTime >= videoDuration)}
+                    title="Tua tới trước 5 giây"
+                    className="px-2.5 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-40 cursor-pointer"
+                  >
+                    <span>+5s</span>
+                    <FastForward className="w-3.5 h-3.5 text-primary" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Bật / Tắt Tự Động Lặp Lại Video (Loop Toggle) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !isLooping;
+                      setIsLooping(next);
+                      toast.info(next ? 'Đã BẬT lặp lại video tự động' : 'Đã TẮT lặp lại video (Dừng khi kết thúc)');
+                    }}
+                    title={isLooping ? 'Bấm để TẮT tự động lặp lại (dừng khi phát hết)' : 'Bấm để BẬT tự động lặp lại video'}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border cursor-pointer ${
+                      isLooping
+                        ? 'bg-primary/15 text-primary border-primary/30 shadow-xs'
+                        : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:text-on-surface'
+                    }`}
+                  >
+                    <Repeat className={`w-3.5 h-3.5 ${isLooping ? 'text-primary' : 'text-on-surface-variant'}`} />
+                    <span>Lặp lại: {isLooping ? 'BẬT' : 'TẮT'}</span>
+                  </button>
+
+                  {/* Nút Đặt lại Bộ Đếm về 0 */}
+                  <button
+                    type="button"
+                    onClick={handleResetCounter}
+                    title="Đặt lại số lượng ổ gà đã đếm về 0"
+                    className="px-2.5 py-1.5 rounded-xl bg-surface-container-low hover:bg-rose-500/15 hover:text-rose-600 text-on-surface-variant text-xs font-medium flex items-center gap-1 transition-all border border-outline-variant/30 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3 text-rose-500" />
+                    <span>Đếm lại</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* BẢNG ĐIỀU KHIỂN & THAM SỐ TUẦN TRA */}
           <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-4">
@@ -1458,7 +1961,7 @@ export const PatrolModePage: React.FC = () => {
                     onChange={(e) => setAutoDispatch(e.target.checked)}
                     className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary"
                   />
-                  <span>Tự động đẩy sự cố lên máy chủ (Auto-Dispatch)</span>
+                  <span>Tự động gửi 1 báo cáo tổng hợp khi kết thúc video</span>
                 </label>
               </div>
             </div>
@@ -1631,104 +2134,416 @@ export const PatrolModePage: React.FC = () => {
             </div>
           </div>
 
-          {/* DANH SÁCH HƯ HẠI ĐÃ PHÁT HIỆN QUA VIDEO */}
-          <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex-1 flex flex-col gap-3 min-h-[360px]">
-            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-on-surface">Hư Hại Bắt Được Tự Động</span>
-                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600">
-                  {capturedList.length}
-                </span>
+          {/* BÁO CÁO TUẦN TRA TUYẾN ĐƯỜNG TỔNG HỢP (GOM TOÀN BỘ VIDEO THÀNH 1 BÁO CÁO DUY NHẤT) */}
+          <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex-1 flex flex-col gap-3.5 min-h-[400px]">
+            {/* Tiêu đề Báo Cáo */}
+            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-on-surface">Báo Cáo Tuyến Đường Tuần Tra</h3>
+                  <p className="text-[11px] text-on-surface-variant line-clamp-1 max-w-[240px]">
+                    {patrolLocation.address}
+                  </p>
+                </div>
               </div>
-              {capturedList.length > 0 && (
+
+              {counterStats.total > 0 && (
                 <button
-                  onClick={handleClearCaptured}
-                  className="text-[11px] text-error hover:underline flex items-center gap-1 font-semibold"
+                  type="button"
+                  onClick={resetPatrolSession}
+                  className="text-[11px] text-error hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                  title="Xóa dữ liệu tuần tra hiện tại và bắt đầu lại"
                 >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Xóa danh sách</span>
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Làm mới</span>
                 </button>
               )}
             </div>
 
-            {capturedList.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-on-surface-variant gap-2">
-                <Video className="w-8 h-8 text-outline" />
-                <span className="text-xs font-semibold">Đang lắng nghe luồng video tuần tra...</span>
-                <span className="text-[11px] text-on-surface-variant/70 max-w-[260px]">
-                  Khi phát hiện ổ gà, vết nứt hoặc vật cản trên video, ảnh chụp snapshot sẽ tự động xuất hiện tại đây.
+            {/* Nội dung báo cáo */}
+            {counterStats.total === 0 && !bestSnapshot ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-on-surface-variant gap-2.5">
+                <Video className="w-8 h-8 text-outline animate-pulse" />
+                <span className="text-xs font-semibold text-on-surface">Đang quét luồng video tuần tra...</span>
+                <span className="text-[11px] text-on-surface-variant/70 max-w-[280px]">
+                  Hệ thống AI sẽ tự động đếm số lượng ổ gà, vết nứt và chọn lọc 1–2 ảnh tiêu biểu nhất của toàn tuyến đường tại đây.
                 </span>
               </div>
             ) : (
-              <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[340px] pr-1">
-                {capturedList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-2xl bg-surface-container-low border border-outline-variant/20 flex gap-3 items-center justify-between hover:bg-surface-container transition-colors"
-                  >
-                    <img
-                      src={item.snapshotUrl}
-                      alt={item.category}
-                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-outline-variant/30 shadow-xs"
-                    />
+              <div className="flex-1 flex flex-col gap-3.5">
+                {/* 1. Thẻ tóm tắt mức độ nghiêm trọng & số lượng */}
+                <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/20 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-on-surface-variant">Đánh giá toàn tuyến:</span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      counterStats.total >= 5 || (counterStats.byCategory.POTHOLE >= 4)
+                        ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                        : counterStats.total >= 2
+                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                        : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                    }`}>
+                      {counterStats.total >= 5 || (counterStats.byCategory.POTHOLE >= 4)
+                        ? 'CRITICAL • Xuống cấp nặng'
+                        : counterStats.total >= 2
+                        ? 'HIGH • Cần duy tu sớm'
+                        : 'MEDIUM • Cần theo dõi'}
+                    </span>
+                  </div>
 
-                    <div className="flex-1 min-w-0 flex flex-col gap-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-xs text-on-surface truncate">
-                          {item.category === 'POTHOLE'
-                            ? '🕳️ Ổ Gà Mặt Đường'
-                            : item.category === 'ROAD_CRACK'
-                            ? '⚡ Vết Nứt Kết Cấu'
-                            : item.category === 'ROAD_FLOODING'
-                            ? '🌊 Điểm Ngập Úng'
-                            : '🚧 Vật Cản Trở'}
-                        </span>
-                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-primary/10 text-primary shrink-0">
-                          {(item.confidence * 100).toFixed(0)}%
-                        </span>
-                        {item.bestFrameOptimized && (
-                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0 flex items-center gap-0.5">
-                            <Sparkles className="w-2.5 h-2.5" />
-                            <span>Frame tối ưu</span>
-                          </span>
-                        )}
-                        {item.framesCount && item.framesCount > 1 ? (
-                          <span className="font-mono text-[9px] font-medium px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant shrink-0">
-                            Theo dõi {item.framesCount}f
-                          </span>
-                        ) : null}
-                      </div>
-                      <span className="text-[11px] text-on-surface-variant truncate">
-                        {item.address}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 rounded-xl bg-surface-container border border-outline-variant/15 flex items-center justify-between">
+                      <span className="text-on-surface-variant flex items-center gap-1.5">
+                        <span>🕳️</span> Ổ gà:
                       </span>
-                      <span className="font-mono text-[10px] text-on-surface-variant/70">
-                        {item.timestamp}
+                      <span className="font-mono font-bold text-on-surface">
+                        {counterStats.byCategory.POTHOLE}
                       </span>
                     </div>
+                    <div className="p-2 rounded-xl bg-surface-container border border-outline-variant/15 flex items-center justify-between">
+                      <span className="text-on-surface-variant flex items-center gap-1.5">
+                        <span>⚡</span> Vết nứt:
+                      </span>
+                      <span className="font-mono font-bold text-on-surface">
+                        {counterStats.byCategory.ROAD_CRACK}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-surface-container border border-outline-variant/15 flex items-center justify-between">
+                      <span className="text-on-surface-variant flex items-center gap-1.5">
+                        <span>🚧</span> Vật cản:
+                      </span>
+                      <span className="font-mono font-bold text-on-surface">
+                        {counterStats.byCategory.ROAD_OBSTACLE}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-surface-container border border-outline-variant/15 flex items-center justify-between">
+                      <span className="text-on-surface-variant flex items-center gap-1.5">
+                        <span>🌊</span> Ngập úng:
+                      </span>
+                      <span className="font-mono font-bold text-on-surface">
+                        {counterStats.byCategory.ROAD_FLOODING}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                    <div className="shrink-0">
-                      {item.status === 'DISPATCHED' ? (
-                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Đã Gửi</span>
+                {/* 2. Ảnh tiêu biểu đại diện của toàn bộ video */}
+                {bestSnapshot && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold text-on-surface-variant">
+                      Ảnh hiện trường tiêu biểu nhất (AI tự động chọn lọc):
+                    </span>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1 rounded-2xl overflow-hidden border border-outline-variant/30 shadow-xs aspect-video bg-black/40">
+                        <img
+                          src={bestSnapshot.snapshotUrl}
+                          alt="Ảnh tiêu biểu"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 backdrop-blur-xs text-white text-[10px] font-mono font-bold">
+                          Ảnh chính • {(bestSnapshot.confidence * 100).toFixed(0)}%
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => handleDispatchIncident(item)}
-                          className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs flex items-center gap-1 shadow-xs transition-all"
-                        >
-                          <Send className="w-3 h-3" />
-                          <span>Gửi Đi</span>
-                        </button>
+                      </div>
+
+                      {secondarySnapshot && (
+                        <div className="relative w-28 rounded-2xl overflow-hidden border border-outline-variant/30 shadow-xs aspect-video bg-black/40 shrink-0">
+                          <img
+                            src={secondarySnapshot.snapshotUrl}
+                            alt="Ảnh phụ"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.2 rounded bg-black/70 backdrop-blur-xs text-white text-[9px] font-mono">
+                            Ảnh phụ
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {/* 3. Nút Gửi Báo Cáo Duy Nhất */}
+                <div className="pt-2 border-t border-outline-variant/20 flex flex-col gap-2">
+                  {routeReportStatus === 'DISPATCHED' ? (
+                    <div className="flex flex-col gap-2.5">
+                      <div className="w-full p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center justify-center gap-2">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Đã Tạo Phiên Tuần Tra {dispatchedIncidentId} Thành Công!</span>
+                      </div>
+
+                      {lastCreatedSession?.hasNearbyDuplicate && (
+                        <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Cơ chế Chống trùng lặp PostGIS:</strong> Phát hiện phản ánh trùng lặp <strong>[{lastCreatedSession.duplicateTicketCode}]</strong> trong bán kính {lastCreatedSession.duplicateDistanceMeters}m. Hệ thống đã tự động liên kết vào hồ sơ!
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (lastCreatedSession) {
+                              setSelectedSessionForReport(lastCreatedSession);
+                              setIsReportModalOpen(true);
+                            }
+                          }}
+                          className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Xuất Biên Bản PDF</span>
+                        </button>
+
+                        {lastCreatedSession?.incidentId ? (
+                          <Link
+                            to={`/incidents/${lastCreatedSession.incidentId}`}
+                            className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-center"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Hồ Sơ Điều Phối</span>
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('HISTORY')}
+                            className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                            <span>Xem Lịch Sử</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={routeReportStatus === 'SENDING' || !bestSnapshot}
+                      onClick={handleDispatchRouteReport}
+                      className="w-full py-3 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      {routeReportStatus === 'SENDING' ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                          <span>Đang Tạo Hồ Sơ Điều Phối...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          <span>Gửi Báo Cáo Tuần Tra Tuyến Đường (1 Phiếu Duy Nhất)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {/* 4. Chi tiết các điểm phát hiện (Thu gọn) */}
+                {capturedList.length > 0 && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsDetailsOpen(!isDetailsOpen)}
+                      className="w-full text-left text-[11px] font-semibold text-on-surface-variant hover:text-on-surface flex items-center justify-between py-1 cursor-pointer"
+                    >
+                      <span>Xem chi tiết các mốc phát hiện ({capturedList.length})</span>
+                      {isDetailsOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {isDetailsOpen && (
+                      <div className="mt-2 flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
+                        {capturedList.map((item, idx) => (
+                          <div
+                            key={item.id}
+                            className="p-2 rounded-xl bg-surface-container-low border border-outline-variant/15 flex items-center justify-between text-[11px]"
+                          >
+                            <span className="font-medium text-on-surface">
+                              #{idx + 1} {item.category === 'POTHOLE' ? 'Ổ gà' : item.category} ({(item.confidence * 100).toFixed(0)}%)
+                            </span>
+                            <span className="font-mono text-[10px] text-on-surface-variant">
+                              {item.timestamp}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
+      ) : (
+        /* GIAO DIỆN TAB LỊCH SỬ PHIÊN TUẦN TRA ĐƯỜNG BỘ */
+        <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-outline-variant/20">
+            <div>
+              <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
+                <History className="w-5 h-5 text-primary" />
+                <span>Nhật Ký & Hồ Sơ Các Phiên Tuần Tra Đường Bộ</span>
+              </h2>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Danh sách các chuyến tuần tra xe AI đã thực hiện và lưu vào cơ sở dữ liệu quốc gia
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadHistory}
+              disabled={isLoadingSessions}
+              className="px-3.5 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-all border border-outline-variant/30 cursor-pointer"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isLoadingSessions ? 'animate-spin' : ''}`} />
+              <span>Làm mới danh sách</span>
+            </button>
+          </div>
+
+          {isLoadingSessions ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-3 text-on-surface-variant">
+              <span className="w-8 h-8 border-3 border-primary/30 border-t-primary rounded-full animate-spin"></span>
+              <span className="text-xs font-semibold">Đang tải lịch sử phiên tuần tra...</span>
+            </div>
+          ) : patrolSessions.length === 0 ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-3 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-surface-container-low flex items-center justify-center text-outline">
+                <FileText className="w-7 h-7" />
+              </div>
+              <div className="max-w-sm">
+                <h3 className="font-bold text-sm text-on-surface">Chưa có phiên tuần tra nào</h3>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  Hãy thực hiện một chuyến tuần tra video bằng AI và nhấn nút &quot;Gửi Báo Cáo Tuần Tra Tuyến Đường&quot; để lưu hồ sơ.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('CAMERA')}
+                className="mt-2 px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs cursor-pointer hover:bg-primary/90 transition-all"
+              >
+                Quay lại Màn hình Tuần tra
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-outline-variant/30 text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+                    <th className="py-3 px-4">Mã Phiên</th>
+                    <th className="py-3 px-4">Tuyến Đường & Địa Chỉ</th>
+                    <th className="py-3 px-4">Thời Gian</th>
+                    <th className="py-3 px-4 text-center">Số Hư Hại</th>
+                    <th className="py-3 px-4">Đánh Giá</th>
+                    <th className="py-3 px-4">Ảnh Chụp (Keyframe)</th>
+                    <th className="py-3 px-4">Mã Điều Phối</th>
+                    <th className="py-3 px-4 text-right">Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/15">
+                  {patrolSessions.map((session) => (
+                    <tr
+                      key={session.id}
+                      className="hover:bg-surface-container-low/60 transition-colors"
+                    >
+                      <td className="py-3.5 px-4 font-mono font-bold text-primary">
+                        {session.sessionCode}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-on-surface line-clamp-1 max-w-[220px]">
+                          {session.routeName}
+                        </div>
+                        {session.hasNearbyDuplicate && (
+                          <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="w-3 h-3" />
+                            Trùng [{session.duplicateTicketCode}] ({session.duplicateDistanceMeters}m)
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-[11px] text-on-surface-variant">
+                        {session.createdAt ? new Date(session.createdAt).toLocaleString('vi-VN') : '--'}
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-mono font-bold text-base text-rose-500">
+                        {session.totalPotholesDetected}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                            session.routeHealthRating === 'CRITICAL'
+                              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                              : session.routeHealthRating === 'HIGH'
+                              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                              : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                          }`}
+                        >
+                          {session.routeHealthRating === 'CRITICAL'
+                            ? 'CRITICAL'
+                            : session.routeHealthRating === 'HIGH'
+                            ? 'HIGH'
+                            : 'MEDIUM'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {session.keyframeUrl1 ? (
+                          <div className="w-16 h-10 rounded-lg overflow-hidden border border-outline-variant/30 bg-black/40">
+                            <img
+                              src={session.keyframeUrl1}
+                              alt="Keyframe"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-on-surface-variant/50">Không có</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {session.incidentTicketCode ? (
+                          <span className="font-mono text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                            {session.incidentTicketCode}
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant/60 text-[10px]">Đang tạo</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSessionForReport(session);
+                              setIsReportModalOpen(true);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+                            title="In hoặc lưu PDF Biên bản kiểm tra kỹ thuật"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Biên Bản PDF</span>
+                          </button>
+
+                          {session.incidentId && (
+                            <Link
+                              to={`/incidents/${session.incidentId}`}
+                              className="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface transition-all"
+                              title="Xem hồ sơ điều phối sự cố"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </Link>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal Biên Bản Kỹ Thuật Kiểm Tra Tuyến Đường (Chuẩn In & PDF) */}
+      <PatrolInspectionReportModal
+        session={selectedSessionForReport}
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+      />
 
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>

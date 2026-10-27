@@ -1,6 +1,7 @@
 package com.roadvision.service;
 
 import com.roadvision.dto.*;
+import com.roadvision.entity.Incident;
 import com.roadvision.entity.Team;
 import com.roadvision.entity.User;
 import com.roadvision.enums.Role;
@@ -188,8 +189,13 @@ public class TeamService {
 
         User saved = userRepository.save(staff);
 
-        // Nếu đặt làm tổ trưởng, cập nhật luôn vào team
+        // Nếu đặt làm tổ trưởng, cập nhật luôn vào team và chuyển tổ trưởng cũ về làm thành viên thường
         if (team != null && Boolean.TRUE.equals(request.getIsTeamLeader())) {
+            if (team.getLeader() != null && !team.getLeader().getId().equals(saved.getId())) {
+                User oldLeader = team.getLeader();
+                oldLeader.setIsTeamLeader(false);
+                userRepository.save(oldLeader);
+            }
             team.setLeader(saved);
             teamRepository.save(team);
         }
@@ -229,8 +235,14 @@ public class TeamService {
         if (request.getIsTeamLeader() != null) {
             staff.setIsTeamLeader(request.getIsTeamLeader());
             if (staff.getTeam() != null && request.getIsTeamLeader()) {
-                staff.getTeam().setLeader(staff);
-                teamRepository.save(staff.getTeam());
+                Team curTeam = staff.getTeam();
+                if (curTeam.getLeader() != null && !curTeam.getLeader().getId().equals(staff.getId())) {
+                    User oldLeader = curTeam.getLeader();
+                    oldLeader.setIsTeamLeader(false);
+                    userRepository.save(oldLeader);
+                }
+                curTeam.setLeader(staff);
+                teamRepository.save(curTeam);
             }
         }
 
@@ -278,6 +290,30 @@ public class TeamService {
             }
         }
 
+        List<Incident> activeIncidents = incidentRepository.findActiveIncidentsByTeamId(team.getId());
+        int activeCount = activeIncidents != null ? activeIncidents.size() : 0;
+        String availability = Boolean.FALSE.equals(team.getIsActive()) ? "INACTIVE"
+                : (activeCount == 0 ? "AVAILABLE" : (activeCount >= 3 ? "OVERLOADED" : "BUSY"));
+
+        String currentTicket = (activeIncidents != null && !activeIncidents.isEmpty())
+                ? activeIncidents.get(0).getTicketCode() : null;
+        String currentTitle = (activeIncidents != null && !activeIncidents.isEmpty())
+                ? activeIncidents.get(0).getTitle() : null;
+
+        List<TeamActiveTaskDto> activeTasks = (activeIncidents != null) ? activeIncidents.stream()
+                .map(inc -> TeamActiveTaskDto.builder()
+                        .id(inc.getId())
+                        .ticketCode(inc.getTicketCode())
+                        .title(inc.getTitle())
+                        .address(inc.getAddress())
+                        .category(inc.getCategory())
+                        .status(inc.getStatus())
+                        .severity(inc.getSeverity())
+                        .plannedDeadline(inc.getPlannedDeadline())
+                        .createdAt(inc.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList()) : new ArrayList<>();
+
         return TeamResponse.builder()
                 .id(team.getId())
                 .name(team.getName())
@@ -291,6 +327,11 @@ public class TeamService {
                 .leaderName(leaderName)
                 .leaderPhone(leaderPhone)
                 .members(memberResponses)
+                .activeTaskCount(activeCount)
+                .availabilityStatus(availability)
+                .currentActiveIncidentTicket(currentTicket)
+                .currentActiveIncidentTitle(currentTitle)
+                .activeTasks(activeTasks)
                 .createdAt(team.getCreatedAt())
                 .updatedAt(team.getUpdatedAt())
                 .build();

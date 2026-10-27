@@ -26,6 +26,11 @@ public class TeamResponse {
     private String leaderName;
     private String leaderPhone;
     private List<StaffResponse> members;
+    private Integer activeTaskCount;
+    private String availabilityStatus; // AVAILABLE, BUSY, OVERLOADED, INACTIVE
+    private String currentActiveIncidentTicket;
+    private String currentActiveIncidentTitle;
+    private List<TeamActiveTaskDto> activeTasks;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

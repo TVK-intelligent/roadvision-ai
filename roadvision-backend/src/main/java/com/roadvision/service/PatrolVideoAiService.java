@@ -177,17 +177,15 @@ public class PatrolVideoAiService {
                     float floodingConf = (numClasses > 2) ? output[0][6][i] : 0f;
 
                     // PHÂN BIỆT THÔNG MINH GIỮA Ổ GÀ (POTHOLE) VÀ NGẬP ÚNG (ROAD_FLOODING):
-                    // Ổ gà đọng nước/vũng trũng là hư hại cục bộ (chiều rộng < 48% ảnh, diện tích < 12% ảnh).
+                    // Ổ gà đọng nước/vũng trũng là hư hại cục bộ (chiều rộng < 50% ảnh, diện tích < 20% ảnh).
                     // Ngập úng (ROAD_FLOODING) là hiện tượng ngập lụt diện rộng (ngập băng qua làn đường, diện tích lớn).
                     float boxAreaRatio = ((float) lw * lh) / (origWidth * origHeight);
-                    boolean isLocalizedCavity = (boxAreaRatio < 0.12f) && (lw < origWidth * 0.48f);
+                    boolean isLocalizedCavity = (boxAreaRatio < 0.20f) && (lw < origWidth * 0.50f);
 
                     if (bestClassId == 2 && isLocalizedCavity) {
-                        // Nếu vũng nước cục bộ bị model nhận nhầm thành ngập úng
-                        if (potholeConf >= 0.08f || potholeConf >= floodingConf * 0.45f) {
-                            bestClassId = 0; // Chuyển về POTHOLE (Ổ gà chứa nước)
-                            bestConf = Math.max(potholeConf, floodingConf * 0.95f);
-                        }
+                        // Vũng nước / hốc trũng cục bộ trên mặt đường: Chuyển đổi chuẩn xác thành POTHOLE (Ổ gà chứa nước)
+                        bestClassId = 0;
+                        bestConf = Math.max(potholeConf, floodingConf * 0.92f);
                     } else if (bestClassId == 1 && isLocalizedCavity) {
                         // Vết nứt vỡ dạng ổ gà rỗ mặt đường
                         if (potholeConf >= 0.12f && potholeConf >= crackConf * 0.65f) {
@@ -231,42 +229,65 @@ public class PatrolVideoAiService {
 
             if (rawCandidates.isEmpty()) return result;
 
-            // 1. Áp dụng NMS
-            List<ImageTensorUtil.BoundingBox> nmsBoxes = ImageTensorUtil.applyNms(rawCandidates, iouThreshold);
+            // 1. Hợp nhất trước các mảnh ổ gà gối nhau để bảo toàn kích thước trọn vẹn, không bị NMS cắt xén
+            List<ImageTensorUtil.BoundingBox> mergedCandidates = mergeOverlappingPotholes(rawCandidates);
 
-            // 2. Bảo toàn và mở rộng nhẹ để ôm trọn toàn bộ ổ gà (không co rúm méo mó)
+            // 2. Áp dụng NMS
+            List<ImageTensorUtil.BoundingBox> nmsBoxes = ImageTensorUtil.applyNms(mergedCandidates, iouThreshold);
+
+            // 3. Tinh chỉnh thu gọn (Tighten & Trim) để hộp ôm sát mép thật của ổ gà, triệt tiêu lấn chiếm đường phẳng
             List<ImageTensorUtil.BoundingBox> convertedBoxes = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : nmsBoxes) {
                 if ("POTHOLE".equals(b.getClassName())) {
-                    // Mở rộng nhẹ 5% để ôm trọn cả thành hố và gờ miệng ổ gà
-                    int padX = Math.max(3, (int) (b.getWidth() * 0.05));
-                    int padY = Math.max(3, (int) (b.getHeight() * 0.05));
-                    int nx = Math.max(0, b.getX() - padX);
-                    int ny = Math.max(0, b.getY() - padY);
-                    int nw = Math.min(origWidth - nx, b.getWidth() + padX * 2);
-                    int nh = Math.min(origHeight - ny, b.getHeight() + padY * 2);
-
-                    convertedBoxes.add(ImageTensorUtil.BoundingBox.builder()
-                            .className("POTHOLE")
-                            .confidence(b.getConfidence())
-                            .x(nx)
-                            .y(ny)
-                            .width(nw)
-                            .height(nh)
-                            .build());
+                    convertedBoxes.add(tightenSinglePotholeBox(image, b));
                 } else {
                     convertedBoxes.add(b);
                 }
             }
 
-            // 3. Triệt tiêu vết nứt con lồng sâu trong hoặc đè lên ổ gà
+            // 3. Phân tách danh sách Ổ gà đã thu gọn
             List<ImageTensorUtil.BoundingBox> potholes = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : convertedBoxes) {
                 if ("POTHOLE".equals(b.getClassName())) potholes.add(b);
             }
 
-            List<ImageTensorUtil.BoundingBox> finalVideoBoxes = new ArrayList<>();
+            // 4. Khử xung đột và triệt tiêu box ngập úng ảo (ROAD_FLOODING)
+            // Hiện tượng ngập úng thật sự là nước tràn mênh mông qua mặt đường.
+            // Nếu một vùng bị model gán ngập úng nhưng bên trong chứa các ổ gà riêng lẻ,
+            // hoặc trùm cả phong cảnh (> 60% diện tích ảnh) -> đó là đường hư hỏng ổ gà đọng nước, không phải ngập lụt.
+            List<ImageTensorUtil.BoundingBox> resolvedBoxes = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : convertedBoxes) {
+                if ("ROAD_FLOODING".equals(b.getClassName())) {
+                    float wRatio = (float) b.getWidth() / Math.max(1, origWidth);
+                    float aRatio = (float) (b.getWidth() * b.getHeight()) / Math.max(1, origWidth * origHeight);
+
+                    // Khung ngập úng bao trùm phong cảnh hoặc bầu trời (> 60% diện tích ảnh) -> Triệt tiêu ảo giác
+                    if (aRatio >= 0.60f) continue;
+
+                    // Nếu có ổ gà cụ thể nằm trong vùng ngập úng này -> Giữ lại các ổ gà, triệt tiêu box ngập úng bao trùm
+                    boolean containsDiscretePothole = false;
+                    for (ImageTensorUtil.BoundingBox p : potholes) {
+                        int cx = p.getX() + p.getWidth() / 2;
+                        int cy = p.getY() + p.getHeight() / 2;
+                        if (cx >= b.getX() && cx <= (b.getX() + b.getWidth())
+                                && cy >= b.getY() && cy <= (b.getY() + b.getHeight())) {
+                            containsDiscretePothole = true;
+                            break;
+                        }
+                    }
+                    if (containsDiscretePothole) continue;
+
+                    // Đối với ngập úng diện rộng (> 50% chiều ngang hoặc > 25% diện tích), độ tin cậy phải đủ cao (>= 0.60) để tránh chớp tắt ngẫu nhiên
+                    if ((wRatio >= 0.50f || aRatio >= 0.25f) && b.getConfidence() < 0.60f) {
+                        continue;
+                    }
+                }
+                resolvedBoxes.add(b);
+            }
+
+            // 5. Triệt tiêu vết nứt con lồng sâu trong hoặc đè lên ổ gà
+            List<ImageTensorUtil.BoundingBox> finalVideoBoxes = new ArrayList<>();
+            for (ImageTensorUtil.BoundingBox b : resolvedBoxes) {
                 if ("ROAD_CRACK".equals(b.getClassName())) {
                     boolean insidePothole = false;
                     for (ImageTensorUtil.BoundingBox p : potholes) {
@@ -314,6 +335,52 @@ public class PatrolVideoAiService {
                 .build();
     }
 
+    /**
+     * Lọc danh sách BoundingBox theo Vùng nhận diện đa giác (Detection Zone ROI).
+     * Chỉ giữ lại các detection có tâm (cx, cy) nằm trong đa giác mặt đường.
+     *
+     * @param boxes Danh sách bounding box thô
+     * @param polygonVertices Danh sách đỉnh đa giác chuẩn hóa [0..1]
+     * @param imgWidth Chiều rộng frame
+     * @param imgHeight Chiều cao frame
+     */
+    public List<ImageTensorUtil.BoundingBox> filterBoxesByDetectionZone(
+            List<ImageTensorUtil.BoundingBox> boxes,
+            List<java.awt.geom.Point2D.Double> polygonVertices,
+            int imgWidth, int imgHeight) {
+        if (boxes == null || boxes.isEmpty() || polygonVertices == null || polygonVertices.size() < 3) {
+            return boxes != null ? boxes : Collections.emptyList();
+        }
+
+        List<ImageTensorUtil.BoundingBox> insideBoxes = new ArrayList<>();
+        for (ImageTensorUtil.BoundingBox b : boxes) {
+            double cx = (double) (b.getX() + b.getWidth() / 2.0) / Math.max(1, imgWidth);
+            double cy = (double) (b.getY() + b.getHeight() / 2.0) / Math.max(1, imgHeight);
+
+            if (isPointInPolygon(cx, cy, polygonVertices)) {
+                insideBoxes.add(b);
+            }
+        }
+        return insideBoxes;
+    }
+
+    /**
+     * Thuật toán Ray-Casting kiểm tra một điểm (px, py) có nằm trong đa giác kín hay không.
+     */
+    public static boolean isPointInPolygon(double px, double py, List<java.awt.geom.Point2D.Double> polygon) {
+        if (polygon == null || polygon.size() < 3) return true;
+        boolean inside = false;
+        int n = polygon.size();
+        for (int i = 0, j = n - 1; i < n; j = i++) {
+            double xi = polygon.get(i).x, yi = polygon.get(i).y;
+            double xj = polygon.get(j).x, yj = polygon.get(j).y;
+            boolean intersect = ((yi > py) != (yj > py))
+                    && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
     public String calculateSeverity(List<ImageTensorUtil.BoundingBox> boxes, int imgWidth, int imgHeight) {
         if (boxes == null || boxes.isEmpty()) return "LOW";
         int count = boxes.size();
@@ -326,6 +393,196 @@ public class PatrolVideoAiService {
         if (count >= 3 || areaRatio >= 0.12) return "CRITICAL";
         if (count >= 2 || areaRatio >= 0.06) return "HIGH";
         return "MEDIUM";
+    }
+
+    private List<ImageTensorUtil.BoundingBox> mergeOverlappingPotholes(List<ImageTensorUtil.BoundingBox> boxes) {
+        if (boxes == null || boxes.size() < 2) return boxes;
+
+        List<ImageTensorUtil.BoundingBox> nonPotholes = new ArrayList<>();
+        List<ImageTensorUtil.BoundingBox> potholes = new ArrayList<>();
+
+        for (ImageTensorUtil.BoundingBox b : boxes) {
+            if ("POTHOLE".equals(b.getClassName())) {
+                potholes.add(b);
+            } else {
+                nonPotholes.add(b);
+            }
+        }
+
+        if (potholes.size() < 2) return boxes;
+
+        boolean mergedAny = true;
+        while (mergedAny) {
+            mergedAny = false;
+            for (int i = 0; i < potholes.size(); i++) {
+                for (int j = i + 1; j < potholes.size(); j++) {
+                    ImageTensorUtil.BoundingBox a = potholes.get(i);
+                    ImageTensorUtil.BoundingBox b = potholes.get(j);
+
+                    int interX1 = Math.max(a.getX(), b.getX());
+                    int interY1 = Math.max(a.getY(), b.getY());
+                    int interX2 = Math.min(a.getX() + a.getWidth(), b.getX() + b.getWidth());
+                    int interY2 = Math.min(a.getY() + a.getHeight(), b.getY() + b.getHeight());
+                    float interArea = Math.max(0, interX2 - interX1) * Math.max(0, interY2 - interY1);
+
+                    float areaA = (float) a.getWidth() * a.getHeight();
+                    float areaB = (float) b.getWidth() * b.getHeight();
+                    float minArea = Math.min(areaA, areaB);
+
+                    if (interArea / minArea >= 0.25f || ImageTensorUtil.computeIoU(a, b) >= 0.15f) {
+                        int nx = Math.min(a.getX(), b.getX());
+                        int ny = Math.min(a.getY(), b.getY());
+                        int nr = Math.max(a.getX() + a.getWidth(), b.getX() + b.getWidth());
+                        int nb = Math.max(a.getY() + a.getHeight(), b.getY() + b.getHeight());
+                        float nConf = Math.max(a.getConfidence(), b.getConfidence());
+
+                        ImageTensorUtil.BoundingBox merged = ImageTensorUtil.BoundingBox.builder()
+                                .className("POTHOLE")
+                                .confidence(nConf)
+                                .x(nx)
+                                .y(ny)
+                                .width(nr - nx)
+                                .height(nb - ny)
+                                .build();
+
+                        potholes.remove(j);
+                        potholes.remove(i);
+                        potholes.add(merged);
+                        mergedAny = true;
+                        break;
+                    }
+                }
+                if (mergedAny) break;
+            }
+        }
+
+        nonPotholes.addAll(potholes);
+        return nonPotholes;
+    }
+
+    private ImageTensorUtil.BoundingBox tightenSinglePotholeBox(
+            BufferedImage img, ImageTensorUtil.BoundingBox b) {
+        if (img == null || b == null) return b;
+        int imgW = img.getWidth(), imgH = img.getHeight();
+        int left = Math.max(0, b.getX());
+        int top = Math.max(0, b.getY());
+        int right = Math.min(imgW - 1, b.getX() + b.getWidth());
+        int bottom = Math.min(imgH - 1, b.getY() + b.getHeight());
+        if ((right - left) < 24 || (bottom - top) < 20) return b;
+
+        // Ước lượng độ sáng trung bình của mặt đường phẳng tại 4 góc ngoài của box
+        int sampleStep = Math.max(2, Math.min(right - left, bottom - top) / 35);
+        int borderLumaSum = 0, borderCount = 0;
+        for (int x = left; x <= right; x += sampleStep) {
+            borderLumaSum += getPixelLuma(img, x, top);
+            borderLumaSum += getPixelLuma(img, x, bottom);
+            borderCount += 2;
+        }
+        for (int y = top; y <= bottom; y += sampleStep) {
+            borderLumaSum += getPixelLuma(img, left, y);
+            borderLumaSum += getPixelLuma(img, right, y);
+            borderCount += 2;
+        }
+        int avgRoadLuma = borderCount > 0 ? borderLumaSum / borderCount : 130;
+        int darkCavityThresh = Math.min(85, avgRoadLuma - 25);
+
+        // Thu gọn mép trái: tiến dần vào trong chừng nào cột x vẫn là nhựa đường phẳng mịn
+        int minAllowedW = Math.max(20, (int) ((right - left) * 0.40));
+        while (left < right - minAllowedW) {
+            int cavityHits = 0;
+            int gradSum = 0, gradSamples = 0;
+            for (int y = top; y <= bottom; y += sampleStep) {
+                int luma = getPixelLuma(img, left, y);
+                if (luma <= darkCavityThresh) cavityHits++;
+                int l1 = getPixelLuma(img, Math.max(0, left - 2), y);
+                int l2 = getPixelLuma(img, Math.min(imgW - 1, left + 2), y);
+                gradSum += Math.abs(l2 - l1);
+                gradSamples++;
+            }
+            float avgGrad = gradSamples > 0 ? (float) gradSum / gradSamples : 0;
+            if (cavityHits >= 3 || avgGrad >= 24.0f) break;
+            left += sampleStep;
+        }
+
+        // Thu gọn mép phải: lùi dần từ phải sang trái chừng nào cột x vẫn là đường phẳng
+        while (right > left + minAllowedW) {
+            int cavityHits = 0;
+            int gradSum = 0, gradSamples = 0;
+            for (int y = top; y <= bottom; y += sampleStep) {
+                int luma = getPixelLuma(img, right, y);
+                if (luma <= darkCavityThresh) cavityHits++;
+                int l1 = getPixelLuma(img, Math.max(0, right - 2), y);
+                int l2 = getPixelLuma(img, Math.min(imgW - 1, right + 2), y);
+                gradSum += Math.abs(l2 - l1);
+                gradSamples++;
+            }
+            float avgGrad = gradSamples > 0 ? (float) gradSum / gradSamples : 0;
+            if (cavityHits >= 3 || avgGrad >= 24.0f) break;
+            right -= sampleStep;
+        }
+
+        // Thu gọn mép trên: tiến dần từ trên xuống dưới
+        int minAllowedH = Math.max(16, (int) ((bottom - top) * 0.40));
+        while (top < bottom - minAllowedH) {
+            int cavityHits = 0;
+            int gradSum = 0, gradSamples = 0;
+            for (int x = left; x <= right; x += sampleStep) {
+                int luma = getPixelLuma(img, x, top);
+                if (luma <= darkCavityThresh) cavityHits++;
+                int l1 = getPixelLuma(img, x, Math.max(0, top - 2));
+                int l2 = getPixelLuma(img, x, Math.min(imgH - 1, top + 2));
+                gradSum += Math.abs(l2 - l1);
+                gradSamples++;
+            }
+            float avgGrad = gradSamples > 0 ? (float) gradSum / gradSamples : 0;
+            if (cavityHits >= 3 || avgGrad >= 24.0f) break;
+            top += sampleStep;
+        }
+
+        // Thu gọn mép dưới: lùi dần từ dưới lên trên
+        while (bottom > top + minAllowedH) {
+            int cavityHits = 0;
+            int gradSum = 0, gradSamples = 0;
+            for (int x = left; x <= right; x += sampleStep) {
+                int luma = getPixelLuma(img, x, bottom);
+                if (luma <= darkCavityThresh) cavityHits++;
+                int l1 = getPixelLuma(img, x, Math.max(0, bottom - 2));
+                int l2 = getPixelLuma(img, x, Math.min(imgH - 1, bottom + 2));
+                gradSum += Math.abs(l2 - l1);
+                gradSamples++;
+            }
+            float avgGrad = gradSamples > 0 ? (float) gradSum / gradSamples : 0;
+            if (cavityHits >= 3 || avgGrad >= 24.0f) break;
+            bottom -= sampleStep;
+        }
+
+        int finalW = right - left;
+        int finalH = bottom - top;
+        int padX = Math.max(2, (int) (finalW * 0.03));
+        int padY = Math.max(2, (int) (finalH * 0.03));
+
+        int newX = Math.max(0, left - padX);
+        int newY = Math.max(0, top - padY);
+        int newW = Math.min(imgW - newX, finalW + padX * 2);
+        int newH = Math.min(imgH - newY, finalH + padY * 2);
+
+        return ImageTensorUtil.BoundingBox.builder()
+                .className("POTHOLE")
+                .confidence(b.getConfidence())
+                .x(newX)
+                .y(newY)
+                .width(newW)
+                .height(newH)
+                .build();
+    }
+
+    private int getPixelLuma(BufferedImage img, int x, int y) {
+        int rgb = img.getRGB(Math.max(0, Math.min(img.getWidth() - 1, x)),
+                             Math.max(0, Math.min(img.getHeight() - 1, y)));
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+        return (int) (0.299 * r + 0.587 * g + 0.114 * b);
     }
 
     private List<ImageTensorUtil.BoundingBox> detectAndTraceMajorRoadCracks(

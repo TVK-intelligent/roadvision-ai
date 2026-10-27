@@ -56,8 +56,17 @@ export function App() {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/map" element={<SpatialMapPage />} />
                   <Route path="/report" element={<ReportIncidentPage />} />
-                  <Route path="/patrol" element={<PatrolModePage />} />
                   <Route path="/incidents/:id" element={<IncidentDossierPage />} />
+
+                  {/* Tuyến Tuần Tra AI Chuyên Nghiệp: Dành riêng cho Kỹ thuật viên / Tuần tra viên & Admin */}
+                  <Route
+                    path="/patrol"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_STAFF', 'ROLE_ADMIN']}>
+                        <PatrolModePage />
+                      </ProtectedRoute>
+                    }
+                  />
 
                   {/* Tuyến Công Dân (Citizen & Admin): Lịch sử phản ánh */}
                   <Route

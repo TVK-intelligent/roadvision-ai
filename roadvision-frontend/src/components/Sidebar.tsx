@@ -128,25 +128,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <PlusCircle className="w-4 h-4 shrink-0" />
                 {!isCollapsed && <span>Báo sự cố</span>}
               </Link>
-
-              <Link to="/patrol" onClick={closeMobile} className={navItemClass('/patrol')} title="Tuần tra tự động bằng AI">
-                <Video className="w-4 h-4 shrink-0" />
-                {!isCollapsed && <span>Tuần tra AI</span>}
-              </Link>
             </nav>
           </div>
 
-          {/* GROUP 2: TÁC NGHIỆP HIỆN TRƯỜNG (STAFF / ADMIN) */}
+          {/* GROUP 2: TÁC NGHIỆP HIỆN TRƯỜNG & TUẦN TRA (STAFF / ADMIN) */}
           {(user?.role === 'ROLE_STAFF' || user?.role === 'ROLE_ADMIN') && (
             <div>
               {!isCollapsed ? (
                 <div className="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Hiện trường (Tổ Đội)
+                  Hiện trường & Tuần tra
                 </div>
               ) : (
                 <div className="border-t border-[#243048] my-2" />
               )}
               <nav className="space-y-1">
+                <Link
+                  to="/patrol"
+                  onClick={closeMobile}
+                  className={navItemClass('/patrol')}
+                  title="Tuần tra tuyến đường bằng Camera AI hành trình"
+                >
+                  <Video className="w-4 h-4 shrink-0 text-cyan-400" />
+                  {!isCollapsed && <span>Tuần tra Tuyến đường (AI)</span>}
+                </Link>
                 <Link
                   to="/inspection-tasks"
                   onClick={closeMobile}

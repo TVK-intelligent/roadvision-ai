@@ -61,6 +61,12 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
            "  AND i.status IN ('INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED')")
     long countActiveTasksByStaffId(@Param("staffId") Long staffId);
 
+    @Query("SELECT i FROM Incident i " +
+           "WHERE (i.inspectionTeam.id = :teamId AND i.status IN ('INSPECTION_ASSIGNED', 'INSPECTING')) " +
+           "   OR (i.assignedTeam.id = :teamId AND i.status IN ('ASSIGNED', 'IN_PROGRESS', 'REWORK_REQUIRED')) " +
+           "ORDER BY i.updatedAt DESC")
+    List<Incident> findActiveIncidentsByTeamId(@Param("teamId") Long teamId);
+
     Page<Incident> findByStatus(IncidentStatus status, Pageable pageable);
 
     Page<Incident> findByCategory(Category category, Pageable pageable);

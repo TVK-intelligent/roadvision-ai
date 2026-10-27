@@ -291,6 +291,18 @@ export interface TeamMemberSummary {
   isTeamLeader: boolean;
 }
 
+export interface TeamActiveTask {
+  id: number;
+  ticketCode: string;
+  title: string;
+  address?: string;
+  category: Category;
+  status: IncidentStatus;
+  severity?: Severity;
+  plannedDeadline?: string;
+  createdAt?: string;
+}
+
 export interface Team {
   id: number;
   name: string;
@@ -303,6 +315,10 @@ export interface Team {
   leaderPhone?: string;
   memberCount: number;
   activeTaskCount: number;
+  availabilityStatus?: 'AVAILABLE' | 'BUSY' | 'OVERLOADED' | 'INACTIVE';
+  currentActiveIncidentTicket?: string;
+  currentActiveIncidentTitle?: string;
+  activeTasks?: TeamActiveTask[];
   members: TeamMemberSummary[];
   isActive: boolean;
   createdAt?: string;
