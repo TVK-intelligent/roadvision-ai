@@ -1864,231 +1864,203 @@ export const PatrolModePage: React.FC = () => {
             </div>
           )}
 
-          {/* BẢNG ĐIỀU KHIỂN & THAM SỐ TUẦN TRA */}
-          <div className="bg-surface-container-lowest p-5 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              {/* Nút Play/Pause & Chuyển Nguồn */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={togglePlay}
-                  disabled={!videoUrl && sourceMode === 'UPLOAD'}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all disabled:opacity-50 ${
-                    isPlaying
-                      ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
-                      : 'bg-primary hover:bg-primary/90 text-on-primary'
+          {/* BẢNG ĐIỀU KHIỂN & THAM SỐ TUẦN TRA (CLEAN & COMPACT DESIGN) */}
+          <div className="bg-surface-container-lowest p-4 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-3">
+            {/* HÀNG 1: CHỌN NGUỒN VIDEO & AUTO-DISPATCH */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              {/* Nguồn Video: Tải Video vs Video Mẫu vs Camera */}
+              <div className="flex items-center gap-1 p-1 rounded-2xl bg-surface-container-low border border-outline-variant/30 text-xs flex-wrap">
+                <label
+                  className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
+                    sourceMode === 'UPLOAD' && !videoUrl?.includes('sample-videos')
+                      ? 'bg-surface-container-lowest text-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
                   }`}
                 >
-                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  <span>{isPlaying ? 'Tạm Dừng Tuần Tra' : 'Bắt Đầu Tuần Tra'}</span>
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Tải Video</span>
+                  <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => handleLoadSampleVideo('/sample-videos/video_tuan_tra_o_ga.mp4', 'Mẫu 1 - Ổ gà đường phố')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    videoUrl === '/sample-videos/video_tuan_tra_o_ga.mp4'
+                      ? 'bg-surface-container-lowest text-amber-600 dark:text-amber-400 shadow-xs'
+                      : 'text-on-surface-variant hover:text-amber-500'
+                  }`}
+                  title="Nạp video tuần tra thực tế có ổ gà để kiểm thử nhanh"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Mẫu 1</span>
                 </button>
 
-                {/* Chọn Nguồn: Tải Video vs Camera vs Video Mẫu */}
-                <div className="flex items-center bg-surface-container-low p-1 rounded-xl border border-outline-variant/30 text-xs">
-                  <label
-                    className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                      sourceMode === 'UPLOAD' && videoUrl !== '/sample-videos/video_tuan_tra_o_ga.mp4'
-                        ? 'bg-surface-container-lowest text-primary shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Tải Video</span>
-                    <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
-                  </label>
+                <button
+                  type="button"
+                  onClick={() => handleLoadSampleVideo('/sample-videos/pothole_tracker_test.mp4', 'Mẫu 2 - Tuyến đường ổ gà liên tiếp')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    videoUrl === '/sample-videos/pothole_tracker_test.mp4'
+                      ? 'bg-surface-container-lowest text-emerald-600 dark:text-emerald-400 shadow-xs'
+                      : 'text-on-surface-variant hover:text-emerald-500'
+                  }`}
+                  title="Nạp video tuần tra ô tô qua đoạn đường nhiều ổ gà liên tiếp"
+                >
+                  <span>Mẫu 2 (Liên tiếp)</span>
+                </button>
 
-                  <div className="relative group">
-                    <button
-                      type="button"
-                      onClick={() => handleLoadSampleVideo('/sample-videos/video_tuan_tra_o_ga.mp4', 'Mẫu 1 - Ổ gà đường phố')}
-                      className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
-                        videoUrl?.includes('sample-videos')
-                          ? 'bg-surface-container-lowest text-amber-600 dark:text-amber-400 shadow-xs'
-                          : 'text-amber-600 dark:text-amber-400 hover:text-amber-500'
-                      }`}
-                      title="Nạp video tuần tra thực tế có ổ gà để kiểm thử nhanh"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Video Mẫu #1</span>
-                    </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadSampleVideo('/sample-videos/test_road2.mp4', 'Mẫu 3 - Vết nứt & Ổ gà đan xen')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    videoUrl === '/sample-videos/test_road2.mp4'
+                      ? 'bg-surface-container-lowest text-cyan-600 dark:text-cyan-400 shadow-xs'
+                      : 'text-on-surface-variant hover:text-cyan-500'
+                  }`}
+                  title="Nạp video tuần tra mặt đường có cả nứt và ổ gà"
+                >
+                  <span>Mẫu 3 (Hỗn hợp)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSourceMode('WEBCAM')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    sourceMode === 'WEBCAM'
+                      ? 'bg-surface-container-lowest text-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Camera Trực Tiếp</span>
+                </button>
+              </div>
+
+              {/* Tùy chọn Tự Động Gửi Báo Cáo */}
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 cursor-pointer text-xs transition-all">
+                <input
+                  type="checkbox"
+                  checked={autoDispatch}
+                  onChange={(e) => setAutoDispatch(e.target.checked)}
+                  className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer"
+                />
+                <span className="font-semibold text-on-surface text-[11px] select-none">
+                  Tự động gửi báo cáo khi hết video
+                </span>
+              </label>
+            </div>
+
+            {/* HÀNG 2: BỐ TRÍ THAM SỐ 2 CỘT HIỆN ĐẠI (AI CONFIDENCE & SAMPLING vs VẠCH ĐẾM & TỐC ĐỘ) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2.5 border-t border-outline-variant/20 text-xs">
+              {/* CỘT TRÁI: ĐỘ NHẠY & TẦN SUẤT AI */}
+              <div className="p-3 rounded-2xl bg-surface-container-low border border-outline-variant/20 flex flex-col gap-2.5">
+                {/* Ngưỡng Tin Cậy AI (Confidence Gate) */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-bold text-on-surface">
+                    <Sliders className="w-3.5 h-3.5 text-primary" />
+                    <span>Ngưỡng Tin Cậy AI:</span>
                   </div>
+                  <span className="font-mono text-primary font-bold text-xs px-2 py-0.5 rounded-lg bg-primary/10">
+                    {(confidenceThreshold * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.15"
+                  max="0.80"
+                  step="0.05"
+                  value={confidenceThreshold}
+                  onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-surface-container-high rounded-lg cursor-pointer accent-primary"
+                  title="Kéo để lọc bỏ các phát hiện dưới ngưỡng tin cậy"
+                />
 
-                  <button
-                    type="button"
-                    onClick={() => handleLoadSampleVideo('/sample-videos/pothole_tracker_test.mp4', 'Mẫu 2 - Tuyến đường ổ gà liên tiếp')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
-                      videoUrl === '/sample-videos/pothole_tracker_test.mp4'
-                        ? 'bg-surface-container-lowest text-emerald-600 dark:text-emerald-400 shadow-xs'
-                        : 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-500'
-                    }`}
-                    title="Nạp video tuần tra ô tô qua đoạn đường nhiều ổ gà liên tiếp"
-                  >
-                    <span>Mẫu #2 (Liên tiếp)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleLoadSampleVideo('/sample-videos/test_road2.mp4', 'Mẫu 3 - Vết nứt & Ổ gà đan xen')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
-                      videoUrl === '/sample-videos/test_road2.mp4'
-                        ? 'bg-surface-container-lowest text-cyan-600 dark:text-cyan-400 shadow-xs'
-                        : 'text-cyan-600 dark:text-cyan-400 hover:text-cyan-500'
-                    }`}
-                    title="Nạp video tuần tra mặt đường có cả nứt và ổ gà"
-                  >
-                    <span>Mẫu #3 (Hỗn hợp)</span>
-                  </button>
-
-                  <button
-                    onClick={() => setSourceMode('WEBCAM')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
-                      sourceMode === 'WEBCAM'
-                        ? 'bg-surface-container-lowest text-primary shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Camera Trực Tiếp</span>
-                  </button>
+                {/* Tần suất quét (Sampling) */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/15">
+                  <span className="font-bold text-on-surface flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Tần suất quét:</span>
+                  </span>
+                  <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface-container border border-outline-variant/20">
+                    {(['REALTIME', 'BALANCED', 'ECONOMY'] as SamplingMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setSamplingMode(mode)}
+                        title={SAMPLING_CONFIG[mode].desc}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                          samplingMode === mode
+                            ? 'bg-surface-container-lowest text-primary shadow-xs'
+                            : 'text-on-surface-variant hover:text-on-surface'
+                        }`}
+                      >
+                        {mode === 'REALTIME' ? '0.12s' : mode === 'BALANCED' ? '0.25s' : '0.5s'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Tùy chọn Tự Động Đẩy Sự Cố */}
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-on-surface">
-                  <input
-                    type="checkbox"
-                    checked={autoDispatch}
-                    onChange={(e) => setAutoDispatch(e.target.checked)}
-                    className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary"
-                  />
-                  <span>Tự động gửi 1 báo cáo tổng hợp khi kết thúc video</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Bộ Chọn Tần Suất Trích Xuất Frame (Adaptive Sampling) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-outline-variant/20 text-xs">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" />
-                <span className="font-semibold text-on-surface">Tần Suất Quét (Adaptive Sampling):</span>
-                <span className="text-[11px] text-on-surface-variant font-mono">
-                  ({SAMPLING_CONFIG[samplingMode].interval}ms / frame)
-                </span>
-              </div>
-              <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
-                {(['REALTIME', 'BALANCED', 'ECONOMY'] as SamplingMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setSamplingMode(mode)}
-                    title={SAMPLING_CONFIG[mode].desc}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                      samplingMode === mode
-                        ? 'bg-surface-container-lowest text-primary shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    {SAMPLING_CONFIG[mode].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Tốc Độ Phát Video (Playback Speed) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-outline-variant/20 text-xs">
-              <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-emerald-500" />
-                <span className="font-semibold text-on-surface">Tốc Độ Video:</span>
-                <span className="text-[11px] text-on-surface-variant font-mono">
-                  ({playbackSpeed}x - Tinh chỉnh để quan sát kỹ)
-                </span>
-              </div>
-              <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
-                {[0.5, 0.75, 1.0].map((speed) => (
-                  <button
-                    key={speed}
-                    type="button"
-                    onClick={() => handleSpeedChange(speed)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                      playbackSpeed === speed
-                        ? 'bg-surface-container-lowest text-emerald-600 dark:text-emerald-400 shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    {speed}x
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Slider Ngưỡng Tin Cậy Bắt Lỗi */}
-            <div className="flex items-center justify-between gap-4 pt-3 border-t border-outline-variant/20 text-xs">
-              <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-primary" />
-                <span className="font-semibold text-on-surface">Ngưỡng Tin Cậy AI (Confidence Gate):</span>
-                <strong className="font-mono text-primary font-bold">
-                  {(confidenceThreshold * 100).toFixed(0)}%
-                </strong>
-              </div>
-              <input
-                type="range"
-                min="0.15"
-                max="0.80"
-                step="0.05"
-                value={confidenceThreshold}
-                onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
-                className="w-48 h-1.5 bg-surface-container-high rounded-lg cursor-pointer accent-primary"
-              />
-            </div>
-
-            {/* BỘ ĐIỀU KHIỂN VẠCH ĐẾM AI (OBJECT COUNTER SETTINGS) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-outline-variant/20 text-xs">
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer font-bold text-on-surface">
-                  <input
-                    type="checkbox"
-                    checked={showCountingLine}
-                    onChange={(e) => setShowCountingLine(e.target.checked)}
-                    className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 accent-cyan-500"
-                  />
-                  <span className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400">
-                    <Target className="w-4 h-4" />
-                    <span>Kích Hoạt Vạch Đếm AI (Counting Line)</span>
-                  </span>
-                </label>
-                {showCountingLine && (
-                  <span className="text-[11px] text-on-surface-variant font-mono">
-                    (Vị trí Y: <strong>{Math.round(countingLineY * 100)}%</strong>)
-                  </span>
-                )}
-              </div>
-
-              {showCountingLine && (
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-on-surface-variant">Cao độ vạch:</span>
+              {/* CỘT PHẢI: VẠCH ĐẾM AI & TỐC ĐỘ PHÁT */}
+              <div className="p-3 rounded-2xl bg-surface-container-low border border-outline-variant/20 flex flex-col gap-2.5">
+                {/* Vạch đếm AI & Cao độ */}
+                <div className="flex items-center justify-between gap-2">
+                  <label className="flex items-center gap-1.5 font-bold text-on-surface cursor-pointer select-none">
                     <input
-                      type="range"
-                      min="0.35"
-                      max="0.85"
-                      step="0.01"
-                      value={countingLineY}
-                      onChange={(e) => setCountingLineY(parseFloat(e.target.value))}
-                      className="w-32 h-1.5 bg-surface-container-high rounded-lg cursor-pointer accent-cyan-500"
+                      type="checkbox"
+                      checked={showCountingLine}
+                      onChange={(e) => setShowCountingLine(e.target.checked)}
+                      className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 accent-cyan-500 cursor-pointer"
                     />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleResetCounter}
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-rose-500 hover:bg-rose-500/10 border border-rose-500/20 transition-all flex items-center gap-1"
-                    title="Đặt lại số lượng đếm về 0"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Reset Bộ Đếm</span>
-                  </button>
+                    <Target className="w-3.5 h-3.5 text-cyan-500" />
+                    <span>Vạch Đếm AI:</span>
+                  </label>
+                  {showCountingLine && (
+                    <span className="font-mono text-cyan-500 font-bold text-xs px-2 py-0.5 rounded-lg bg-cyan-500/10">
+                      Y: {Math.round(countingLineY * 100)}%
+                    </span>
+                  )}
                 </div>
-              )}
+
+                {showCountingLine ? (
+                  <input
+                    type="range"
+                    min="0.35"
+                    max="0.85"
+                    step="0.01"
+                    value={countingLineY}
+                    onChange={(e) => setCountingLineY(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-surface-container-high rounded-lg cursor-pointer accent-cyan-500"
+                    title="Kéo để điều chỉnh cao độ vạch đếm AI trên khung hình"
+                  />
+                ) : (
+                  <div className="h-1.5 bg-surface-container-high/30 rounded-lg" />
+                )}
+
+                {/* Tốc độ phát video */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/15">
+                  <span className="font-bold text-on-surface flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Tốc độ video:</span>
+                  </span>
+                  <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface-container border border-outline-variant/20">
+                    {[0.5, 0.75, 1.0].map((speed) => (
+                      <button
+                        key={speed}
+                        type="button"
+                        onClick={() => handleSpeedChange(speed)}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                          playbackSpeed === speed
+                            ? 'bg-surface-container-lowest text-emerald-600 dark:text-emerald-400 shadow-xs'
+                            : 'text-on-surface-variant hover:text-on-surface'
+                        }`}
+                      >
+                        {speed}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
