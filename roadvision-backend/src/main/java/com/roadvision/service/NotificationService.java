@@ -52,14 +52,14 @@ public class NotificationService {
                 .title(actualTitle)
                 .message(actualMsg)
                 .type(type)
-                .targetRole("ALL")
+                .targetRole("ROLE_STAFF")
                 .targetUserId(null)
                 .build();
         noti = notificationRepository.save(noti);
 
         NotificationDTO dto = toDTO(noti);
         try {
-            messagingTemplate.convertAndSend("/topic/notifications/all", dto);
+            messagingTemplate.convertAndSend("/topic/notifications/staff", dto);
             Map<String, Object> payload = new HashMap<>();
             payload.put("active", active);
             payload.put("title", actualTitle);

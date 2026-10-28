@@ -207,47 +207,65 @@ export const MyReportsPage: React.FC = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {reports.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col justify-between gap-4 hover:border-slate-300 transition-colors"
-              >
-                <div className="flex gap-4">
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    className="w-20 h-20 rounded-md object-cover shrink-0 border border-slate-200"
-                  />
-                  <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-semibold text-blue-700">{item.ticketCode}</span>
-                      <StatusBadge status={item.status} />
-                    </div>
-                    <h3 className="font-semibold text-sm text-slate-900 line-clamp-1">{item.title}</h3>
-                    <div className="flex items-center gap-1 text-xs text-slate-500 line-clamp-1">
-                      <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                      <span>{item.address || `${item.latitude?.toFixed(4)}, ${item.longitude?.toFixed(4)}`}</span>
-                    </div>
-                  </div>
-                </div>
+            {reports.map((item) => {
+              const isDone = item.status === 'CLOSED' || item.status === 'RESOLVED';
+              const isReworking = item.status === 'REWORK_REQUIRED';
 
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>
-                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong'}
-                    </span>
+              return (
+                <div
+                  key={item.id}
+                  className={`p-5 rounded-lg border shadow-xs flex flex-col justify-between gap-4 transition-colors ${
+                    isDone
+                      ? 'bg-gradient-to-b from-emerald-50/20 via-white to-white border-emerald-300/80 hover:border-emerald-400'
+                      : isReworking
+                      ? 'bg-rose-50/20 border-rose-200 hover:border-rose-300'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex gap-4">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="w-20 h-20 rounded-md object-cover shrink-0 border border-slate-200"
+                    />
+                    <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-semibold text-blue-700">{item.ticketCode}</span>
+                        <StatusBadge status={item.status} />
+                        {isDone && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Nghiệm thu đạt
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-semibold text-sm text-slate-900 line-clamp-1">{item.title}</h3>
+                      <div className="flex items-center gap-1 text-xs text-slate-500 line-clamp-1">
+                        <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <span>{item.address || `${item.latitude?.toFixed(4)}, ${item.longitude?.toFixed(4)}`}</span>
+                      </div>
+                    </div>
                   </div>
-                  <Link
-                    to={`/incidents/${item.id}`}
-                    className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                  >
-                    <span>Chi tiết hồ sơ</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>
+                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong'}
+                      </span>
+                    </div>
+                    <Link
+                      to={`/incidents/${item.id}`}
+                      className={`inline-flex items-center gap-1 font-medium transition-colors ${
+                        isDone ? 'text-emerald-700 hover:text-emerald-800' : 'text-blue-600 hover:text-blue-700'
+                      }`}
+                    >
+                      <span>Chi tiết hồ sơ</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Phân trang */}

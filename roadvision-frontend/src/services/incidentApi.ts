@@ -31,6 +31,7 @@ export const incidentApi = {
     return axiosClient.post<{
       className: string;
       confidence: number;
+      obstacleDetail?: string;
       bboxX: number;
       bboxY: number;
       bboxWidth: number;
@@ -61,6 +62,7 @@ export const incidentApi = {
     return axiosClient.post<{
       className: string;
       confidence: number;
+      obstacleDetail?: string;
       bboxX: number;
       bboxY: number;
       bboxWidth: number;
@@ -94,6 +96,11 @@ export const incidentApi = {
   // Xem chi tiết hồ sơ sự cố (Dossier)
   getIncidentById: (id: number | string) => {
     return axiosClient.get<Incident>(`/incidents/${id}`);
+  },
+
+  // Tra cứu nhanh phản ánh bằng mã phiếu (#RC-...) hoặc ID
+  lookupIncident: (code: string) => {
+    return axiosClient.get<Incident>(`/incidents/lookup/${encodeURIComponent(code)}`);
   },
 
   // Lấy phản ánh của công dân hiện tại

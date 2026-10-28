@@ -41,6 +41,12 @@ const AdminAnalyticsPage = lazy(() =>
 const AdminTeamsPage = lazy(() =>
   import('./pages/AdminTeamsPage').then((m) => ({ default: m.AdminTeamsPage }))
 );
+const LeaderboardPage = lazy(() =>
+  import('./pages/LeaderboardPage').then((m) => ({ default: m.LeaderboardPage }))
+);
+const PhotoGuidePage = lazy(() =>
+  import('./pages/PhotoGuidePage').then((m) => ({ default: m.PhotoGuidePage }))
+);
 
 
 export function App() {
@@ -56,6 +62,8 @@ export function App() {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/map" element={<SpatialMapPage />} />
                   <Route path="/report" element={<ReportIncidentPage />} />
+                  <Route path="/leaderboard" element={<LeaderboardPage />} />
+                  <Route path="/photo-guide" element={<PhotoGuidePage />} />
                   <Route path="/incidents/:id" element={<IncidentDossierPage />} />
 
                   {/* Tuyến Tuần Tra AI Chuyên Nghiệp: Dành riêng cho Kỹ thuật viên / Tuần tra viên & Admin */}

@@ -717,6 +717,29 @@ public class IncidentService {
     }
 
     @Transactional(readOnly = true)
+    public IncidentResponse getIncidentByTicketOrId(String query) {
+        if (query == null || query.isBlank()) {
+            throw new BadRequestException("Mã tra cứu không được để trống");
+        }
+        String clean = query.trim();
+        java.util.Optional<Incident> opt = incidentRepository.findByTicketCode(clean);
+        if (opt.isEmpty() && !clean.startsWith("#")) {
+            opt = incidentRepository.findByTicketCode("#" + clean);
+        }
+        if (opt.isEmpty()) {
+            String digits = clean.replaceAll("[^0-9]", "");
+            if (!digits.isEmpty()) {
+                try {
+                    Long id = Long.parseLong(digits);
+                    opt = incidentRepository.findById(id);
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        return opt.map(this::mapToResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phản ánh tương ứng với: " + query));
+    }
+
+    @Transactional(readOnly = true)
     public Page<IncidentResponse> getFilteredIncidents(IncidentStatus status, List<IncidentStatus> statuses, Category category, String search, Pageable pageable) {
         if (statuses != null && !statuses.isEmpty()) {
             return incidentRepository.findWithStatuses(statuses, category, search, pageable)

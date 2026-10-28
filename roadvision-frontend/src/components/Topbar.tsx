@@ -87,12 +87,14 @@ export const Topbar: React.FC<TopbarProps> = ({
     if (pathname.startsWith('/map')) return 'Bản đồ không gian GIS';
     if (pathname.startsWith('/report')) return 'Báo cáo sự cố mặt đường';
     if (pathname.startsWith('/patrol')) return 'Tuần tra video trực tuyến';
-    if (pathname.startsWith('/inspection-tasks')) return 'Khảo sát hiện trường (Giai đoạn 4)';
-    if (pathname.startsWith('/construction-tasks')) return 'Thi công & Nghiệm thu (Giai đoạn 6)';
+    if (pathname.startsWith('/inspection-tasks')) return 'Quản lý nhiệm vụ khảo sát';
+    if (pathname.startsWith('/construction-tasks')) return 'Thi công & Nghiệm thu';
     if (pathname.startsWith('/dispatch')) return 'Hàng đợi điều phối nhiệm vụ';
     if (pathname.startsWith('/analytics')) return 'Báo cáo KPI & Phân tích chất lượng';
     if (pathname.startsWith('/admin/teams')) return 'Quản lý Tổ đội & Nhân sự';
     if (pathname.startsWith('/my-reports')) return 'Lịch sử phản ánh của tôi';
+    if (pathname.startsWith('/leaderboard')) return 'Bảng vinh danh cộng đồng';
+    if (pathname.startsWith('/photo-guide')) return 'Cẩm nang chụp ảnh hiện trường chuẩn AI';
     if (pathname.startsWith('/incidents/')) return 'Hồ sơ sự cố chi tiết';
     return 'Hạ tầng giao thông';
   };
@@ -194,8 +196,8 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   return (
     <>
-      {/* BANNER BÁO ĐỘNG KHẨN CẤP TOÀN MẠNG LƯỚI ĐÔ THỊ */}
-      {emergencyBroadcast?.active && (
+      {/* BANNER BÁO ĐỘNG KHẨN CẤP - CHỈ DÀNH CHO KỸ THUẬT VIÊN / ĐỘI THI CÔNG */}
+      {emergencyBroadcast?.active && user?.role === 'ROLE_STAFF' && (
         <div className="bg-rose-600 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold shadow-md border-b border-rose-700 animate-pulse sticky top-0 z-40">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <Radio className="w-4 h-4 text-white shrink-0 animate-ping" />
@@ -206,14 +208,6 @@ export const Topbar: React.FC<TopbarProps> = ({
               {emergencyBroadcast.message || 'Ban Quản Lý yêu cầu các tổ tuần kiểm và thi công ưu tiên xử lý khẩn các sự cố sụt lún, ngập úng nguy hiểm!'}
             </span>
           </div>
-          {user?.role === 'ROLE_ADMIN' && (
-            <button
-              onClick={() => triggerEmergencyBroadcast(false)}
-              className="ml-3 px-2.5 py-1 bg-white text-rose-700 text-[11px] font-bold rounded-lg hover:bg-rose-50 transition shadow-xs shrink-0 cursor-pointer"
-            >
-              Hạ Cảnh Báo
-            </button>
-          )}
         </div>
       )}
 

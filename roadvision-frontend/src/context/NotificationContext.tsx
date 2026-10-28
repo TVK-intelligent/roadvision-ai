@@ -168,9 +168,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             setUnreadCount((prev) => prev + 1);
 
             // Bật âm thanh chuông báo và popup Toast (duy nhất 1 lần)
+            // Lệnh khẩn cấp (URGENT / Siren) chỉ kích hoạt cho Kỹ thuật viên (ROLE_STAFF)
             if (noti.type === 'URGENT') {
-              playEmergencySiren();
-              toast.error(noti.message, noti.title);
+              if (user.role === 'ROLE_STAFF') {
+                playEmergencySiren();
+                toast.error(noti.message, noti.title);
+              }
             } else if (noti.type === 'SUCCESS') {
               playNotificationChime();
               toast.success(noti.message, noti.title);

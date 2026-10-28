@@ -1179,8 +1179,8 @@ export const AdminTeamsPage: React.FC = () => {
                     onChange={(e) => setTeamFormData({ ...teamFormData, teamType: e.target.value as TeamType })}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
                   >
-                    <option value="INSPECTION">Khảo sát hiện trường (Giai đoạn 4)</option>
-                    <option value="CONSTRUCTION">Thi công sửa chữa (Giai đoạn 5 & 6)</option>
+                    <option value="INSPECTION">Quản lý nhiệm vụ khảo sát</option>
+                    <option value="CONSTRUCTION">Thi công sửa chữa</option>
                     <option value="EMERGENCY">Cơ động khẩn cấp 24/7</option>
                   </select>
                 </div>

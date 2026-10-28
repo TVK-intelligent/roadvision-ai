@@ -9,7 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { AuthModal } from '../components/AuthModal';
 import { preprocessImage } from '../utils/imagePreprocess';
 import { extractGpsFromExif } from '../utils/exifGps';
-import { Upload, MapPin, CheckCircle2, AlertCircle, Loader2, Crosshair, Search, Sliders, ShieldAlert, Zap, Layers, Image as ImageIcon, ThumbsUp, LogIn, ChevronDown, Truck, CircleAlert, GitBranch, Waves, Construction, AlertTriangle } from 'lucide-react';
+import { reverseGeocodeAddress, forwardGeocodeAddress, getIpLocationFallback } from '../utils/geoAddress';
+import { Upload, MapPin, CheckCircle2, AlertCircle, Loader2, Crosshair, Search, Sliders, ShieldAlert, Zap, Layers, Image as ImageIcon, ThumbsUp, LogIn, ChevronDown, Truck, CircleAlert, GitBranch, Waves, Construction, AlertTriangle, Copy, Navigation } from 'lucide-react';
 
 interface AiPreviewResult {
   className: string;
@@ -235,103 +236,101 @@ export const ReportIncidentPage: React.FC = () => {
     checkNearby(latitude, longitude);
   }, []);
 
-  // Tự động định vị địa chỉ ngược khi thay đổi tọa độ từ bản đồ
+  // Tự động định vị địa chỉ ngược với cơ chế dự phòng đa tầng (BigDataCloud -> Nominatim -> Coordinates Fallback)
   const reverseGeocode = async (lat: number, lng: number) => {
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        { headers: { 'Accept-Language': 'vi' } }
-      );
-      const data = await res.json();
-      if (data && data.display_name) {
-        setAddress(data.display_name);
+      const addr = await reverseGeocodeAddress(lat, lng);
+      if (addr) {
+        setAddress(addr);
       }
-    } catch (err) {
-      console.warn('Lỗi reverse geocode:', err);
+    } catch {
+      setAddress(`Vị trí [${lat.toFixed(5)}, ${lng.toFixed(5)}]`);
     }
   };
 
-  // Tra cứu tọa độ khi người dùng nhập địa chỉ chữ
+  // Tra cứu tọa độ khi người dùng nhập địa chỉ chữ hoặc dán tọa độ
   const handleSearchAddress = async () => {
     if (!address.trim()) return;
     setIsLocating(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
-        { headers: { 'Accept-Language': 'vi' } }
-      );
-      const data = await res.json();
-      if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
-        setLatitude(lat);
-        setLongitude(lon);
-        checkNearby(lat, lon);
-        if (data[0].display_name) {
-          setAddress(data[0].display_name);
+      const result = await forwardGeocodeAddress(address);
+      if (result) {
+        setLatitude(result.lat);
+        setLongitude(result.lng);
+        checkNearby(result.lat, result.lng);
+        if (result.displayName) {
+          setAddress(result.displayName);
         }
-        toast.success(`Đã định vị thành công: ${address.split(',')[0]}`, 'Bản Đồ Không Gian');
+        toast.success(`Đã định vị thành công: ${result.displayName.split(',')[0]}`, 'Bản Đồ Không Gian');
       } else {
-        toast.warning('Không tìm thấy tọa độ cho địa chỉ này. Bạn hãy nhấp trực tiếp vào bản đồ bên dưới để chọn.');
+        toast.warning(
+          'Không tìm thấy tọa độ cho địa chỉ này. Bạn có thể nhấp trực tiếp vào bản đồ bên dưới hoặc nhập tọa độ dạng: 20.437, 105.903'
+        );
       }
-    } catch (err) {
-      console.warn('Lỗi forward geocode:', err);
+    } catch {
+      toast.warning('Không thể tra cứu tự động. Bạn hãy nhấp trực tiếp lên bản đồ bên dưới để chọn.');
     } finally {
       setIsLocating(false);
     }
   };
 
-  // Lấy vị trí GPS hiện tại từ thiết bị (có thông báo rõ ràng nếu lấy từ IP mạng máy tính)
+  // Lấy vị trí GPS hiện tại từ thiết bị (có fallback IP mạng cực mạnh khi chạy PC/máy tính bàn)
   const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.warning('Trình duyệt của bạn không hỗ trợ định vị Geolocation');
-      return;
-    }
     setIsLocating(true);
 
-    const applyPosition = (pos: GeolocationPosition, isFallback = false) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const acc = pos.coords.accuracy;
+    const applyPos = async (lat: number, lng: number, acc?: number, isIpFallback = false) => {
       setLatitude(lat);
       setLongitude(lng);
       setOriginalLatitude(lat);
       setOriginalLongitude(lng);
       if (acc) setGpsAccuracy(acc);
-      reverseGeocode(lat, lng);
+      const addr = await reverseGeocodeAddress(lat, lng);
+      setAddress(addr);
       checkNearby(lat, lng);
       setIsLocating(false);
 
-      if (acc > 2500) {
+      if (isIpFallback) {
         toast.info(
-          `Vị trí ước lượng từ trạm mạng Internet (sai số ~${Math.round(acc / 1000)}km do máy tính không có chip GPS vệ tinh). Bạn có thể nhấp trực tiếp lên bản đồ hoặc bấm nút vị trí nhanh để đặt chuẩn xác.`,
-          'Lưu Ý Định Vị PC'
+          `Đã định vị theo địa chỉ mạng IP Internet máy tính (${addr.split(',')[0]}). Bạn có thể nhấp trực tiếp lên bản đồ để tinh chỉnh vị trí chính xác hơn.`,
+          'Định Vị IP Máy Tính'
         );
       } else {
-        toast.success(isFallback ? 'Đã định vị vị trí qua mạng Internet!' : 'Đã xác định vị trí GPS hiện tại!');
+        toast.success('Đã xác định vị trí GPS hiện tại!');
       }
     };
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => applyPosition(pos, false),
-      (err) => {
-        // Nếu lỗi do Timeout hoặc không có chip GPS (thường gặp trên PC máy bàn), thử chế độ IP/Network
-        if (err.code === 3 || err.code === 2) {
-          navigator.geolocation.getCurrentPosition(
-            (fallbackPos) => applyPosition(fallbackPos, true),
-            () => {
-              setIsLocating(false);
-              toast.info('Không thể lấy GPS tự động (máy tính không có phần cứng GPS). Vui lòng nhấp trực tiếp lên bản đồ bên dưới.');
-            },
-            { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
-          );
+    if (!navigator.geolocation) {
+      // Thiết bị không hỗ trợ Geolocation -> Thử ngay IP fallback
+      getIpLocationFallback().then((ipPos) => {
+        if (ipPos) {
+          applyPos(ipPos.lat, ipPos.lng, 5000, true);
         } else {
           setIsLocating(false);
-          toast.info('Trình duyệt bị từ chối quyền truy cập vị trí. Bạn có thể chọn trực tiếp trên bản đồ.');
+          toast.warning('Trình duyệt không hỗ trợ Geolocation. Bạn vui lòng nhấp trực tiếp trên bản đồ.');
+        }
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        applyPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, false);
+      },
+      async (err) => {
+        console.warn('Geolocation error, trying IP network fallback:', err.message);
+        // Khi GPS vệ tinh thất bại (PC máy bàn không có chip GPS hoặc timeout), fallback ngay sang IP Geolocation
+        const ipPos = await getIpLocationFallback();
+        if (ipPos) {
+          applyPos(ipPos.lat, ipPos.lng, 5000, true);
+        } else {
+          setIsLocating(false);
+          toast.info(
+            'Không thể lấy GPS tự động (máy tính không có chip GPS). Vui lòng nhấp trực tiếp lên bản đồ bên dưới.'
+          );
         }
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+      { enableHighAccuracy: false, timeout: 4000, maximumAge: 60000 }
     );
   };
 
@@ -384,7 +383,7 @@ export const ReportIncidentPage: React.FC = () => {
           if (counts['POTHOLE']) labelParts.push(`${counts['POTHOLE']} ổ gà`);
           if (counts['ROAD_CRACK']) labelParts.push(`${counts['ROAD_CRACK']} vết nứt`);
           if (counts['ROAD_FLOODING']) labelParts.push(`${counts['ROAD_FLOODING']} điểm ngập`);
-          if (counts['ROAD_OBSTACLE']) labelParts.push(`${counts['ROAD_OBSTACLE']} vật cản`);
+          if (counts['ROAD_OBSTACLE']) labelParts.push(`${counts['ROAD_OBSTACLE']} ${data.obstacleDetail ? data.obstacleDetail.toLowerCase() : 'vật cản'}`);
           const labelStr = labelParts.join(', ');
 
           setTitle(`Phát hiện ${labelStr} mặt đường tại ${loc}`);
@@ -417,16 +416,33 @@ export const ReportIncidentPage: React.FC = () => {
               `AI phát hiện ${count} điểm ứ đọng ngập nước trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần nạo vét khơi thông dòng chảy thoát nước.`
             );
           } else {
-            setTitle(`Phát hiện ${count} vật cản trên mặt đường tại ${loc}`);
-            setDescription(
-              `AI phát hiện ${count} vật cản trở an toàn giao thông trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị cử kỹ thuật viên xử lý và thu dọn hiện trường.`
-            );
+            const specificObst = data.obstacleDetail || 'vật cản / chướng ngại vật';
+            const isFallenTree = specificObst.toLowerCase().includes('cây');
+            const isBarrier = specificObst.toLowerCase().includes('rào chắn') || specificObst.toLowerCase().includes('chóp nón');
+
+            if (isFallenTree) {
+              setTitle(`Phát hiện ${specificObst.toLowerCase()} chắn ngang đường tại ${loc}`);
+              setDescription(
+                `AI phát hiện ${specificObst.toLowerCase()} chắn ngang lòng đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị cử đội cây xanh đô thị và cứu hộ môi trường khẩn trương cưa cắt, thu dọn giải tỏa hiện trường để thông tuyến giao thông.`
+              );
+            } else if (isBarrier) {
+              setTitle(`Phát hiện ${specificObst.toLowerCase()} cản trở giao thông tại ${loc}`);
+              setDescription(
+                `AI phát hiện ${specificObst.toLowerCase()} cản trở an toàn giao thông trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị kiểm tra giấy phép thi công và thu dọn hiện trường gọn gàng.`
+              );
+            } else {
+              setTitle(`Phát hiện ${specificObst.toLowerCase()} trên mặt đường tại ${loc}`);
+              setDescription(
+                `AI phát hiện ${count} ${specificObst.toLowerCase()} gây mất an toàn giao thông trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị cử kỹ thuật viên xử lý và thu dọn hiện trường.`
+              );
+            }
           }
           toast.info(
             `AI phát hiện ${count} ${
               singleCat === 'POTHOLE' ? 'ổ gà' :
               singleCat === 'ROAD_CRACK' ? 'vết nứt' :
-              singleCat === 'ROAD_FLOODING' ? 'điểm ngập' : 'vật cản'
+              singleCat === 'ROAD_FLOODING' ? 'điểm ngập' :
+              (data.obstacleDetail ? data.obstacleDetail.toLowerCase() : 'vật cản')
             } (${(data.confidence * 100).toFixed(1)}%)`,
             'Thị Giác YOLOv8'
           );
@@ -1031,6 +1047,42 @@ export const ReportIncidentPage: React.FC = () => {
                   </button>
                 ))}
               </div>
+
+              {/* Thẻ hiển thị Tọa độ GPS thời gian thực */}
+              <div className="mt-2.5 p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-blue-950 flex items-center gap-1">
+                    <Navigation className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Tọa độ GPS:</span>
+                  </span>
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <span className="bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-700 font-bold text-[11px] shadow-2xs">
+                      Lat: {latitude.toFixed(6)}
+                    </span>
+                    <span className="bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-700 font-bold text-[11px] shadow-2xs">
+                      Lng: {longitude.toFixed(6)}
+                    </span>
+                  </div>
+                  {gpsAccuracy && (
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      (±{Math.round(gpsAccuracy)}m)
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                    toast.success(`Đã sao chép tọa độ: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, 'GPS Clipboard');
+                  }}
+                  className="px-2 py-1 rounded bg-white hover:bg-blue-100 text-blue-700 text-[11px] font-medium border border-blue-200 flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                  title="Sao chép cặp tọa độ Lat, Lng"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Sao chép</span>
+                </button>
+              </div>
             </div>
 
             {/* CẢNH BÁO TRÙNG LẶP KHÔNG GIAN (SPATIAL DEDUPLICATION & UPVOTE) */}
@@ -1113,12 +1165,13 @@ export const ReportIncidentPage: React.FC = () => {
 
             {/* BẢN ĐỒ TƯƠNG TÁC LEAFLET / OPENSTREETMAP */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-slate-700">
-                  Bản đồ không gian (Nhấp hoặc kéo ghim để chọn tọa độ)
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Bản đồ không gian (Nhấp hoặc kéo ghim để chọn vị trí)</span>
                 </label>
-                <span className="font-mono text-[11px] text-slate-500">
-                  {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  📍 {latitude.toFixed(6)}, {longitude.toFixed(6)}
                 </span>
               </div>
               <MapPicker

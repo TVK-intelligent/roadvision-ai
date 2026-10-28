@@ -729,6 +729,15 @@ export const DispatchQueuePage: React.FC = () => {
                                   <span>Nghiệm thu</span>
                                 </Link>
                               )}
+
+                              {/* Giai đoạn 7: Đã hoàn tất & Đóng */}
+                              {['RESOLVED', 'CLOSED'].includes(incident.status) && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>{incident.status === 'CLOSED' ? 'Đã đóng' : 'Đã nghiệm thu'}</span>
+                                </span>
+                              )}
+
                               <Link
                                 to={`/incidents/${incident.id}`}
                                 title="Xem hồ sơ chi tiết"

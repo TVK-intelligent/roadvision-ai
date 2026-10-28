@@ -1,12 +1,24 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
 import { patrolApi, PatrolSession } from '../services/patrolApi';
 import { PatrolInspectionReportModal } from '../components/PatrolInspectionReportModal';
+import { reverseGeocodeAddress, getIpLocationFallback } from '../utils/geoAddress';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { AuthModal } from '../components/AuthModal';
 import { LeafletMap } from '../components/LeafletMap';
+import { PatrolRouteMap } from '../components/PatrolRouteMap';
+import {
+  SAMPLE_ROUTE_1,
+  SAMPLE_ROUTE_2,
+  SAMPLE_ROUTE_3,
+  interpolatePosition,
+  getTraveledPath,
+  calculateRouteDistanceKm,
+  parseGpxOrGeoJson,
+  type PatrolPin,
+} from '../utils/patrolRoutes';
 import {
   Video,
   Camera,
@@ -38,6 +50,7 @@ import {
   ExternalLink,
   ShieldCheck,
   AlertTriangle,
+  Navigation,
 } from 'lucide-react';
 
 interface RepresentativeSnapshot {
@@ -80,6 +93,7 @@ interface ActiveTrack {
   maxConfidence: number;
   hitCount: number;
   committed: boolean;
+  prevCenterY?: number;
 }
 
 interface LinePulseEffect {
@@ -170,6 +184,10 @@ export const PatrolModePage: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.22);
   const [autoDispatch, setAutoDispatch] = useState<boolean>(false);
+  const autoDispatchRef = useRef<boolean>(autoDispatch);
+  useEffect(() => {
+    autoDispatchRef.current = autoDispatch;
+  }, [autoDispatch]);
 
   // Điều khiển Phát & Dòng Thời Gian Video (Timeline, Scrubbing & Looping)
   const [videoDuration, setVideoDuration] = useState<number>(0);
@@ -235,11 +253,45 @@ export const PatrolModePage: React.FC = () => {
     lng: number;
     address: string;
   }>({
-    lat: 20.436036,
-    lng: 105.904596,
-    address: 'Khu vực tuần tra, Thanh Liêm, Hà Nam',
+    lat: 20.437269,
+    lng: 105.903159,
+    address: 'Tuyến ĐH.08, Xã Thanh Lâm, Phố Cà, Thanh Liêm, Hà Nam',
   });
+  const patrolLocationRef = useRef(patrolLocation);
+  useEffect(() => {
+    patrolLocationRef.current = patrolLocation;
+  }, [patrolLocation]);
   const [isLocating, setIsLocating] = useState<boolean>(false);
+
+  // Lộ trình GPS tuần tra và đồng bộ thời gian thực theo video
+  const [routePoints, setRoutePoints] = useState<[number, number][]>(SAMPLE_ROUTE_1);
+  const routePointsRef = useRef<[number, number][]>(SAMPLE_ROUTE_1);
+  const [currentCarPosition, setCurrentCarPosition] = useState<[number, number]>(SAMPLE_ROUTE_1[0]);
+  const currentCarPositionRef = useRef<[number, number]>(SAMPLE_ROUTE_1[0]);
+  const [incidentPins, setIncidentPins] = useState<PatrolPin[]>([]);
+  const gpxFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    routePointsRef.current = routePoints;
+  }, [routePoints]);
+
+  // Đồng bộ vị trí xe tuần tra dọc theo đường Polyline theo tiến độ video
+  useEffect(() => {
+    const progress = videoDuration > 0 ? Math.min(1, Math.max(0, videoCurrentTime / videoDuration)) : 0;
+    const pos = interpolatePosition(routePoints, progress);
+    setCurrentCarPosition(pos);
+    currentCarPositionRef.current = pos;
+    setPatrolLocation((prev) => ({
+      ...prev,
+      lat: pos[0],
+      lng: pos[1],
+    }));
+  }, [videoCurrentTime, videoDuration, routePoints]);
+
+  const traveledRoutePoints = useMemo(() => {
+    const progress = videoDuration > 0 ? Math.min(1, Math.max(0, videoCurrentTime / videoDuration)) : 0;
+    return getTraveledPath(routePoints, currentCarPosition, progress);
+  }, [routePoints, currentCarPosition, videoCurrentTime, videoDuration]);
 
   // Telemetry thực tế từ mô hình AI
   const [activeBoxes, setActiveBoxes] = useState<any[]>([]);
@@ -273,53 +325,46 @@ export const PatrolModePage: React.FC = () => {
   const [selectedSessionForReport, setSelectedSessionForReport] = useState<PatrolSession | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
 
-  // Lấy tọa độ GPS thực tế của thiết bị (có fallback mạng khi chạy trên desktop/PC không có GPS)
+  // Lấy tọa độ GPS thực tế của thiết bị (có fallback IP mạng cực mạnh khi chạy trên desktop/PC không có GPS)
   const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.warning('Trình duyệt không hỗ trợ Geolocation');
-      return;
-    }
     setIsLocating(true);
 
-    const applyPos = async (pos: GeolocationPosition, isFallback = false) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      let addr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-          { headers: { 'Accept-Language': 'vi' } }
-        );
-        const data = await res.json();
-        if (data && data.display_name) {
-          addr = data.display_name;
-        }
-      } catch {
-        // Bỏ qua lỗi reverse geocode
-      }
+    const applyPos = async (lat: number, lng: number, isIpFallback = false) => {
+      const addr = await reverseGeocodeAddress(lat, lng);
       setPatrolLocation({ lat, lng, address: addr });
       setIsLocating(false);
-      toast.success(isFallback ? 'Đã lấy vị trí qua mạng Internet!' : 'Đã cập nhật vị trí tuần tra từ GPS thiết bị');
+      toast.success(
+        isIpFallback
+          ? `Đã lấy vị trí qua mạng Internet (${addr.split(',')[0]})!`
+          : 'Đã cập nhật vị trí tuần tra từ GPS thiết bị'
+      );
     };
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => applyPos(pos, false),
-      (err) => {
-        if (err.code === 3 || err.code === 2) {
-          navigator.geolocation.getCurrentPosition(
-            (fallbackPos) => applyPos(fallbackPos, true),
-            () => {
-              setIsLocating(false);
-              toast.info('Không thể lấy GPS tự động (máy tính không có GPS vệ tinh). Bạn có thể chỉnh tọa độ theo bản đồ.');
-            },
-            { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
-          );
+    if (!navigator.geolocation) {
+      getIpLocationFallback().then((ipPos) => {
+        if (ipPos) {
+          applyPos(ipPos.lat, ipPos.lng, true);
         } else {
           setIsLocating(false);
-          toast.info('Quyền truy cập vị trí chưa được cấp.');
+          toast.warning('Trình duyệt không hỗ trợ Geolocation. Bạn có thể chỉnh tọa độ theo bản đồ.');
+        }
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => applyPos(pos.coords.latitude, pos.coords.longitude, false),
+      async (err) => {
+        console.warn('Patrol geolocation error, falling back to IP:', err.message);
+        const ipPos = await getIpLocationFallback();
+        if (ipPos) {
+          applyPos(ipPos.lat, ipPos.lng, true);
+        } else {
+          setIsLocating(false);
+          toast.info('Không thể lấy GPS tự động (máy tính không có GPS vệ tinh). Bạn có thể chỉnh tọa độ theo bản đồ.');
         }
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+      { enableHighAccuracy: false, timeout: 4000, maximumAge: 60000 }
     );
   };
 
@@ -411,6 +456,7 @@ export const PatrolModePage: React.FC = () => {
     recentCountedLocationsRef.current = [];
     visualTracksRef.current = [];
     activeTracksRef.current = [];
+    setIncidentPins([]);
     toast.info('Đã làm mới dữ liệu phiên tuần tra', 'Tuần Tra AI');
   }, [capturedList]);
 
@@ -445,19 +491,28 @@ export const PatrolModePage: React.FC = () => {
       if (obstacleCount > 0) detailsList.push(`${obstacleCount} vật cản`);
       const detailsStr = detailsList.join(', ') || `${totalCount} hư hại`;
 
+      const startLat = routePoints.length > 0 ? routePoints[0][0] : patrolLocation.lat;
+      const startLng = routePoints.length > 0 ? routePoints[0][1] : patrolLocation.lng;
+      const endLat = routePoints.length > 1 ? routePoints[routePoints.length - 1][0] : startLat;
+      const endLng = routePoints.length > 1 ? routePoints[routePoints.length - 1][1] : startLng;
+      const totalKm = calculateRouteDistanceKm(routePoints);
+
       const formData = new FormData();
       formData.append('routeName', patrolLocation.address || 'Tuyến đường tuần tra');
       formData.append('keyframe1', snap.blob, 'patrol_keyframe_1.jpg');
       if (secondarySnapshotRef.current?.blob) {
         formData.append('keyframe2', secondarySnapshotRef.current.blob, 'patrol_keyframe_2.jpg');
       }
-      formData.append('startLatitude', patrolLocation.lat.toString());
-      formData.append('startLongitude', patrolLocation.lng.toString());
-      formData.append('totalDistanceKm', '1.2');
+      formData.append('startLatitude', startLat.toString());
+      formData.append('startLongitude', startLng.toString());
+      formData.append('endLatitude', endLat.toString());
+      formData.append('endLongitude', endLng.toString());
+      formData.append('totalDistanceKm', (totalKm > 0 ? totalKm : 1.2).toString());
+      formData.append('gpsPathJson', JSON.stringify(routePoints));
       formData.append('totalPotholesDetected', totalCount.toString());
       formData.append('routeHealthRating', severity);
       formData.append('videoName', currentVideoName || 'Video tuần tra đường bộ');
-      formData.append('notes', `Phát hiện: ${detailsStr}. Mức độ đánh giá: ${severity}`);
+      formData.append('notes', `Lộ trình ${routePoints.length} mốc GPS (${(totalKm > 0 ? totalKm : 1.2)} km). Phát hiện: ${detailsStr}. Mức độ đánh giá: ${severity}`);
 
       const session = await patrolApi.createSession(formData);
       setRouteReportStatus('DISPATCHED');
@@ -481,7 +536,7 @@ export const PatrolModePage: React.FC = () => {
       setRouteReportStatus('IDLE');
       toast.error('Lỗi khi gửi báo cáo tuần tra: ' + (e.response?.data?.message || e.message));
     }
-  }, [isAuthenticated, user, patrolLocation, counterStats, currentVideoName, loadHistory]);
+  }, [isAuthenticated, user, patrolLocation, counterStats, currentVideoName, routePoints, loadHistory]);
 
   // Xử lý gửi sự cố tuần tra riêng lẻ vào hệ thống trung tâm
   const handleDispatchIncident = useCallback(async (incident: CapturedIncident, isAuto = false) => {
@@ -529,6 +584,11 @@ export const PatrolModePage: React.FC = () => {
       toast.error('Lỗi khi gửi sự cố: ' + (e.response?.data?.message || e.message));
     }
   }, [isAuthenticated, user]);
+
+  const handleDispatchIncidentRef = useRef(handleDispatchIncident);
+  useEffect(() => {
+    handleDispatchIncidentRef.current = handleDispatchIncident;
+  }, [handleDispatchIncident]);
 
   // Vòng lặp Render 60 FPS GPU-accelerated Overlay Canvas với thuật toán nội suy & ngoại suy quán tính
   useEffect(() => {
@@ -686,12 +746,12 @@ export const PatrolModePage: React.FC = () => {
                 track.history.push({ x: currCenterX, y: currCenterY });
               } else {
                 const jumpDist = Math.hypot(currCenterX - lastPt.x, currCenterY - lastPt.y);
-                // Nếu khoảng cách nhảy vọt bất thường (> 0.12) -> reset trajectory, không vẽ đường nối chéo màn hình
-                if (jumpDist > 0.12) {
+                // Nếu khoảng cách nhảy vọt bất thường (> 0.16) -> reset trajectory, không vẽ đường nối chéo màn hình
+                if (jumpDist > 0.16) {
                   track.history = [{ x: currCenterX, y: currCenterY }];
-                } else if (jumpDist > 0.003) {
+                } else if (jumpDist > 0.002) {
                   track.history.push({ x: currCenterX, y: currCenterY });
-                  if (track.history.length > 10) track.history.shift();
+                  if (track.history.length > 30) track.history.shift(); // Lưu 30 điểm để vệt đuôi dài và rõ nét như video mẫu Ultralytics
                 }
               }
 
@@ -699,35 +759,27 @@ export const PatrolModePage: React.FC = () => {
               const lineY = countingLineYRef.current;
               const touchesLine = (boxTop <= lineY && boxBottom >= lineY);
               const centroidCrossed = (prevCenterY < lineY && currCenterY >= lineY);
-              // Mở rộng dải kiểm soát qua vạch: [lineY - 0.04, lineY + 0.08]
-              const inGateZone = (currCenterY >= lineY - 0.04 && currCenterY <= lineY + 0.08);
-              const wasAboveOrAtLine = (track.spawnY !== undefined ? track.spawnY <= lineY + 0.06 : prevCenterY <= lineY + 0.06) ||
-                                       (track.history.length > 0 && track.history[0].y <= lineY + 0.06);
-              const isCrossingAction = centroidCrossed || (touchesLine && wasAboveOrAtLine) || (inGateZone && wasAboveOrAtLine);
+              const passedLine = (currCenterY >= lineY || boxBottom >= lineY);
+              // Bắt trọn 100% các ổ gà đi qua vạch (kể cả ổ gà nhỏ hoặc frame nhảy nhanh), không để sót
+              const isCrossingAction = centroidCrossed || touchesLine || (passedLine && (track.spawnY === undefined || track.spawnY <= lineY + 0.14));
 
               if (showCountingLineRef.current && !track.hasCrossedLine && isCrossingAction) {
-                // Khóa chống đếm trùng 2D cục bộ (Local 2D Debounce):
-                // - Nếu 2 hay nhiều ổ gà cùng cắt vạch trong cùng 1 frame hoặc cùng thời điểm (dt < 120ms):
-                //   Chỉ coi là trùng nếu 2 box gần như đè khít lên nhau (dx < 0.025 && dy < 0.025). Mọi ổ gà khác vị trí ĐỀU ĐƯỢC ĐẾM ĐỒNG THỜI!
-                // - Nếu là frame kế tiếp (120ms -> 800ms): Chặn nếu cùng 1 vị trí (dx < 0.04 && dy < 0.045) để chống detector bị giật frame.
-                // - Sau 800ms: Xe đã chạy được 7-14 mét, các ổ gà tiếp theo luôn được đếm đầy đủ!
+                // Khóa chống đếm trùng siêu nhạy (Local Fast Debounce):
+                // - Chỉ chặn nếu 2 box gần như đè khít lên nhau trong cùng 1 frame hoặc < 180ms (dx < 0.03 && dy < 0.03).
+                // - Sau 180ms: Xe đã chạy qua vị trí mới, toàn bộ các ổ gà liên tiếp chạy ngay phía sau ĐỀU ĐƯỢC ĐẾM ĐẦY ĐỦ!
                 const recent = recentCountedLocationsRef.current;
                 const isDuplicate = recent.some(c => {
                   const dt = now - c.time;
-                  if (dt >= 800) return false;
+                  if (dt >= 180) return false;
                   const dx = Math.abs(c.x - currCenterX);
                   const dy = Math.abs(c.y - currCenterY);
-                  if (dt < 120) {
-                    return dx < 0.025 && dy < 0.025;
-                  }
-                  return dx < 0.04 && dy < 0.045;
+                  return dx < 0.03 && dy < 0.03;
                 });
 
-                track.hasCrossedLine = true;
-
                 if (!isDuplicate) {
+                  track.hasCrossedLine = true;
                   recentCountedLocationsRef.current.push({ x: currCenterX, y: currCenterY, time: now });
-                  recentCountedLocationsRef.current = recentCountedLocationsRef.current.filter(c => now - c.time < 2000);
+                  recentCountedLocationsRef.current = recentCountedLocationsRef.current.filter(c => now - c.time < 1200);
 
                   lineFlashUntilRef.current = now + 400;
 
@@ -746,6 +798,26 @@ export const PatrolModePage: React.FC = () => {
                       [catKey]: (prev.byCategory[catKey] || 0) + 1,
                     },
                   }));
+
+                  // Tự động ghim điểm sự cố thời gian thực lên bản đồ Polyline
+                  const vTime = videoRef.current?.currentTime || 0;
+                  const currentPos = currentCarPositionRef.current;
+                  const minStr = Math.floor(vTime / 60).toString().padStart(2, '0');
+                  const secStr = Math.floor(vTime % 60).toString().padStart(2, '0');
+                  const labelType = catKey === 'POTHOLE' ? 'Ổ gà' : catKey === 'ROAD_CRACK' ? 'Vết nứt' : 'Sự cố';
+
+                  setIncidentPins((prev) => [
+                    ...prev,
+                    {
+                      id: `pin_${now}_${track.numericId || prev.length + 1}`,
+                      lat: currentPos[0],
+                      lng: currentPos[1],
+                      label: `${labelType} #${track.numericId || prev.length + 1}`,
+                      category: catKey,
+                      timestampSec: vTime,
+                      timeStr: `${minStr}:${secStr}`,
+                    },
+                  ]);
 
                   pulseEffectsRef.current.push({
                     id: `${now}_${Math.random()}`,
@@ -804,15 +876,15 @@ export const PatrolModePage: React.FC = () => {
                       ? `rgba(6, 182, 212, ${track.alpha})`
                       : isObstacle
                       ? `rgba(244, 63, 94, ${track.alpha})`
-                      : `rgba(59, 130, 246, ${track.alpha})`;
+                      : `rgba(236, 72, 153, ${track.alpha})`; // Hồng cánh sen rực rỡ đặc trưng Ultralytics YOLO!
 
                     fillColor = isCrack
-                      ? `rgba(245, 158, 11, ${track.alpha * 0.16})`
+                      ? `rgba(245, 158, 11, ${track.alpha * 0.14})`
                       : isFlood
-                      ? `rgba(6, 182, 212, ${track.alpha * 0.16})`
+                      ? `rgba(6, 182, 212, ${track.alpha * 0.14})`
                       : isObstacle
-                      ? `rgba(244, 63, 94, ${track.alpha * 0.16})`
-                      : `rgba(59, 130, 246, ${track.alpha * 0.16})`;
+                      ? `rgba(244, 63, 94, ${track.alpha * 0.14})`
+                      : `rgba(236, 72, 153, ${track.alpha * 0.14})`;
 
                     badgeBg = isCrack
                       ? `rgba(217, 119, 6, ${track.alpha * 0.95})`
@@ -820,7 +892,7 @@ export const PatrolModePage: React.FC = () => {
                       ? `rgba(8, 145, 178, ${track.alpha * 0.95})`
                       : isObstacle
                       ? `rgba(225, 29, 72, ${track.alpha * 0.95})`
-                      : `rgba(37, 99, 235, ${track.alpha * 0.95})`;
+                      : `rgba(219, 39, 119, ${track.alpha * 0.95})`; // Badge hồng sen nổi bật
                   }
 
                   const labelTitle = isCrack
@@ -831,12 +903,15 @@ export const PatrolModePage: React.FC = () => {
                     ? 'Vật cản'
                     : 'Ổ gà';
 
-                  // 2. Vẽ Vết Quỹ Đạo Chuyển Động (Trajectory Trail)
+                  // 2. Vẽ Vết Quỹ Đạo Chuyển Động (Vệt đuôi vàng dạ quang chuẩn Ultralytics YOLO Tracking)
                   if (track.history && track.history.length > 1 && track.alpha > 0.08) {
                     ctx.save();
-                    ctx.strokeStyle = strokeColor;
-                    ctx.lineWidth = 2.0;
-                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = '#facc15'; // Màu vàng tươi rực rỡ bám dính đuôi đối tượng
+                    ctx.shadowColor = 'rgba(234, 179, 8, 0.9)';
+                    ctx.shadowBlur = 8;
+                    ctx.lineWidth = 2.8;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
                     ctx.beginPath();
                     for (let i = 0; i < track.history.length; i++) {
                       const hx = offsetX + track.history[i].x * renderedW;
@@ -845,17 +920,20 @@ export const PatrolModePage: React.FC = () => {
                       else ctx.lineTo(hx, hy);
                     }
                     ctx.stroke();
-                    ctx.setLineDash([]);
                     ctx.restore();
                   }
 
-                  // 3. Vẽ Chấm Tâm Đối Tượng (Centroid Dot)
+                  // 3. Vẽ Chấm Tâm Đối Tượng (Centroid Dot) màu vàng dạ quang
                   const cx = offsetX + currCenterX * renderedW;
                   const cy = offsetY + currCenterY * renderedH;
+                  ctx.save();
                   ctx.beginPath();
-                  ctx.arc(cx, cy, 3.5, 0, 2 * Math.PI);
-                  ctx.fillStyle = strokeColor;
+                  ctx.arc(cx, cy, 4.5, 0, 2 * Math.PI);
+                  ctx.fillStyle = '#facc15';
+                  ctx.shadowColor = 'rgba(234, 179, 8, 0.9)';
+                  ctx.shadowBlur = 8;
                   ctx.fill();
+                  ctx.restore();
 
                   // 4. Nền bán trong suốt và khung viền bo góc
                   ctx.fillStyle = fillColor;
@@ -1005,7 +1083,7 @@ export const PatrolModePage: React.FC = () => {
       const canvas = canvasRef.current;
       if (!video || !canvas || video.readyState < 2 || video.paused) {
         if (!isCancelled) {
-          timerId = setTimeout(processFrame, 80);
+          timerId = setTimeout(processFrame, 30);
         }
         return;
       }
@@ -1013,8 +1091,8 @@ export const PatrolModePage: React.FC = () => {
       const vw = video.videoWidth || 640;
       const vh = video.videoHeight || 360;
 
-      // Giới hạn độ phân giải gửi đi tối đa 800px theo chuẩn YOLOv8 để giảm payload từ 3MB xuống ~35KB
-      const maxDim = 800;
+      // Giới hạn độ phân giải gửi đi chuẩn 640px (Native YOLOv8) để giảm payload xuống ~35KB, triệt tiêu độ trễ mạng
+      const maxDim = 640;
       let targetW = vw;
       let targetH = vh;
       if (vw > maxDim || vh > maxDim) {
@@ -1082,14 +1160,28 @@ export const PatrolModePage: React.FC = () => {
                 return true;
               });
 
-              // Chuẩn hóa tọa độ theo [0, 1] để render khớp 100% vào video hiển thị
-              const normalizedBoxes = finalBoxes.map((b: any) => ({
-                ...b,
-                normX: b.x / targetW,
-                normY: b.y / targetH,
-                normW: b.width / targetW,
-                normH: b.height / targetH,
-              }));
+              // Chuẩn hóa tọa độ theo [0, 1] và áp dụng Bộ Lọc Hình Học Phối Cảnh & Đường Chân Trời (Perspective Filter)
+              // 1. Loại bỏ các box nằm ở đỉnh khung hình (normCenterY < 0.18): Bầu trời, tán cây, phương tiện phía trước
+              // 2. Loại bỏ box nằm sát mép dưới capo xe (normCenterY > 0.96)
+              // 3. Khử tỷ lệ cạnh dị biệt đối với ổ gà (aspect ratio > 3.8): Vệt sơn, rãnh phân cách
+              // 4. Khử bóng râm khổng lồ của cầu vượt, bóng nhà (area > 35%)
+              const normalizedBoxes = finalBoxes
+                .map((b: any) => ({
+                  ...b,
+                  normX: b.x / targetW,
+                  normY: b.y / targetH,
+                  normW: b.width / targetW,
+                  normH: b.height / targetH,
+                }))
+                .filter((b: any) => {
+                  const centerY = b.normY + b.normH / 2;
+                  if (centerY < 0.18 || centerY > 0.96) return false;
+                  const aspect = Math.max(b.normW, b.normH) / Math.max(0.001, Math.min(b.normW, b.normH));
+                  if (b.className === 'POTHOLE' && aspect > 3.8) return false;
+                  const areaRatio = b.normW * b.normH;
+                  if (b.className === 'POTHOLE' && areaRatio > 0.35) return false;
+                  return true;
+                });
 
               // Tự động chọn lọc 1–2 ảnh hiện trường tiêu biểu nhất cho toàn bộ chuyến tuần tra video
               if (normalizedBoxes.length > 0) {
@@ -1120,19 +1212,27 @@ export const PatrolModePage: React.FC = () => {
                 }
               }
 
-              // Đồng bộ ngay lập tức vào Bộ Theo Dõi Trực Quan 60 FPS (Visual Motion Tracker)
+              // BỘ THEO DÕI ĐA MỤC TIÊU BYTETRACK (2-STAGE MULTI-OBJECT ASSOCIATION)
+              // Giải quyết triệt để tình trạng nhấp nháy (flickering) và nhảy cóc vị trí/ID!
               const vNow = performance.now();
               const curVisuals = visualTracksRef.current;
 
-              for (const box of normalizedBoxes) {
+              // Tách 2 tầng theo chuẩn thuật toán ByteTrack:
+              const highConfBoxes = normalizedBoxes.filter((b: any) => (b.confidence || 0) >= 0.20);
+              const lowConfBoxes = normalizedBoxes.filter((b: any) => (b.confidence || 0) < 0.20);
+
+              const matchedVisualIds = new Set<string>();
+
+              // Giai đoạn 1: Liên kết các box có độ tin cậy cao
+              for (const box of highConfBoxes) {
                 const boxCat = box.className || data.className || 'POTHOLE';
-                const boxConf = box.confidence || data.confidence || 0.85;
+                const boxConf = box.confidence || 0.85;
 
                 let bestTrack: TrackedVisualObject | null = null;
                 let bestScore = 0;
 
                 for (const tr of curVisuals) {
-                  if (tr.category !== boxCat) continue;
+                  if (matchedVisualIds.has(tr.id) || tr.category !== boxCat) continue;
                   const iou = calculateIoU(
                     { x: tr.targetX, y: tr.targetY, width: tr.targetW, height: tr.targetH },
                     { x: box.normX, y: box.normY, width: box.normW, height: box.normH }
@@ -1144,10 +1244,9 @@ export const PatrolModePage: React.FC = () => {
                   );
                   const dy = box.normY - tr.targetY;
                   const dx = Math.abs(box.normX - tr.targetX);
-                  // Xe tiến thẳng về phía trước: ổ gà trôi dọc xuống dưới (+Y). Không cho nhảy làn ngang (dx <= 0.08)
-                  const isTrackForward = dy >= -0.04 && dy <= 0.22 && dx <= 0.08;
+                  const isTrackForward = dy >= -0.05 && dy <= 0.28 && dx <= 0.12;
 
-                  if (iou >= 0.15 || (distRatio <= 0.18 && dx <= 0.08) || (isTrackForward && iou >= 0.05)) {
+                  if (iou >= 0.12 || (distRatio <= 0.22 && dx <= 0.12) || (isTrackForward && (iou >= 0.04 || distRatio <= 0.28))) {
                     const score = iou * 3.0 + (1.0 - Math.min(1.0, distRatio * 2)) + (isTrackForward ? 0.8 : 0);
                     if (score > bestScore) {
                       bestScore = score;
@@ -1157,7 +1256,7 @@ export const PatrolModePage: React.FC = () => {
                 }
 
                 if (bestTrack) {
-                  // Cập nhật mục tiêu bám sát trực tiếp vào kết quả phát hiện của mô hình AI
+                  matchedVisualIds.add(bestTrack.id);
                   bestTrack.targetX = box.normX;
                   bestTrack.targetY = box.normY;
                   bestTrack.targetW = box.normW;
@@ -1188,11 +1287,53 @@ export const PatrolModePage: React.FC = () => {
                     lastSeenTime: vNow,
                     hitCount: 1,
                     committed: false,
-                    alpha: 0.15,
+                    alpha: 1.0,
                     history: [{ x: box.normX + box.normW / 2, y: box.normY + box.normH / 2 }],
                     hasCrossedLine: false,
                     spawnY: box.normY + box.normH / 2,
                   });
+                }
+              }
+
+              // Giai đoạn 2 (ByteTrack Stage 2): Cứu vãn các Track hiện hữu chưa được khớp bằng Low-Confidence Boxes
+              // Khi xe rung lắc hoặc motion blur làm confidence sụt giảm nhẹ, ByteTrack vẫn giữ nguyên ID và không ngắt quãng track!
+              for (const box of lowConfBoxes) {
+                const boxCat = box.className || data.className || 'POTHOLE';
+                let bestTrack: TrackedVisualObject | null = null;
+                let bestScore = 0;
+
+                for (const tr of curVisuals) {
+                  if (matchedVisualIds.has(tr.id) || tr.category !== boxCat) continue;
+                  const iou = calculateIoU(
+                    { x: tr.targetX, y: tr.targetY, width: tr.targetW, height: tr.targetH },
+                    { x: box.normX, y: box.normY, width: box.normW, height: box.normH }
+                  );
+                  const distRatio = centerDistanceRatio(
+                    { x: tr.targetX, y: tr.targetY, width: tr.targetW, height: tr.targetH },
+                    { x: box.normX, y: box.normY, width: box.normW, height: box.normH },
+                    1, 1
+                  );
+                  const dy = box.normY - tr.targetY;
+                  const dx = Math.abs(box.normX - tr.targetX);
+                  const isTrackForward = dy >= -0.05 && dy <= 0.28 && dx <= 0.12;
+
+                  if (iou >= 0.14 || (distRatio <= 0.20 && isTrackForward)) {
+                    const score = iou * 2.0 + (1.0 - distRatio);
+                    if (score > bestScore) {
+                      bestScore = score;
+                      bestTrack = tr;
+                    }
+                  }
+                }
+
+                if (bestTrack) {
+                  matchedVisualIds.add(bestTrack.id);
+                  bestTrack.targetX = box.normX;
+                  bestTrack.targetY = box.normY;
+                  bestTrack.targetW = box.normW;
+                  bestTrack.targetH = box.normH;
+                  bestTrack.lastSeenTime = vNow;
+                  bestTrack.hitCount += 1;
                 }
               }
 
@@ -1230,21 +1371,38 @@ export const PatrolModePage: React.FC = () => {
                   const distRatio = centerDistanceRatio(track.box, normBoxObj, 1, 1);
                   const trDy = normBoxObj.y - track.box.y;
                   const trDx = Math.abs(normBoxObj.x - track.box.x);
-                  const isTrackForward = trDy >= -0.04 && trDy <= 0.22 && trDx <= 0.08;
-                  return iou >= 0.15 || (distRatio <= 0.18 && trDx <= 0.08) || (isTrackForward && iou >= 0.05);
+                  const isTrackForward = trDy >= -0.05 && trDy <= 0.28 && trDx <= 0.12;
+                  return iou >= 0.12 || (distRatio <= 0.22 && trDx <= 0.12) || (isTrackForward && (iou >= 0.04 || distRatio <= 0.28));
                 });
 
                 if (matchedTrack) {
+                  const prevCenterY = matchedTrack.prevCenterY ?? (matchedTrack.box.y + matchedTrack.box.height / 2);
+                  const currCenterY = normBoxObj.y + normBoxObj.height / 2;
+                  matchedTrack.prevCenterY = currCenterY;
                   matchedTrack.lastSeenTime = now;
                   matchedTrack.box = normBoxObj;
                   matchedTrack.hitCount = (matchedTrack.hitCount || 1) + 1;
+                  matchedTrack.maxConfidence = Math.max(matchedTrack.maxConfidence, boxConf);
 
                   // Xác nhận hư hại thật: TẬP TRUNG CHÍNH XÁC KHI ĐỐI TƯỢNG ĐẾN/CẮT VẠCH ĐẾM AI
                   const lineY = countingLineYRef.current;
                   const boxTop = normBoxObj.y;
                   const boxBottom = normBoxObj.y + normBoxObj.height;
-                  const touchesOrCrossesLine = (boxTop <= lineY && boxBottom >= lineY - 0.03) || (boxBottom >= lineY);
-                  const canCommit = !matchedTrack.committed && (touchesOrCrossesLine || matchedTrack.hitCount >= 4);
+                  const touchesLine = (boxTop <= lineY && boxBottom >= lineY - 0.04);
+                  const crossedLine = (prevCenterY <= lineY && currCenterY >= lineY);
+                  const passedLine = (boxBottom >= lineY);
+                  const touchesOrCrossesLine = touchesLine || crossedLine || passedLine;
+
+                  // Điều kiện commit chống sót & chống bắt nhầm:
+                  // 1. Phải được xác thực qua ít nhất 2 frame quét (hitCount >= 2) khi qua vạch
+                  // 2. HOẶC đối tượng có độ tin cậy vượt trội (>= 0.55) khi chạm vạch
+                  // 3. HOẶC đối tượng bền vững xuất hiện liên tiếp (hitCount >= 3)
+                  const isHighConfidenceHit = boxConf >= 0.55 || matchedTrack.maxConfidence >= 0.55;
+                  const canCommit = !matchedTrack.committed && (
+                    (matchedTrack.hitCount >= 2 && touchesOrCrossesLine) ||
+                    (isHighConfidenceHit && touchesOrCrossesLine) ||
+                    matchedTrack.hitCount >= 3
+                  );
 
                   if (canCommit) {
                     matchedTrack.committed = true;
@@ -1255,9 +1413,9 @@ export const PatrolModePage: React.FC = () => {
                       timestamp: new Date().toLocaleTimeString('vi-VN'),
                       category: boxCat,
                       confidence: Math.max(boxConf, matchedTrack.maxConfidence),
-                      latitude: patrolLocation.lat,
-                      longitude: patrolLocation.lng,
-                      address: patrolLocation.address,
+                      latitude: patrolLocationRef.current.lat,
+                      longitude: patrolLocationRef.current.lng,
+                      address: patrolLocationRef.current.address,
                       snapshotUrl,
                       blob,
                       status: 'PENDING',
@@ -1272,8 +1430,8 @@ export const PatrolModePage: React.FC = () => {
                       return [newIncident, ...prev.slice(0, 19)];
                     });
 
-                    if (autoDispatch) {
-                      handleDispatchIncident(newIncident, true);
+                    if (autoDispatchRef.current) {
+                      handleDispatchIncidentRef.current(newIncident, true);
                     }
                   } else if (matchedTrack.committed) {
                     // Cập nhật số frame đã track
@@ -1294,18 +1452,23 @@ export const PatrolModePage: React.FC = () => {
                   // Track mới xuất hiện: chỉ khởi tạo theo dõi, tập trung commit khi đối tượng đến Vạch Đếm AI
                   const newId = `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
                   const lineY = countingLineYRef.current;
+                  const currCenterY = normBoxObj.y + normBoxObj.height / 2;
                   const isTouchingLineNow = (normBoxObj.y <= lineY && normBoxObj.y + normBoxObj.height >= lineY);
 
-                  if (isTouchingLineNow) {
+                  // Chống bắt nhầm: Chỉ commit ngay nếu độ tin cậy RẤT CAO (>= 0.60) VÀ đang đè trực tiếp lên vạch.
+                  // Ngược lại, bắt buộc phải chờ frame tiếp theo (hitCount >= 2) để lọc bỏ 100% bóng râm / vệt sáng chớp tắt 1 frame!
+                  const canImmediateCommit = isTouchingLineNow && boxConf >= 0.60;
+
+                  if (canImmediateCommit) {
                     const snapshotUrl = URL.createObjectURL(blob);
                     const newIncident: CapturedIncident = {
                       id: newId,
                       timestamp: new Date().toLocaleTimeString('vi-VN'),
                       category: boxCat,
                       confidence: boxConf,
-                      latitude: patrolLocation.lat,
-                      longitude: patrolLocation.lng,
-                      address: patrolLocation.address,
+                      latitude: patrolLocationRef.current.lat,
+                      longitude: patrolLocationRef.current.lng,
+                      address: patrolLocationRef.current.address,
                       snapshotUrl,
                       blob,
                       status: 'PENDING',
@@ -1320,8 +1483,8 @@ export const PatrolModePage: React.FC = () => {
                       return [newIncident, ...prev.slice(0, 19)];
                     });
 
-                    if (autoDispatch) {
-                      handleDispatchIncident(newIncident, true);
+                    if (autoDispatchRef.current) {
+                      handleDispatchIncidentRef.current(newIncident, true);
                     }
                   }
 
@@ -1332,7 +1495,8 @@ export const PatrolModePage: React.FC = () => {
                     lastSeenTime: now,
                     maxConfidence: boxConf,
                     hitCount: 1,
-                    committed: isTouchingLineNow,
+                    committed: canImmediateCommit,
+                    prevCenterY: currCenterY,
                   });
                 }
               }
@@ -1372,7 +1536,7 @@ export const PatrolModePage: React.FC = () => {
         clearTimeout(boxFadeTimeoutRef.current);
       }
     };
-  }, [isPlaying, samplingMode, confidenceThreshold, patrolLocation, autoDispatch, handleDispatchIncident]);
+  }, [isPlaying, samplingMode, confidenceThreshold]);
 
   // Đồng bộ thời lượng video khi video được nạp
   useEffect(() => {
@@ -1499,6 +1663,31 @@ export const PatrolModePage: React.FC = () => {
     setVideoDuration(0);
     setVideoCurrentTime(0);
     setCurrentVideoName(label);
+    setIncidentPins([]);
+
+    if (samplePath.includes('video_tuan_tra_o_ga')) {
+      setRoutePoints(SAMPLE_ROUTE_1);
+      setPatrolLocation({
+        lat: SAMPLE_ROUTE_1[0][0],
+        lng: SAMPLE_ROUTE_1[0][1],
+        address: 'Tuyến ĐH.08, Xã Thanh Lâm, Phố Cà, Thanh Liêm, Hà Nam',
+      });
+    } else if (samplePath.includes('pothole_tracker_test')) {
+      setRoutePoints(SAMPLE_ROUTE_2);
+      setPatrolLocation({
+        lat: SAMPLE_ROUTE_2[0][0],
+        lng: SAMPLE_ROUTE_2[0][1],
+        address: 'Quốc Lộ 1A (Kiện Khê - Phố Cà), Thanh Liêm, Hà Nam',
+      });
+    } else if (samplePath.includes('test_road2')) {
+      setRoutePoints(SAMPLE_ROUTE_3);
+      setPatrolLocation({
+        lat: SAMPLE_ROUTE_3[0][0],
+        lng: SAMPLE_ROUTE_3[0][1],
+        address: 'Đường Tỉnh ĐT.494, Thanh Liêm, Hà Nam',
+      });
+    }
+
     if (videoUrl && videoUrl.startsWith('blob:')) {
       URL.revokeObjectURL(videoUrl);
     }
@@ -1511,6 +1700,31 @@ export const PatrolModePage: React.FC = () => {
       setIsPlaying(true);
     }
     toast.success(`Đã nạp video tuần tra thực tế: ${label}!`, 'Tuần Tra AI');
+  };
+
+  // Nạp tệp GPX hoặc GeoJSON tùy chỉnh từ camera hành trình / thiết bị đo
+  const handleGpxUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      const points = parseGpxOrGeoJson(content);
+      if (points.length >= 2) {
+        setRoutePoints(points);
+        setIncidentPins([]);
+        setPatrolLocation({
+          lat: points[0][0],
+          lng: points[0][1],
+          address: `Lộ trình GPS: ${file.name}`,
+        });
+        toast.success(`Đã nạp thành công ${points.length} mốc tọa độ GPS từ ${file.name}!`, 'Đồng Bộ GPS');
+      } else {
+        toast.warning('Tệp GPS không chứa đủ mốc tọa độ hợp lệ (tối thiểu 2 điểm).', 'Lỗi định dạng');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const togglePlay = () => {
@@ -1557,25 +1771,6 @@ export const PatrolModePage: React.FC = () => {
             <h1 className="font-display text-xl font-black text-on-surface mt-0.5">
               Giám Sát & Tuần Tra Mặt Đường Qua Video Hành Trình
             </h1>
-          </div>
-        </div>
-
-        {/* Chỉ số Telemetry thực tế từ hệ thống AI */}
-        <div className="flex items-center gap-2.5 font-mono text-xs flex-wrap">
-          <div className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-500" />
-            <span className="text-on-surface-variant text-[11px]">TẦN SUẤT:</span>
-            <strong className="text-amber-500 font-bold">{SAMPLING_CONFIG[samplingMode].label.split(' ')[0]} ({SAMPLING_CONFIG[samplingMode].interval / 1000}s)</strong>
-          </div>
-          <div className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-on-surface-variant text-[11px]">ĐỘ TRỄ AI:</span>
-            <strong className="text-primary font-bold">{inferenceLatency > 0 ? `${inferenceLatency}ms` : '--'}</strong>
-          </div>
-          <div className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-secondary" />
-            <span className="text-on-surface-variant text-[11px]">ĐÃ XỬ LÝ:</span>
-            <strong className="text-on-surface font-bold">{processedFrames} frames</strong>
           </div>
         </div>
       </div>
@@ -1637,49 +1832,6 @@ export const PatrolModePage: React.FC = () => {
               ref={overlayCanvasRef}
               className="absolute inset-0 w-full h-full pointer-events-none z-10"
             />
-
-            {/* HUD BỘ ĐẾM THỜI GIAN THỰC (AI OBJECT COUNTER HUD) */}
-            {showCountingLine && (
-              <div className="absolute top-3 right-3 z-20 pointer-events-none flex flex-col items-end gap-1.5 font-mono select-none">
-                <div className="px-3.5 py-2.5 rounded-2xl bg-slate-950/85 backdrop-blur-md border border-cyan-500/30 shadow-xl text-white flex flex-col gap-1 min-w-[210px]">
-                  <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
-                    <div className="flex items-center gap-1.5 text-cyan-400 text-[11px] font-bold">
-                      <Target className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>BỘ ĐẾM VẬT THỂ AI</span>
-                    </div>
-                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold">
-                      LIVE
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline justify-between mt-1">
-                    <span className="text-[11px] text-slate-400">TỔNG ĐÃ QUA VẠCH:</span>
-                    <span className="text-2xl font-black text-cyan-300 font-mono tracking-tight">
-                      {counterStats.total}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1.5 pt-1.5 text-[10px] border-t border-white/5">
-                    <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300">
-                      <span>Ổ gà:</span>
-                      <strong className="font-bold text-white">{counterStats.byCategory.POTHOLE || 0}</strong>
-                    </div>
-                    <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300">
-                      <span>Vết nứt:</span>
-                      <strong className="font-bold text-white">{counterStats.byCategory.ROAD_CRACK || 0}</strong>
-                    </div>
-                    <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300">
-                      <span>Vật cản:</span>
-                      <strong className="font-bold text-white">{counterStats.byCategory.ROAD_OBSTACLE || 0}</strong>
-                    </div>
-                    <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
-                      <span>Ngập úng:</span>
-                      <strong className="font-bold text-white">{counterStats.byCategory.ROAD_FLOODING || 0}</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Trạng thái quét frame hiển thị góc dưới màn hình */}
             {isPlaying && (
@@ -1934,6 +2086,24 @@ export const PatrolModePage: React.FC = () => {
                   <Camera className="w-3.5 h-3.5" />
                   <span>Camera Trực Tiếp</span>
                 </button>
+
+                {/* Nạp Lộ Trình GPS tùy chỉnh (GPX / GeoJSON) */}
+                <button
+                  type="button"
+                  onClick={() => gpxFileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 text-on-surface-variant hover:text-primary cursor-pointer border-l border-outline-variant/30 pl-2.5 ml-1"
+                  title="Nạp tệp nhật ký GPS (.gpx, .geojson) từ camera hành trình để vẽ Polyline tuyến đường"
+                >
+                  <Navigation className="w-3.5 h-3.5 text-primary" />
+                  <span>Nạp Tệp GPS</span>
+                </button>
+                <input
+                  type="file"
+                  ref={gpxFileInputRef}
+                  accept=".gpx,.geojson,.json"
+                  onChange={handleGpxUpload}
+                  className="hidden"
+                />
               </div>
 
               {/* Tùy chọn Tự Động Gửi Báo Cáo */}
@@ -2096,11 +2266,29 @@ export const PatrolModePage: React.FC = () => {
               className="w-full px-3 py-1.5 text-xs rounded-xl bg-surface-container-low border border-outline-variant/40 text-on-surface focus:outline-none focus:border-primary"
             />
 
-            <div className="h-52 w-full rounded-2xl overflow-hidden border border-outline-variant/20">
-              <LeafletMap
-                latitude={patrolLocation.lat}
-                longitude={patrolLocation.lng}
-                popupTitle="Vị trí ghi nhận tuần tra mặt đường"
+            {/* Hiển thị Tọa độ GPS & Tuyến Tuần Tra */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs font-mono">
+              <span className="text-on-surface-variant font-medium flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-primary" />
+                <span>GPS xe:</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-on-surface-variant font-sans">
+                  {calculateRouteDistanceKm(routePoints)} km ({routePoints.length} mốc)
+                </span>
+                <span className="font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20">
+                  {currentCarPosition[0].toFixed(6)}, {currentCarPosition[1].toFixed(6)}
+                </span>
+              </div>
+            </div>
+
+            <div className="h-64 w-full rounded-2xl overflow-hidden border border-outline-variant/20">
+              <PatrolRouteMap
+                routePoints={routePoints}
+                currentPosition={currentCarPosition}
+                traveledPoints={traveledRoutePoints}
+                incidentPins={incidentPins}
+                routeName={patrolLocation.address}
                 className="h-full w-full"
               />
             </div>

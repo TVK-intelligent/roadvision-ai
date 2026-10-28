@@ -119,9 +119,10 @@ public class IncidentController {
         List<com.roadvision.util.ImageTensorUtil.BoundingBox> boxes = new ArrayList<>();
         int imgWidth = 0;
         int imgHeight = 0;
+        java.awt.image.BufferedImage bimg = null;
         try {
             byte[] bytes = image.getBytes();
-            java.awt.image.BufferedImage bimg = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes));
+            bimg = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes));
             if (bimg != null) {
                 imgWidth = bimg.getWidth();
                 imgHeight = bimg.getHeight();
@@ -131,9 +132,22 @@ public class IncidentController {
             // empty boxes
         }
 
-        com.roadvision.util.ImageTensorUtil.BoundingBox best = boxes.isEmpty()
-                ? aiInferenceService.emptyDetection()
-                : boxes.get(0);
+        com.roadvision.util.ImageTensorUtil.BoundingBox best = aiInferenceService.emptyDetection();
+        if (!boxes.isEmpty()) {
+            // Ưu tiên sự cố nguy hiểm khẩn cấp cản trở giao thông làm nhãn đại diện:
+            // 1. ROAD_OBSTACLE (cây đổ, sạt lở, rào chắn sập cản đường)
+            // 2. ROAD_FLOODING (ngập úng diện rộng)
+            // 3. POTHOLE (ổ gà sụt lún)
+            // 4. ROAD_CRACK (vết rạn nứt)
+            best = boxes.stream().min(java.util.Comparator.comparingInt(b -> {
+                return switch (b.getClassName()) {
+                    case "ROAD_OBSTACLE" -> 0;
+                    case "ROAD_FLOODING" -> 1;
+                    case "POTHOLE" -> 2;
+                    default -> 3;
+                };
+            })).orElse(boxes.get(0));
+        }
 
         String estimatedSeverity = aiInferenceService.calculateSeverity(boxes, imgWidth, imgHeight);
 
@@ -148,9 +162,15 @@ public class IncidentController {
                 ? ((double) totalArea / (imgWidth * imgHeight)) * 100.0
                 : 0.0;
 
+        String obstacleDetail = null;
+        if ("ROAD_OBSTACLE".equals(best.getClassName())) {
+            obstacleDetail = aiInferenceService.classifyObstacleDetail(bimg, best);
+        }
+
         Map<String, Object> res = new HashMap<>();
         res.put("className", best.getClassName());
         res.put("confidence", best.getConfidence());
+        res.put("obstacleDetail", obstacleDetail);
         res.put("bboxX", best.getX());
         res.put("bboxY", best.getY());
         res.put("bboxWidth", best.getWidth());
@@ -179,9 +199,10 @@ public class IncidentController {
         List<com.roadvision.util.ImageTensorUtil.BoundingBox> boxes = new ArrayList<>();
         int imgWidth = 0;
         int imgHeight = 0;
+        java.awt.image.BufferedImage bimg = null;
         try {
             byte[] bytes = image.getBytes();
-            java.awt.image.BufferedImage bimg = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes));
+            bimg = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes));
             if (bimg != null) {
                 imgWidth = bimg.getWidth();
                 imgHeight = bimg.getHeight();
@@ -207,9 +228,15 @@ public class IncidentController {
                 ? ((double) totalArea / (imgWidth * imgHeight)) * 100.0
                 : 0.0;
 
+        String obstacleDetail = null;
+        if ("ROAD_OBSTACLE".equals(best.getClassName())) {
+            obstacleDetail = aiInferenceService.classifyObstacleDetail(bimg, best);
+        }
+
         Map<String, Object> res = new HashMap<>();
         res.put("className", best.getClassName());
         res.put("confidence", best.getConfidence());
+        res.put("obstacleDetail", obstacleDetail);
         res.put("bboxX", best.getX());
         res.put("bboxY", best.getY());
         res.put("bboxWidth", best.getWidth());
@@ -242,6 +269,15 @@ public class IncidentController {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return ResponseEntity.ok(incidentService.getFilteredIncidents(status, statuses, category, search, pageable));
+    }
+
+    /**
+     * Tra cứu nhanh phản ánh công khai theo mã phiếu (#RC-...) hoặc ID
+     */
+    @GetMapping("/lookup/{code}")
+    @Operation(summary = "Tra cứu nhanh phản ánh theo mã phiếu (#RC-...) hoặc ID")
+    public ResponseEntity<IncidentResponse> lookupIncident(@PathVariable("code") String code) {
+        return ResponseEntity.ok(incidentService.getIncidentByTicketOrId(code));
     }
 
     /**

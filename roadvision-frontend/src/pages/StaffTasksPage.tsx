@@ -22,6 +22,7 @@ import {
   Layers,
   Send,
   Navigation,
+  RefreshCw,
 } from 'lucide-react';
 
 export const StaffTasksPage: React.FC = () => {
@@ -302,7 +303,13 @@ export const StaffTasksPage: React.FC = () => {
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col justify-between gap-4 hover:border-slate-300 transition-colors"
+                className={`p-5 rounded-lg border shadow-xs flex flex-col justify-between gap-4 transition-colors ${
+                  ['RESOLVED', 'CLOSED'].includes(task.status)
+                    ? 'bg-linear-to-b from-emerald-50/20 to-white border-emerald-300/80 hover:border-emerald-400'
+                    : task.status === 'REWORK_REQUIRED'
+                    ? 'bg-linear-to-b from-rose-50/20 to-white border-rose-300 hover:border-rose-400'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
               >
                 <div className="flex gap-4">
                   <img
@@ -345,17 +352,54 @@ export const StaffTasksPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Cảnh báo yêu cầu thi công lại nếu có */}
+                {/* Trạng thái yêu cầu thi công lại (Phân biệt rõ: Đang bắt làm lại vs Đang làm vs Đã làm xong đạt chuẩn) */}
                 {Boolean(task.reworkCount && task.reworkCount > 0) && (
-                  <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-md text-xs flex flex-col gap-1">
-                    <div className="font-semibold flex items-center gap-1.5 text-rose-800">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      <span>Yêu cầu thi công lại (Lần #{task.reworkCount})</span>
-                    </div>
-                    {task.reworkReason && (
-                      <p className="text-slate-600 italic">"{task.reworkReason}"</p>
+                  <>
+                    {/* TRƯỜNG HỢP 1: Đang bị yêu cầu làm lại khẩn cấp (Chưa đạt) */}
+                    {task.status === 'REWORK_REQUIRED' && (
+                      <div className="bg-rose-50 border border-rose-300 p-2.5 rounded-md text-xs flex flex-col gap-1.5 shadow-2xs">
+                        <div className="font-semibold flex items-center gap-1.5 text-rose-800">
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>Yêu cầu thi công lại khẩn cấp (Lần #{task.reworkCount})</span>
+                        </div>
+                        {task.reworkReason && (
+                          <p className="text-rose-700 italic font-medium bg-rose-100/60 p-2 rounded border border-rose-200">
+                            "{task.reworkReason}"
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
+
+                    {/* TRƯỜNG HỢP 2: Đang triển khai khắc phục lại tại hiện trường */}
+                    {['ASSIGNED', 'IN_PROGRESS'].includes(task.status) && (
+                      <div className="bg-amber-50 border border-amber-300 p-2.5 rounded-md text-xs flex flex-col gap-1.5">
+                        <div className="font-semibold flex items-center gap-1.5 text-amber-800">
+                          <RefreshCw className="w-3.5 h-3.5 text-amber-600 shrink-0 animate-spin" />
+                          <span>Đang khắc phục thi công lại (Lần #{task.reworkCount})</span>
+                        </div>
+                        {task.reworkReason && (
+                          <p className="text-slate-600 italic">Chỉ đạo: "{task.reworkReason}"</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TRƯỜNG HỢP 3: Đã khắc phục và nghiệm thu hoàn thành đạt chuẩn */}
+                    {['RESOLVED', 'CLOSED'].includes(task.status) && (
+                      <div className="bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-md text-xs flex items-start gap-2 text-emerald-900 shadow-2xs">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-emerald-800 flex items-center gap-1.5">
+                            <span>Đã khắc phục & nghiệm thu đạt chuẩn (Sau lần thi công lại #{task.reworkCount})</span>
+                          </div>
+                          {task.reworkReason && (
+                            <p className="text-slate-600 text-[11px] mt-0.5 italic">
+                              Đã xử lý dứt điểm theo chỉ đạo: "{task.reworkReason}"
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Thao tác kỹ thuật theo từng giai đoạn */}
@@ -433,6 +477,13 @@ export const StaffTasksPage: React.FC = () => {
                     {['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(task.status) && (
                       <span className="text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-200">
                         Chờ Admin thẩm định
+                      </span>
+                    )}
+
+                    {['RESOLVED', 'CLOSED'].includes(task.status) && (
+                      <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Đã hoàn tất</span>
                       </span>
                     )}
 

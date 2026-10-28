@@ -15,7 +15,8 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
-  Zap,
+  Trophy,
+  BookOpen,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -155,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   to="/inspection-tasks"
                   onClick={closeMobile}
                   className={navItemClass('/inspection-tasks')}
-                  title="Khảo sát đo đạc hiện trường (Giai đoạn 4)"
+                  title="Khảo sát đo đạc hiện trường"
                 >
                   <Compass className="w-4 h-4 shrink-0 text-teal-400" />
                   {!isCollapsed && <span>Khảo sát hiện trường</span>}
@@ -223,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div>
               {!isCollapsed ? (
                 <div className="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Hồ sơ cá nhân
+                  {user?.role === 'ROLE_ADMIN' ? 'Hồ sơ sự cố' : 'Dịch vụ công dân'}
                 </div>
               ) : (
                 <div className="border-t border-[#243048] my-2" />
@@ -240,32 +241,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span>{user?.role === 'ROLE_ADMIN' ? 'Hồ sơ phản ánh' : 'Lịch sử phản ánh'}</span>
                   )}
                 </Link>
+
+                {/* Các tiện ích trang dành riêng cho Công dân */}
+                {user?.role === 'ROLE_CITIZEN' && (
+                  <>
+                    <Link
+                      to="/leaderboard"
+                      onClick={closeMobile}
+                      className={navItemClass('/leaderboard')}
+                      title="Bảng vinh danh công dân đóng góp tích cực cho thành phố"
+                    >
+                      <Trophy className="w-4 h-4 shrink-0 text-amber-400" />
+                      {!isCollapsed && <span>Bảng vinh danh</span>}
+                    </Link>
+
+                    <Link
+                      to="/photo-guide"
+                      onClick={closeMobile}
+                      className={navItemClass('/photo-guide')}
+                      title="Cẩm nang chụp ảnh hiện trường chuẩn AI"
+                    >
+                      <BookOpen className="w-4 h-4 shrink-0 text-sky-400" />
+                      {!isCollapsed && <span>Cẩm nang chụp ảnh</span>}
+                    </Link>
+                  </>
+                )}
               </nav>
             </div>
           )}
         </div>
-
-        {/* 3. Footer của Sidebar (Trạng thái AI Engine) */}
-        {!isCollapsed ? (
-          <div className="p-3 border-t border-[#243048] bg-[#141c2b]/60">
-            <div className="p-2.5 rounded-lg bg-[#1f2b40] border border-[#2d3d5a] flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <Zap className="w-3.5 h-3.5" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-[11px] font-semibold text-slate-200 truncate">YOLOv8 Inference</span>
-                </div>
-                <span className="text-[10px] text-slate-400 truncate">Model RoadCare 800px</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-3 border-t border-[#243048] flex justify-center">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="AI Engine đang trực tuyến" />
-          </div>
-        )}
       </aside>
     </>
   );

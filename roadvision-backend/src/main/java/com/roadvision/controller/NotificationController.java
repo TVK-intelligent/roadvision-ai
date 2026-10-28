@@ -77,7 +77,7 @@ public class NotificationController {
 
     @PostMapping("/broadcast-emergency")
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Admin phát lệnh báo động khẩn cấp tới toàn mạng lưới (Staff & Citizens)")
+    @Operation(summary = "Admin phát lệnh báo động khẩn cấp điều động kỹ thuật viên (ROLE_STAFF)")
     public ResponseEntity<NotificationDTO> broadcastEmergency(
             @RequestBody(required = false) Map<String, Object> body) {
         boolean active = true;

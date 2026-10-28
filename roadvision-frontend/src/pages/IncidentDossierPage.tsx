@@ -441,7 +441,7 @@ export const IncidentDossierPage: React.FC = () => {
               <button
                 onClick={() => setIsAssignInspectionOpen(true)}
                 className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
-                title="Chỉ định Tổ Khảo Sát đến đo đạc hiện trường (Giai đoạn 4)"
+                title="Chỉ định Tổ Khảo Sát đến đo đạc hiện trường"
               >
                 <Compass className="w-3.5 h-3.5" />
                 <span>Giao Khảo sát</span>
@@ -1163,7 +1163,7 @@ export const IncidentDossierPage: React.FC = () => {
         )}
 
         {/* Người dân (Citizen) & Quản trị viên đối chiếu ảnh Trước/Sau & Đóng sự cố hoặc Khiếu nại */}
-        {['PENDING_INSPECTION', 'PENDING_ACCEPTANCE', 'RESOLVED', 'CLOSED'].includes(incident.status) && incident.resolution && (
+        {['PENDING_INSPECTION', 'PENDING_ACCEPTANCE', 'RESOLVED'].includes(incident.status) && incident.resolution && (
           <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
             {incident.status === 'PENDING_INSPECTION' && (
               <div className="p-3.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-950 flex items-start gap-2.5">
@@ -1596,7 +1596,26 @@ export const IncidentDossierPage: React.FC = () => {
 
         {/* Đã đóng phiếu hoàn tất */}
         {incident.status === 'CLOSED' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 bg-gradient-to-b from-emerald-50/20 via-white to-white p-5 rounded-lg border border-emerald-200/80 shadow-xs">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="font-semibold text-xs text-emerald-950 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Đối chiếu tương tác Trước & Sau thi công (Đã nghiệm thu hoàn tất)
+              </span>
+              <div className="flex items-center gap-2">
+                {incident.resolution?.staffName && (
+                  <span className="text-xs font-mono text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                    Kỹ thuật viên: {incident.resolution.staffName}
+                  </span>
+                )}
+                {Boolean(incident.reworkCount && incident.reworkCount > 0) && (
+                  <span className="text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded">
+                    Đã khắc phục qua {incident.reworkCount} lần thi công lại
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Thẻ Kết Quả Kiểm Định Chất Lượng AI (AI Quality Verification) */}
             {incident.resolution?.aiVerificationStatus && (
               <div
@@ -1642,7 +1661,7 @@ export const IncidentDossierPage: React.FC = () => {
               <BeforeAfterSlider
                 beforeImageUrl={incident.imageUrl}
                 afterImageUrl={incident.resolution.proofImageUrl}
-                className="h-80 w-full"
+                className="min-h-[420px] w-full"
               />
             ) : (
               <div className="h-64 w-full rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center p-4">
@@ -1650,18 +1669,24 @@ export const IncidentDossierPage: React.FC = () => {
               </div>
             )}
 
-            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
+            <div className="p-3.5 rounded-lg bg-emerald-50/60 border border-emerald-200 flex items-center justify-between flex-wrap gap-3">
               <div>
-                <div className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
+                <div className="font-semibold text-xs text-emerald-950 flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Sự cố đã được đóng và lưu trữ hoàn tất
+                  Sự cố đã được nghiệm thu & đóng lưu trữ thành công
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  Đánh giá của công dân: {incident.feedback?.rating || 5} Sao • "{incident.feedback?.comments || 'Rất hài lòng'}"
+                <div className="text-xs text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-slate-700">Đánh giá của công dân:</span>
+                  <div className="inline-flex items-center text-amber-500">
+                    {Array.from({ length: incident.feedback?.rating || 5 }).map((_, i) => (
+                      <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                    ))}
+                  </div>
+                  <span className="italic text-slate-600">"{incident.feedback?.comments || 'Mặt đường hoàn trả êm thuận, an toàn.'}"</span>
                 </div>
               </div>
-              <span className="font-mono text-xs font-medium text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded shadow-xs">
-                HOÀN TẤT VÒNG ĐỜI
+              <span className="font-mono text-xs font-semibold text-emerald-800 bg-white border border-emerald-300 px-2.5 py-1 rounded shadow-2xs">
+                ✓ HOÀN TẤT VÒNG ĐỜI
               </span>
             </div>
           </div>

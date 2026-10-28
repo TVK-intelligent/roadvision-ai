@@ -84,6 +84,18 @@ public class PatrolVideoAiService {
                         }
                     } catch (Exception ignored) {}
                     log.info("[PatrolVideoAiService] Nạp thành công Session AI chuyên biệt cho Video Tuần Tra từ: {} (InputSize: {})", modelResource.getFilename(), cachedInputSize);
+
+                    // WARM-UP MÔ HÌNH NGAY KHI KHỞI ĐỘNG (Triệt tiêu độ trễ 2s của frame đầu tiên)
+                    try {
+                        java.nio.FloatBuffer dummyBuf = java.nio.FloatBuffer.allocate(3 * cachedInputSize * cachedInputSize);
+                        long[] dummyShape = new long[]{1, 3, cachedInputSize, cachedInputSize};
+                        try (OnnxTensor dummyTensor = OnnxTensor.createTensor(env, dummyBuf, dummyShape);
+                             OrtSession.Result ignored = session.run(Collections.singletonMap("images", dummyTensor))) {
+                            log.info("[PatrolVideoAiService] Khởi động nóng (Warm-up) ONNX Engine thành công! Sẵn sàng nhận diện tức thì ngay frame 0.");
+                        }
+                    } catch (Exception warmErr) {
+                        log.debug("[PatrolVideoAiService] Bỏ qua warm-up dummy: {}", warmErr.getMessage());
+                    }
                 }
             } else {
                 log.warn("[PatrolVideoAiService] Không tìm thấy file model ONNX tại: {}", modelPath);
@@ -172,23 +184,31 @@ public class PatrolVideoAiService {
 
                     if (lw <= 8 || lh <= 8) continue;
 
+                    // 1. Khử vùng chân trời / bầu trời / xe phía trước (Top 18% của frame video camera hành trình)
+                    float normCenterY = localCy / (float) Math.max(1, origHeight);
+                    if (normCenterY < 0.18f || normCenterY > 0.97f) continue;
+
+                    // 2. Khử bóng râm khổng lồ (bóng tòa nhà, bóng cầu vượt, bóng xe container trùm > 35% diện tích ảnh)
+                    float boxAreaRatio = ((float) lw * lh) / (origWidth * origHeight);
+                    if (boxAreaRatio > 0.35f) continue;
+
                     float potholeConf = (numClasses > 0) ? output[0][4][i] : 0f;
                     float crackConf = (numClasses > 1) ? output[0][5][i] : 0f;
                     float floodingConf = (numClasses > 2) ? output[0][6][i] : 0f;
 
-                    // PHÂN BIỆT THÔNG MINH GIỮA Ổ GÀ (POTHOLE) VÀ NGẬP ÚNG (ROAD_FLOODING):
-                    // Ổ gà đọng nước/vũng trũng là hư hại cục bộ (chiều rộng < 50% ảnh, diện tích < 20% ảnh).
-                    // Ngập úng (ROAD_FLOODING) là hiện tượng ngập lụt diện rộng (ngập băng qua làn đường, diện tích lớn).
-                    float boxAreaRatio = ((float) lw * lh) / (origWidth * origHeight);
+                    // PHÂN BIỆT RÕ RÀNG GIỮA VẾT ƯỚT / VŨNG NƯỚC (ROAD_FLOODING) VÀ Ổ GÀ (POTHOLE):
+                    // Tuyệt đối không tự động biến vệt ướt / vũng nước thành Ổ gà!
+                    // Chỉ khi nào mô hình nhận diện rõ hố lõm (potholeConf >= 0.38f và cao hơn hẳn floodingConf) mới coi là ổ gà chứa nước.
                     boolean isLocalizedCavity = (boxAreaRatio < 0.20f) && (lw < origWidth * 0.50f);
 
-                    if (bestClassId == 2 && isLocalizedCavity) {
-                        // Vũng nước / hốc trũng cục bộ trên mặt đường: Chuyển đổi chuẩn xác thành POTHOLE (Ổ gà chứa nước)
-                        bestClassId = 0;
-                        bestConf = Math.max(potholeConf, floodingConf * 0.92f);
+                    if (bestClassId == 2) {
+                        if (isLocalizedCavity && potholeConf >= 0.38f && potholeConf > floodingConf) {
+                            bestClassId = 0;
+                            bestConf = potholeConf;
+                        }
                     } else if (bestClassId == 1 && isLocalizedCavity) {
-                        // Vết nứt vỡ dạng ổ gà rỗ mặt đường
-                        if (potholeConf >= 0.12f && potholeConf >= crackConf * 0.65f) {
+                        // Vết nứt vỡ rỗ mặt đường dạng ổ gà
+                        if (potholeConf >= 0.25f && potholeConf >= crackConf * 0.80f) {
                             float aspect = (float) Math.max(lw, lh) / Math.max(1, Math.min(lw, lh));
                             if (aspect < 2.5f) {
                                 bestClassId = 0;
@@ -201,20 +221,27 @@ public class PatrolVideoAiService {
                             ? CLASS_NAMES[bestClassId]
                             : "ROAD_DAMAGE_" + bestClassId;
 
-                    // Ngưỡng thu thập gợi ý ban đầu để không bỏ lỡ vết nứt/vật cản trước khi truy vết
+                    // Ngưỡng lọc tin cậy chuẩn xác: Lọc bỏ triệt để các vệt ướt/bóng gương mờ nhạt
                     float minThresh;
                     if ("ROAD_CRACK".equals(className)) {
-                        minThresh = Math.min(0.12f, effectiveThreshold);
+                        minThresh = Math.min(0.18f, effectiveThreshold);
                     } else if ("POTHOLE".equals(className)) {
-                        minThresh = Math.min(0.10f, effectiveThreshold);
+                        // Bám sát ngưỡng tin cậy (mặc định 0.22), loại bỏ hoàn toàn nhiễu vết ướt < 20%
+                        minThresh = effectiveThreshold;
                     } else if ("ROAD_OBSTACLE".equals(className)) {
-                        minThresh = Math.min(0.12f, effectiveThreshold);
+                        minThresh = Math.min(0.20f, effectiveThreshold);
                     } else if ("ROAD_FLOODING".equals(className)) {
-                        minThresh = Math.min(0.15f, effectiveThreshold);
+                        minThresh = Math.min(0.20f, effectiveThreshold);
                     } else {
-                        minThresh = Math.min(0.15f, effectiveThreshold);
+                        minThresh = effectiveThreshold;
                     }
                     if (bestConf < minThresh) continue;
+
+                    // Khử vệt ướt dài dạng vệt bánh xe hoặc vệt trượt dài mỏng (tỷ lệ cạnh > 3.6 không thể là ổ gà)
+                    if ("POTHOLE".equals(className)) {
+                        float aspect = (float) Math.max(lw, lh) / Math.max(1, Math.min(lw, lh));
+                        if (aspect > 3.6f) continue;
+                    }
 
                     rawCandidates.add(ImageTensorUtil.BoundingBox.builder()
                             .className(className)
