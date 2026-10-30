@@ -23,7 +23,37 @@ import {
   Send,
   Navigation,
   RefreshCw,
+  Calculator,
 } from 'lucide-react';
+
+const SOLUTION_PRESETS: Record<string, string[]> = {
+  POTHOLE: [
+    'Cào bóc 4-7cm, tưới nhựa dính bám 0.5kg/m2, thảm bù BTN C12.5 đầm lèn K98 đảm bảo êm thuận',
+    'Vá nguội khẩn cấp bằng Carboncor Asphalt đảm bảo an toàn giao thông trước giờ cao điểm',
+    'Đào xử lý móng cấp phối đá dăm loại 1, đầm chặt K98 và thảm bù 2 lớp BTN C19 và C12.5'
+  ],
+  ROAD_CRACK: [
+    'Cắt mở rộng rãnh chữ V, làm sạch bằng máy nén khí, quét lớp lót, rót matit chèn khe Polyurethane đạt chuẩn',
+    'Dán màng sợi thủy tinh chống nứt phản áp kết hợp cào bóc thảm bù lớp mặt BTN polymer',
+    'Tưới nhũ tương nhựa đường thấm bám và rải cát mịn trám kín các khe nứt chân chim diện rộng'
+  ],
+  ROAD_OBSTACLE: [
+    'Huy động máy cưa xẻ phân đoạn thân cành cây ngã, dùng xe cẩu giải phóng lòng đường, chở phế thải dọn sạch',
+    'Điều động xe xúc lật và 02 xe ben xúc hót vận chuyển đất đá sạt lở, dùng xe bồn rửa sạch bùn đất mặt đường',
+    'Thu gom toàn bộ phế liệu, lốp xe, vật liệu rơi vãi vào lề an toàn, bốc xếp lên xe tải giải tỏa lòng đường',
+    'Rải cát khô và mùn cưa thấm hút dầu nhớt loang, dùng dung dịch sinh học tẩy rửa và đặt biển cảnh báo đường trơn'
+  ],
+  ROAD_FLOODING: [
+    'Bố trí rào chắn và biển báo cấm xe ngập sâu, khơi thông rác hố ga thu nước, bơm dã chiến công suất lớn',
+    'Nạo vét bùn đất và rác ứ đọng tại rãnh thoát nước dọc tuyến, hoàn trả khả năng tiêu thoát tự nhiên',
+    'Lắp đặt máy bơm chìm dã chiến công suất lớn bơm cưỡng bức thoát nước qua lưu vực lân cận'
+  ],
+  OTHER: [
+    'Thay thế nắp gang hố ga chịu lực tải trọng 40 tấn, gia cố cổ hố ga bằng bê tông mác 250',
+    'Tháo dỡ tấm đan vỉa hè vỡ, lát lại gạch terrazzo phẳng êm, hoàn trả mỹ quan đô thị',
+    'Gia cố khắc phục sạt lở lề đường bằng rọ đá và hoàn trả kết cấu hạ tầng đồng bộ'
+  ]
+};
 
 export const StaffTasksPage: React.FC = () => {
   const toast = useToast();
@@ -42,6 +72,7 @@ export const StaffTasksPage: React.FC = () => {
   const [surveyLatitude, setSurveyLatitude] = useState<number>(21.0285);
   const [surveyLongitude, setSurveyLongitude] = useState<number>(105.8542);
   const [confirmedCategory, setConfirmedCategory] = useState<Category>('POTHOLE');
+  const [obstacleSubType, setObstacleSubType] = useState<'TREE' | 'LANDSLIDE' | 'DEBRIS' | 'OIL_SPILL'>('TREE');
   const [actualSeverity, setActualSeverity] = useState<Severity>('HIGH');
   const [estimatedLengthM, setEstimatedLengthM] = useState<number>(1.2);
   const [estimatedWidthM, setEstimatedWidthM] = useState<number>(0.8);
@@ -103,9 +134,207 @@ export const StaffTasksPage: React.FC = () => {
     setSelectedSurveyTask(task);
     setSurveyLatitude(task.latitude || 21.0285);
     setSurveyLongitude(task.longitude || 105.8542);
-    setConfirmedCategory(task.category || 'POTHOLE');
+    const cat = task.category || 'POTHOLE';
+    setConfirmedCategory(cat);
     setActualSeverity(task.severity || 'HIGH');
     setSurveyPhotos([]);
+
+    // Tự động khởi tạo thông số đo đạc & phương án kỹ thuật phù hợp với từng loại hư hại
+    if (cat === 'ROAD_OBSTACLE') {
+      setEstimatedLengthM(4.5);
+      setEstimatedWidthM(2.5);
+      setEstimatedDepthCm(40.0);
+      setProposedSolution(SOLUTION_PRESETS.ROAD_OBSTACLE[0]);
+      setSurveyNotes('Cây ngã đổ chiếm một phần lòng đường, cần cưa xẻ và cẩu dọn khẩn cấp');
+    } else if (cat === 'ROAD_CRACK') {
+      setEstimatedLengthM(6.0);
+      setEstimatedWidthM(0.3);
+      setEstimatedDepthCm(3.0);
+      setProposedSolution(SOLUTION_PRESETS.ROAD_CRACK[0]);
+      setSurveyNotes('Vết nứt bề mặt kéo dài, cần trám keo matit ngăn nước mưa ngấm xuống móng');
+    } else if (cat === 'ROAD_FLOODING') {
+      setEstimatedLengthM(15.0);
+      setEstimatedWidthM(6.0);
+      setEstimatedDepthCm(35.0);
+      setProposedSolution(SOLUTION_PRESETS.ROAD_FLOODING[0]);
+      setSurveyNotes('Ngập úng cục bộ lòng đường, rác nghẹt miệng cống thu gom');
+    } else if (cat === 'OTHER' || (cat as string) === 'COMPLEX_DAMAGE') {
+      setEstimatedLengthM(1.5);
+      setEstimatedWidthM(1.0);
+      setEstimatedDepthCm(10.0);
+      setProposedSolution(SOLUTION_PRESETS.OTHER[0]);
+      setSurveyNotes('Hư hỏng kết cấu hạ tầng kỹ thuật đường bộ');
+    } else {
+      setEstimatedLengthM(1.6);
+      setEstimatedWidthM(0.8);
+      setEstimatedDepthCm(6.0);
+      setProposedSolution(SOLUTION_PRESETS.POTHOLE[0]);
+      setSurveyNotes('Mặt đường lún võng nguy hiểm cho xe máy');
+    }
+  };
+
+  const handleCategoryChange = (newCat: Category) => {
+    setConfirmedCategory(newCat);
+    const presets = SOLUTION_PRESETS[newCat] || SOLUTION_PRESETS.POTHOLE;
+    setProposedSolution(presets[0]);
+    if (newCat === 'ROAD_OBSTACLE') {
+      setEstimatedLengthM((prev) => (prev < 3 ? 4.5 : prev));
+      setEstimatedWidthM((prev) => (prev < 1.5 ? 2.5 : prev));
+      setEstimatedDepthCm((prev) => (prev < 20 ? 40 : prev));
+    } else if (newCat === 'ROAD_FLOODING') {
+      setEstimatedLengthM((prev) => (prev < 5 ? 12.0 : prev));
+      setEstimatedWidthM((prev) => (prev < 3 ? 5.0 : prev));
+      setEstimatedDepthCm((prev) => (prev < 15 ? 30 : prev));
+    } else if (newCat === 'ROAD_CRACK') {
+      setEstimatedLengthM((prev) => (prev < 2 ? 5.0 : prev));
+      setEstimatedWidthM((prev) => (prev > 1 ? 0.3 : prev));
+      setEstimatedDepthCm((prev) => (prev > 10 ? 3 : prev));
+    }
+  };
+
+  const getCategoryDetails = () => {
+    switch (confirmedCategory) {
+      case 'ROAD_OBSTACLE':
+        if (obstacleSubType === 'LANDSLIDE') {
+          return {
+            title: 'Quy mô Đất đá sạt lở / Đá tảng tràn lòng đường:',
+            lLabel: 'Chiều dài vệt sạt (m)',
+            wLabel: 'Bề rộng tràn mặt đường (m)',
+            dLabel: 'Độ dày lớp đất đá (cm)',
+            card1Title: 'Diện tích tràn mặt đường (S)',
+            card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+            card1Sub: 'S = Dài × Rộng',
+            card2Title: 'Khối lượng đất đá xúc hốt (V)',
+            card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(2)} m³`,
+            card2Sub: 'V = S × Độ dày',
+            card3Title: 'Phương tiện huy động',
+            card3Val: 'Xe xúc lật + Xe ben + Xe bồn',
+            card3Sub: 'Múc đất đá & Rửa mặt đường',
+            formula: '* Phương án cứu hộ: Điều động xe xúc lật múc đất đá lên xe ben vận chuyển, xe bồn phun nước rửa sạch bùn đất trơn trượt'
+          };
+        } else if (obstacleSubType === 'DEBRIS') {
+          return {
+            title: 'Quy mô Phế liệu / Vật liệu rơi vãi (Lốp xe, thùng hàng, sắt vụn):',
+            lLabel: 'Chiều dài phạm vi rơi vãi (m)',
+            wLabel: 'Bề rộng chiếm dụng (m)',
+            dLabel: 'Chiều cao kiện hàng / Khối vật cản (cm)',
+            card1Title: 'Lòng đường chiếm dụng (S)',
+            card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+            card1Sub: 'S = Dài × Rộng',
+            card2Title: 'Khối lượng phế thải ước tính',
+            card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(2)} m³`,
+            card2Sub: 'Cần bốc xếp thu dọn',
+            card3Title: 'Phương tiện & Nhân lực',
+            card3Val: 'Công nhân + Xe tải thu gom',
+            card3Sub: 'Thu gom giải phóng lòng đường',
+            formula: '* Phương án cứu hộ: Phân luồng điều tiết giao thông, thu gom toàn bộ vật liệu rơi vãi vào lề an toàn, chở xe tải đi'
+          };
+        } else if (obstacleSubType === 'OIL_SPILL') {
+          return {
+            title: 'Phạm vi Vệt dầu nhớt / Hóa chất loang trơn trượt nguy hiểm:',
+            lLabel: 'Chiều dài vệt dầu loang (m)',
+            wLabel: 'Bề rộng vệt dầu (m)',
+            dLabel: 'Mức độ loang trượt (cm)',
+            card1Title: 'Diện tích dầu nhớt loang (S)',
+            card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+            card1Sub: 'S = Dài × Rộng',
+            card2Title: 'Cát khô / mùn cưa thấm hút',
+            card2Val: `~ ${(estimatedLengthM * estimatedWidthM * 1.5).toFixed(1)} kg`,
+            card2Sub: 'Định mức thấm hút dầu nhớt',
+            card3Title: 'Biện pháp xử lý chống trượt',
+            card3Val: 'Rải cát + Tẩy rửa sinh học',
+            card3Sub: 'Khử trơn trượt bề mặt đường',
+            formula: '* Phương án xử lý: Đặt biển cảnh báo trơn trượt từ xa, rải cát/mùn cưa thấm hút váng dầu, phun dung dịch tẩy rửa và rửa sạch'
+          };
+        } else {
+          return {
+            title: 'Quy mô Cây xanh ngã đổ / Cành cây gãy chắn đường:',
+            lLabel: 'Chiều dài thân cây / cành (m)',
+            wLabel: 'Bề rộng làn bị chắn (m)',
+            dLabel: 'Đường kính thân cây (cm)',
+            card1Title: 'Lòng đường chiếm dụng (S)',
+            card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+            card1Sub: 'S = Dài × Rộng',
+            card2Title: 'Khối lượng cưa cắt giải tỏa',
+            card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(2)} m³`,
+            card2Sub: 'Cưa xẻ & Cẩu dọn',
+            card3Title: 'Phương tiện & Biện pháp',
+            card3Val: 'Cưa máy + Xe cẩu + Xe ben',
+            card3Sub: 'Giải phóng & Chở phế thải',
+            formula: '* Phương án cứu hộ: Cưa xẻ phân đoạn thân cành, cẩu giải tỏa khỏi lòng đường, xe ben chở phế thải hoàn trả mặt đường sạch sẽ'
+          };
+        }
+      case 'ROAD_CRACK':
+        return {
+          title: 'Thông số đo đạc vết nứt rạn mặt đường:',
+          lLabel: 'Chiều dài vệt nứt (m)',
+          wLabel: 'Bề rộng rạn nứt (m)',
+          dLabel: 'Độ sâu khe nứt (cm)',
+          card1Title: 'Chiều dài trám nứt (L)',
+          card1Val: `${estimatedLengthM.toFixed(1)} m dài`,
+          card1Sub: 'Khe nứt cần rót keo',
+          card2Title: 'Diện tích vùng rạn (S)',
+          card2Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+          card2Sub: 'S = Dài × Rộng',
+          card3Title: 'Matit chèn khe Polyurethane',
+          card3Val: `~ ${(estimatedLengthM * 0.25).toFixed(1)} kg`,
+          card3Sub: 'Định mức trám nứt TCVN',
+          formula: '* Quy chuẩn xử lý nứt: Cắt rãnh theo vết nứt, làm sạch bằng máy nén khí, rót matit chèn khe đàn hồi chuyên dụng'
+        };
+      case 'ROAD_FLOODING':
+        return {
+          title: 'Phạm vi ngập úng & Mực nước ngập sâu:',
+          lLabel: 'Chiều dài đoạn ngập (m)',
+          wLabel: 'Bề rộng vùng ngập (m)',
+          dLabel: 'Mực nước ngập sâu (cm)',
+          card1Title: 'Diện tích ngập nước (S)',
+          card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+          card1Sub: 'S = Dài × Rộng',
+          card2Title: 'Lượng nước ứ đọng',
+          card2Val: `~ ${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(1)} m³`,
+          card2Sub: 'V = S × Mực nước sâu',
+          card3Title: 'Biện pháp tiêu úng',
+          card3Val: 'Bơm dã chiến + Khơi cống',
+          card3Sub: 'Hút xả nước cưỡng bức',
+          formula: '* Phương án tiêu úng: Đặt biển cảnh báo ngập sâu, khơi thông rác hố ga thu gom, vận hành máy bơm dã chiến giải tỏa úng ngập'
+        };
+      case 'OTHER':
+      default:
+        if (confirmedCategory === 'OTHER' || (confirmedCategory as string) === 'COMPLEX_DAMAGE') {
+          return {
+            title: 'Thông số đo đạc hư hỏng kết cấu hạ tầng:',
+            lLabel: 'Chiều dài (m)',
+            wLabel: 'Chiều rộng (m)',
+            dLabel: 'Độ sâu / Chiều cao (cm)',
+            card1Title: 'Diện tích xử lý (S)',
+            card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+            card1Sub: 'S = Dài × Rộng',
+            card2Title: 'Thể tích ước tính (V)',
+            card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(3)} m³`,
+            card2Sub: 'V = S × Sâu / 100',
+            card3Title: 'Hạng mục vật tư',
+            card3Val: 'Kết cấu chuyên ngành',
+            card3Sub: 'Thay thế & Sửa chữa',
+            formula: '* Phương án: Xử lý theo hồ sơ thiết kế kỹ thuật định hình hoặc thay thế vật tư phụ kiện đồng bộ'
+          };
+        }
+        return {
+          title: 'Thông số đo đạc kích thước hiện trường (Ổ gà / Hố sụt):',
+          lLabel: 'Chiều dài (m)',
+          wLabel: 'Chiều rộng (m)',
+          dLabel: 'Độ sâu (cm)',
+          card1Title: 'Diện tích cào bóc (S)',
+          card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+          card1Sub: 'S = Dài × Rộng',
+          card2Title: 'Thể tích đào bù (V)',
+          card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(3)} m³`,
+          card2Sub: 'V = S × (Sâu / 100)',
+          card3Title: 'BTN dự kiến (tấn)',
+          card3Val: `~ ${(((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)) * 2.4).toFixed(2)} tấn`,
+          card3Sub: 'γ ≈ 2.4 tấn/m³',
+          formula: '* Công thức quy chuẩn: S = Dài × Rộng; V = S × (Sâu / 100); BTN ≈ V × 2.4 tấn/m³'
+        };
+    }
   };
 
   const handleGetLiveLocation = () => {
@@ -580,13 +809,14 @@ export const StaffTasksPage: React.FC = () => {
                   <label className="block font-medium mb-1 text-slate-700">Xác nhận loại hư hỏng *</label>
                   <select
                     value={confirmedCategory}
-                    onChange={(e) => setConfirmedCategory(e.target.value as Category)}
-                    className="w-full px-2.5 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                    onChange={(e) => handleCategoryChange(e.target.value as Category)}
+                    className="w-full px-2.5 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 cursor-pointer"
                   >
-                    <option value="POTHOLE">Ổ gà / Hố sụt</option>
+                    <option value="POTHOLE">Ổ gà / Hố sụt lún</option>
                     <option value="ROAD_CRACK">Vết nứt mặt đường</option>
+                    <option value="ROAD_OBSTACLE">Chướng ngại vật / Vật cản</option>
                     <option value="ROAD_FLOODING">Điểm ngập úng</option>
-                    <option value="ROAD_OBSTACLE">Chướng ngại vật</option>
+                    <option value="OTHER">Hư hỏng kết cấu khác</option>
                   </select>
                 </div>
                 <div>
@@ -594,62 +824,164 @@ export const StaffTasksPage: React.FC = () => {
                   <select
                     value={actualSeverity}
                     onChange={(e) => setActualSeverity(e.target.value as Severity)}
-                    className="w-full px-2.5 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                    className="w-full px-2.5 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 cursor-pointer"
                   >
-                    <option value="HIGH">Cao (Nguy hiểm lớn)</option>
+                    <option value="CRITICAL">Khẩn cấp</option>
+                    <option value="HIGH">Cao</option>
                     <option value="MEDIUM">Trung bình</option>
-                    <option value="LOW">Thấp (Chưa khẩn)</option>
+                    <option value="LOW">Thấp</option>
                   </select>
                 </div>
               </div>
 
+              {/* Phân loại vật cản cụ thể khi là ROAD_OBSTACLE */}
+              {confirmedCategory === 'ROAD_OBSTACLE' && (
+                <div className="p-2.5 rounded-md bg-amber-50/70 border border-amber-200">
+                  <span className="text-[11px] font-semibold text-amber-900 block mb-1.5">
+                    Phân loại vật cản cụ thể ngoài hiện trường:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'TREE', label: '🌲 Cây ngã / cành đổ', solutionIdx: 0, l: 4.5, w: 2.5, d: 40 },
+                      { id: 'LANDSLIDE', label: '🪨 Đất đá sạt trượt', solutionIdx: 1, l: 8.0, w: 3.5, d: 25 },
+                      { id: 'DEBRIS', label: '📦 Phế liệu / Hàng rơi', solutionIdx: 2, l: 3.0, w: 1.8, d: 30 },
+                      { id: 'OIL_SPILL', label: '🛢️ Vệt dầu loang trượt', solutionIdx: 3, l: 15.0, w: 2.0, d: 2 },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setObstacleSubType(item.id as any);
+                          setProposedSolution(SOLUTION_PRESETS.ROAD_OBSTACLE[item.solutionIdx]);
+                          setEstimatedLengthM(item.l);
+                          setEstimatedWidthM(item.w);
+                          setEstimatedDepthCm(item.d);
+                        }}
+                        className={`px-2 py-1.5 rounded text-xs font-medium border text-center transition-colors cursor-pointer truncate ${
+                          obstacleSubType === item.id
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-2xs font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Đo đạc kích thước thực tế */}
               <div className="p-3 bg-slate-50 rounded-md border border-slate-200">
-                <span className="font-semibold text-slate-800 block mb-2">Thông số đo đạc kích thước hiện trường:</span>
+                <span className="font-semibold text-slate-800 block mb-2">{getCategoryDetails().title}</span>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="text-[11px] text-slate-500">Chiều dài (m)</label>
+                    <label className="text-[11px] text-slate-600 font-medium">{getCategoryDetails().lLabel}</label>
                     <input
                       type="number"
                       step="0.1"
                       value={estimatedLengthM}
                       onChange={(e) => setEstimatedLengthM(parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium"
+                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium text-slate-900"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-slate-500">Chiều rộng (m)</label>
+                    <label className="text-[11px] text-slate-600 font-medium">{getCategoryDetails().wLabel}</label>
                     <input
                       type="number"
                       step="0.1"
                       value={estimatedWidthM}
                       onChange={(e) => setEstimatedWidthM(parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium"
+                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium text-slate-900"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-slate-500">Độ sâu (cm)</label>
+                    <label className="text-[11px] text-slate-600 font-medium">{getCategoryDetails().dLabel}</label>
                     <input
                       type="number"
                       step="0.5"
                       value={estimatedDepthCm}
                       onChange={(e) => setEstimatedDepthCm(parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium"
+                      className="w-full px-2 py-1.5 rounded bg-white border border-slate-300 font-medium text-slate-900"
                     />
                   </div>
                 </div>
+
+                {/* Tự động tính toán diện tích & khối lượng vật tư dự toán */}
+                {estimatedLengthM > 0 && estimatedWidthM > 0 && (
+                  <div className="mt-3 p-2.5 bg-blue-50/80 rounded-md border border-blue-200 text-xs">
+                    <div className="flex items-center gap-1.5 font-semibold text-blue-900 mb-1.5">
+                      <Calculator className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Dự toán diện tích, khối lượng & phương án (BoQ Real-time):</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-white p-2 rounded border border-blue-100 shadow-2xs">
+                        <span className="text-[10px] text-slate-500 block truncate">{getCategoryDetails().card1Title}</span>
+                        <span className="text-xs font-bold text-blue-700 font-mono">
+                          {getCategoryDetails().card1Val}
+                        </span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5">{getCategoryDetails().card1Sub}</span>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-blue-100 shadow-2xs">
+                        <span className="text-[10px] text-slate-500 block truncate">{getCategoryDetails().card2Title}</span>
+                        <span className="text-xs font-bold text-indigo-700 font-mono">
+                          {getCategoryDetails().card2Val}
+                        </span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5">{getCategoryDetails().card2Sub}</span>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-blue-100 shadow-2xs">
+                        <span className="text-[10px] text-slate-500 block truncate">{getCategoryDetails().card3Title}</span>
+                        <span className="text-xs font-bold text-emerald-700 font-mono">
+                          {getCategoryDetails().card3Val}
+                        </span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5">{getCategoryDetails().card3Sub}</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-slate-500 italic block mt-1.5 text-center">
+                      {getCategoryDetails().formula}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Đề xuất phương án */}
               <div>
-                <label className="block font-medium mb-1 text-slate-700">Đề xuất phương án xử lý kỹ thuật *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-medium text-slate-700">Đề xuất phương án xử lý kỹ thuật *</label>
+                  <span className={`text-[10px] font-mono ${proposedSolution.trim().length >= 10 ? 'text-emerald-600 font-semibold' : 'text-rose-500'}`}>
+                    {proposedSolution.trim().length}/10 ký tự tối thiểu
+                  </span>
+                </div>
+
+                {/* Gợi ý phương án nhanh 1-Click theo từng loại hư hỏng */}
+                <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                  <span className="text-[10px] font-semibold text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
+                    Gợi ý mẫu:
+                  </span>
+                  {(SOLUTION_PRESETS[confirmedCategory] || SOLUTION_PRESETS.POTHOLE).map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setProposedSolution(preset)}
+                      className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-300 transition-colors truncate max-w-[240px] text-left cursor-pointer"
+                      title={preset}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+
                 <textarea
                   rows={2}
                   value={proposedSolution}
                   required
+                  minLength={10}
                   onChange={(e) => setProposedSolution(e.target.value)}
-                  placeholder="Ví dụ: Cào bóc 4cm, tưới nhựa dính bám 0.5kg/m2, thảm bù BTN C12.5 đầm lèn K98..."
-                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900"
+                  placeholder="Ghi rõ giải pháp kỹ thuật cụ thể..."
+                  className={`w-full px-3 py-2 rounded-md bg-white border font-medium text-slate-900 ${
+                    proposedSolution.trim().length > 0 && proposedSolution.trim().length < 10
+                      ? 'border-rose-400 focus:border-rose-500'
+                      : 'border-slate-300'
+                  }`}
                 />
               </div>
 

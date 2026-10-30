@@ -770,21 +770,79 @@ export const IncidentDossierPage: React.FC = () => {
                       </span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center">
-                      <div className="bg-white p-2.5 rounded-md border border-blue-100 shadow-2xs">
-                        <span className="text-[10px] text-slate-500 block">Diện tích cào bóc (S)</span>
-                        <span className="text-sm font-bold text-blue-700 font-mono">{boq.area} m²</span>
-                        <span className="text-[9px] text-slate-400 block mt-0.5">S = Dài × Rộng</span>
-                      </div>
-                      <div className="bg-white p-2.5 rounded-md border border-indigo-100 shadow-2xs">
-                        <span className="text-[10px] text-slate-500 block">Thể tích đào bù hoàn trả (V)</span>
-                        <span className="text-sm font-bold text-indigo-700 font-mono">{boq.volume} m³</span>
-                        <span className="text-[9px] text-slate-400 block mt-0.5">V = S × (Sâu / 100)</span>
-                      </div>
-                      <div className="bg-white p-2.5 rounded-md border border-emerald-100 shadow-2xs">
-                        <span className="text-[10px] text-slate-500 block">Dự toán Bê tông nhựa nóng (BTN)</span>
-                        <span className="text-sm font-bold text-emerald-700 font-mono">~ {boq.asphaltTons} tấn</span>
-                        <span className="text-[9px] text-slate-400 block mt-0.5">Dung trọng BTN γ ≈ 2.4 tấn/m³</span>
-                      </div>
+                      {incident.category === 'ROAD_OBSTACLE' ? (
+                        <>
+                          <div className="bg-white p-2.5 rounded-md border border-blue-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Lòng đường chiếm dụng (S)</span>
+                            <span className="text-sm font-bold text-blue-700 font-mono">{boq.area} m²</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">S = Dài × Rộng</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-md border border-indigo-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Khối lượng giải tỏa ước tính</span>
+                            <span className="text-sm font-bold text-indigo-700 font-mono">{boq.volume} m³</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">Cưa xẻ & Cẩu dọn</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-md border border-emerald-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Phương tiện cứu hộ</span>
+                            <span className="text-sm font-bold text-emerald-700 font-mono">Cưa máy + Xe cẩu + Xe ben</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">Giải tỏa & Dọn dẹp phế thải</span>
+                          </div>
+                        </>
+                      ) : incident.category === 'ROAD_CRACK' ? (
+                        <>
+                          <div className="bg-white p-2.5 rounded-md border border-blue-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Chiều dài trám nứt (L)</span>
+                            <span className="text-sm font-bold text-blue-700 font-mono">{boq.length} m dài</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">Rãnh nứt cần rót matit</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-md border border-indigo-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Diện tích vùng rạn (S)</span>
+                            <span className="text-sm font-bold text-indigo-700 font-mono">{boq.area} m²</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">S = Dài × Rộng</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-md border border-emerald-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Dự toán Matit Polyurethane</span>
+                            <span className="text-sm font-bold text-emerald-700 font-mono">~ {(boq.length * 0.25).toFixed(1)} kg</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">Định mức chèn khe TCVN</span>
+                          </div>
+                        </>
+                      ) : incident.category === 'ROAD_FLOODING' ? (
+                        <>
+                          <div className="bg-white p-2.5 rounded-md border border-blue-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Diện tích ngập nước (S)</span>
+                            <span className="text-sm font-bold text-blue-700 font-mono">{boq.area} m²</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">S = Dài × Rộng</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-md border border-indigo-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Lượng nước ứ đọng (V)</span>
+                            <span className="text-sm font-bold text-indigo-700 font-mono">~ {boq.volume} m³</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">V = S × Mực nước sâu</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-md border border-emerald-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Biện pháp tiêu úng</span>
+                            <span className="text-sm font-bold text-emerald-700 font-mono">Bơm dã chiến + Khơi cống</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">Tiêu úng khẩn cấp</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="bg-white p-2.5 rounded-md border border-blue-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Diện tích cào bóc (S)</span>
+                            <span className="text-sm font-bold text-blue-700 font-mono">{boq.area} m²</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">S = Dài × Rộng</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-md border border-indigo-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Thể tích đào bù hoàn trả (V)</span>
+                            <span className="text-sm font-bold text-indigo-700 font-mono">{boq.volume} m³</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">V = S × (Sâu / 100)</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-md border border-emerald-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Dự toán Bê tông nhựa nóng (BTN)</span>
+                            <span className="text-sm font-bold text-emerald-700 font-mono">~ {boq.asphaltTons} tấn</span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">Dung trọng BTN γ ≈ 2.4 tấn/m³</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -1753,10 +1811,10 @@ export const IncidentDossierPage: React.FC = () => {
                   onChange={(e) => setInspectionPriority(e.target.value as Priority)}
                   className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
                 >
-                  <option value="LOW">Thấp (Xử lý trong tuần)</option>
-                  <option value="NORMAL">Bình thường (Trong 48 giờ)</option>
-                  <option value="HIGH">Cao (Trong 24 giờ)</option>
-                  <option value="CRITICAL">Khẩn cấp (Đi ngay trong ca trực)</option>
+                  <option value="LOW">Thấp</option>
+                  <option value="NORMAL">Bình thường</option>
+                  <option value="HIGH">Cao</option>
+                  <option value="CRITICAL">Khẩn cấp</option>
                 </select>
               </div>
 
@@ -1854,10 +1912,10 @@ export const IncidentDossierPage: React.FC = () => {
                     onChange={(e) => setConstructionPriority(e.target.value as Priority)}
                     className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
                   >
-                    <option value="LOW">Thấp (Trong 7 ngày)</option>
-                    <option value="NORMAL">Bình thường (Trong 48 giờ)</option>
-                    <option value="HIGH">Ưu tiên cao (Trong 24 giờ)</option>
-                    <option value="CRITICAL">Khẩn cấp (Xử lý ngay trong ca)</option>
+                    <option value="LOW">Thấp</option>
+                    <option value="NORMAL">Bình thường</option>
+                    <option value="HIGH">Cao</option>
+                    <option value="CRITICAL">Khẩn cấp</option>
                   </select>
                 </div>
               </div>

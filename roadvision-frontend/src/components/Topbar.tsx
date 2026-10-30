@@ -41,7 +41,7 @@ export const Topbar: React.FC<TopbarProps> = ({
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, switchRoleWithCredentials } = useAuth();
   const { notifications, unreadCount, isConnected, emergencyBroadcast, triggerEmergencyBroadcast, markAsRead, markAllAsRead } = useNotifications();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
@@ -551,6 +551,75 @@ export const Topbar: React.FC<TopbarProps> = ({
                         <span>Phản ánh của tôi</span>
                       </Link>
                     )}
+
+                    {/* Chuyển nhanh tài khoản mẫu */}
+                    <div className="px-3 py-2 border-t border-slate-100 bg-slate-50/70">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                        Chuyển tài khoản (1-Click)
+                      </span>
+                      <div className="grid grid-cols-2 gap-1 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            switchRoleWithCredentials('admin@roadcare.gov.vn');
+                          }}
+                          className={`px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                            user.role === 'ROLE_ADMIN'
+                              ? 'bg-rose-100 text-rose-800 font-bold border border-rose-200'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'
+                          }`}
+                        >
+                          <span>👑 Admin</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            switchRoleWithCredentials('staff.khu1@roadcare.gov.vn');
+                          }}
+                          className={`px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                            user.email === 'staff.khu1@roadcare.gov.vn'
+                              ? 'bg-sky-100 text-sky-800 font-bold border border-sky-200'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'
+                          }`}
+                        >
+                          <span>🧭 Khảo sát</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            switchRoleWithCredentials('staff.khu4@roadcare.gov.vn');
+                          }}
+                          className={`px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                            user.email === 'staff.khu4@roadcare.gov.vn'
+                              ? 'bg-amber-100 text-amber-800 font-bold border border-amber-200'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'
+                          }`}
+                        >
+                          <span>🔨 Thi công</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            switchRoleWithCredentials('citizen.an@gmail.com');
+                          }}
+                          className={`px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                            user.role === 'ROLE_CITIZEN'
+                              ? 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-200'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'
+                          }`}
+                        >
+                          <span>👤 Người dân</span>
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="border-t border-slate-100 my-1"></div>
                     <button
                       onClick={() => {

@@ -10,7 +10,7 @@ interface AuthContextType {
   logout: () => void;
   refreshUserProfile: () => Promise<void>;
   hasRole: (roles: Role | Role[]) => boolean;
-  switchRoleWithCredentials: (role: Role) => Promise<void>;
+  switchRoleWithCredentials: (roleOrEmail: string, customPassword?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,16 +71,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const switchRoleWithCredentials = async (role: Role) => {
-    let email = 'admin@roadcare.gov.vn';
-    if (role === 'ROLE_STAFF') {
-      email = 'staff.nguyen@roadcare.gov.vn';
-    } else if (role === 'ROLE_CITIZEN') {
-      email = 'citizen.an@gmail.com';
+  const switchRoleWithCredentials = async (roleOrEmail: string, customPassword = '12345678') => {
+    let targetEmail = 'admin@roadcare.gov.vn';
+    if (roleOrEmail === 'ROLE_STAFF' || roleOrEmail === 'INSPECTION') {
+      targetEmail = 'staff.khu1@roadcare.gov.vn';
+    } else if (roleOrEmail === 'CONSTRUCTION') {
+      targetEmail = 'staff.khu4@roadcare.gov.vn';
+    } else if (roleOrEmail === 'ROLE_CITIZEN' || roleOrEmail === 'CITIZEN') {
+      targetEmail = 'citizen.an@gmail.com';
+    } else if (roleOrEmail === 'ROLE_ADMIN' || roleOrEmail === 'ADMIN') {
+      targetEmail = 'admin@roadcare.gov.vn';
+    } else if (roleOrEmail.includes('@')) {
+      targetEmail = roleOrEmail;
     }
 
     try {
-      const res = await authApi.login({ email, password: '12345678' });
+      const res = await authApi.login({ email: targetEmail, password: customPassword });
       login(res.data);
     } catch (err) {
       console.error('Đăng nhập nhanh thất bại:', err);

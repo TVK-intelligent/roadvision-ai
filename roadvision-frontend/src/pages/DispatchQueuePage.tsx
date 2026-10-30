@@ -933,9 +933,9 @@ export const DispatchQueuePage: React.FC = () => {
                       onChange={(e) => setInspectionPriority(e.target.value as Priority)}
                       className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
                     >
-                      <option value="CRITICAL">Khẩn cấp (Tiếp cận trong 30-60 phút)</option>
-                      <option value="HIGH">Cao (Tiếp cận trong 4 giờ)</option>
-                      <option value="NORMAL">Bình thường (Trong vòng 24 giờ)</option>
+                      <option value="CRITICAL">Khẩn cấp</option>
+                      <option value="HIGH">Cao</option>
+                      <option value="NORMAL">Bình thường</option>
                     </select>
                   </div>
 
@@ -1153,9 +1153,9 @@ export const DispatchQueuePage: React.FC = () => {
                         onChange={(e) => setConstructionPriority(e.target.value as Priority)}
                         className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent cursor-pointer"
                       >
-                        <option value="CRITICAL">Khẩn cấp (24h)</option>
-                        <option value="HIGH">Cao (48h)</option>
-                        <option value="NORMAL">Bình thường (72h)</option>
+                        <option value="CRITICAL">Khẩn cấp</option>
+                        <option value="HIGH">Cao</option>
+                        <option value="NORMAL">Bình thường</option>
                       </select>
                     </div>
                   </div>

@@ -200,8 +200,8 @@ public class AiInferenceService {
                     // BƯỚC 3.5: THU GỌN KHUNG + LOẠI BOX RÁC
                     List<ImageTensorUtil.BoundingBox> tightenedBoxes = tightenAndFilterBoundingBoxes(image, mergedBoxes);
 
-                    // BƯỚC 3.6: CHUẨN HÓA ĐỘ TIN CẬY HIỂN THỊ
-                    List<ImageTensorUtil.BoundingBox> calibratedBoxesList = applyDisplayCalibration(tightenedBoxes);
+                    // BƯỚC 3.6: CHUẨN HÓA ĐỘ TIN CẬY HIỂN THỊ (CHỈ CHUẨN HÓA CÁC PHÁT HIỆN ĐẠT NGƯỠNG)
+                    List<ImageTensorUtil.BoundingBox> calibratedBoxesList = applyDisplayCalibration(tightenedBoxes, effectiveThreshold);
 
                     // BƯỚC 3.7: LỌC THEO NGƯỠNG HIỂN THỊ CẤU HÌNH / SLIDER UI
                     List<ImageTensorUtil.BoundingBox> finalBoxes = new ArrayList<>();
@@ -289,15 +289,15 @@ public class AiInferenceService {
 
                     float candidateCollectThresh;
                     if ("ROAD_CRACK".equals(className)) {
-                        candidateCollectThresh = Math.min(0.05f, effectiveThreshold);
+                        candidateCollectThresh = Math.max(0.18f, effectiveThreshold * 0.85f);
                     } else if ("POTHOLE".equals(className)) {
-                        candidateCollectThresh = Math.min(0.08f, effectiveThreshold);
+                        candidateCollectThresh = Math.max(0.12f, effectiveThreshold * 0.70f);
                     } else if ("ROAD_FLOODING".equals(className)) {
-                        candidateCollectThresh = Math.min(0.12f, effectiveThreshold);
+                        candidateCollectThresh = Math.max(0.18f, effectiveThreshold * 0.85f);
                     } else if ("ROAD_OBSTACLE".equals(className)) {
-                        candidateCollectThresh = Math.min(0.05f, effectiveThreshold);
+                        candidateCollectThresh = Math.max(0.18f, effectiveThreshold * 0.85f);
                     } else {
-                        candidateCollectThresh = Math.min(0.10f, effectiveThreshold);
+                        candidateCollectThresh = Math.max(0.18f, effectiveThreshold * 0.85f);
                     }
 
                     if (bestConf >= candidateCollectThresh) {
@@ -369,6 +369,9 @@ public class AiInferenceService {
                                 continue;
                             }
                             if (isRoadsideGuardrailOrCurb(subImg, lx, ly, lw, lh, gx, origWidth)) {
+                                continue;
+                            }
+                            if (isDryAsphalt(subImg, lx, ly, lw, lh)) {
                                 continue;
                             }
                             // Chỉ chuyển đổi thành POTHOLE nếu kích thước nhỏ (hốc trũng / vũng nước nhỏ mặt đường)
@@ -556,21 +559,24 @@ public class AiInferenceService {
         return traced;
     }
 
-    private List<ImageTensorUtil.BoundingBox> applyDisplayCalibration(List<ImageTensorUtil.BoundingBox> boxes) {
+    private List<ImageTensorUtil.BoundingBox> applyDisplayCalibration(
+            List<ImageTensorUtil.BoundingBox> boxes, float effectiveThreshold) {
         if (boxes == null || boxes.isEmpty()) return boxes;
 
         List<ImageTensorUtil.BoundingBox> calibrated = new ArrayList<>(boxes.size());
         for (ImageTensorUtil.BoundingBox b : boxes) {
             float rawConf = b.getConfidence();
             float displayConf = rawConf;
-            if (rawConf >= 0.05f) {
-                float normalized = (rawConf - 0.05f) / 0.95f;
-                displayConf = 0.58f + 0.38f * (float) Math.pow(normalized, 0.55);
+            if (rawConf >= effectiveThreshold) {
+                float normalized = (rawConf - effectiveThreshold) / Math.max(0.01f, 1.0f - effectiveThreshold);
+                displayConf = 0.65f + 0.30f * (float) Math.pow(normalized, 0.55);
                 displayConf = Math.min(0.96f, Math.max(rawConf, displayConf));
-            }
-            if ("ROAD_OBSTACLE".equals(b.getClassName()) && (b.getWidth() >= 60 || b.getHeight() >= 40)) {
-                // Vật cản lớn trên đường (cây đổ, rào chắn chắn ngang lòng đường)
-                displayConf = Math.max(0.75f, displayConf);
+                if ("ROAD_OBSTACLE".equals(b.getClassName()) && (b.getWidth() >= 60 || b.getHeight() >= 40)) {
+                    // Vật cản lớn trên đường (cây đổ, rào chắn chắn ngang lòng đường)
+                    displayConf = Math.max(0.75f, displayConf);
+                }
+            } else {
+                displayConf = rawConf;
             }
             log.debug("CALIB {} raw={} -> display={}", b.getClassName(),
                     String.format("%.3f", rawConf), String.format("%.3f", displayConf));
@@ -927,12 +933,6 @@ public class AiInferenceService {
     private boolean isStandingTreeCanopy(BufferedImage img, int x, int y, int w, int h, int gy, int origH) {
         if (img == null || w <= 0 || h <= 0) return false;
 
-        // Nếu phần đáy của box kéo dài xuống mặt đường (quá 50% chiều cao ảnh)
-        // thì là CÂY ĐỔ / CÀNH CÂY RƠI TRÊN ĐƯỜNG, không phải tán cây đứng trên không
-        if ((gy + h) >= (int) (origH * 0.50f)) {
-            return false;
-        }
-
         int imgW = img.getWidth();
         int imgH = img.getHeight();
         int rx = Math.max(0, Math.min(x, imgW - 1));
@@ -946,6 +946,7 @@ public class AiInferenceService {
         int totalSampled = 0;
         int foliagePixels = 0;
         int skyPixels = 0;
+        int woodPixels = 0;
 
         for (int py = ry; py < ry + rh; py += step) {
             for (int px = rx; px < rx + rw; px += step) {
@@ -957,18 +958,17 @@ public class AiInferenceService {
                 totalSampled++;
 
                 // Lá cây phải có sắc thái xanh lục đặc trưng
-                boolean isFoliage = (g > r + 12 && g > b + 12 && g > 45)
-                        || (g > 65 && g > (int)(r * 1.15) && g > (int)(b * 1.15));
-                // Bầu trời phải có màu xanh lam chiếm ưu thế (hoặc sáng chói ở đỉnh ảnh gy < 15%)
+                boolean isFoliage = (g > r + 10 && g > b + 10 && g > 40)
+                        || (g > 60 && g > (int)(r * 1.15) && g > (int)(b * 1.15));
+                // Bầu trời
                 boolean isSkyBackground = (b > r + 20 && b > g + 10 && b > 110)
                         || (gy < origH * 0.15f && r > 215 && g > 215 && b > 215);
+                // Thân gỗ / cành cây gãy màu nâu đậm
+                boolean isWood = (r > 60 && r < 165 && g > 40 && g < 130 && b < 100 && r > g && g > b);
 
-                if (isFoliage) {
-                    foliagePixels++;
-                }
-                if (isSkyBackground) {
-                    skyPixels++;
-                }
+                if (isFoliage) foliagePixels++;
+                if (isSkyBackground) skyPixels++;
+                if (isWood) woodPixels++;
             }
         }
 
@@ -976,8 +976,26 @@ public class AiInferenceService {
 
         float foliageRatio = (float) foliagePixels / totalSampled;
         float skyRatio = (float) skyPixels / totalSampled;
-        // Bắt buộc phải có tỷ lệ lá cây xanh thực tế (foliageRatio) và nằm ở nửa trên ảnh
-        return ((foliageRatio >= 0.35f || (foliageRatio >= 0.18f && (foliageRatio + skyRatio) >= 0.60f)) && gy < origH * 0.50f);
+        float woodRatio = (float) woodPixels / totalSampled;
+
+        // Nếu có nhiều cành cây/thân gỗ (woodRatio >= 0.08) và trải rộng ngang (rw >= imgW * 0.35)
+        // thì đây là CÂY ĐỔ / VẬT CẢN CHẮN ĐƯỜNG, không phải tán cây đứng
+        if (woodRatio >= 0.08f && rw >= (int) (imgW * 0.35f)) {
+            return false;
+        }
+
+        // Tán cây đứng trên không (nửa trên ảnh)
+        if ((foliageRatio >= 0.30f || (foliageRatio >= 0.15f && (foliageRatio + skyRatio) >= 0.55f)) && gy < origH * 0.55f) {
+            return true;
+        }
+
+        // Cây xanh đứng thẳng ở mép đường, vỉa hè, sườn đèo (không cắt ngang trung tâm làn đường)
+        boolean isSidePosition = (rx + rw < (int) (imgW * 0.35f)) || (rx > (int) (imgW * 0.65f));
+        if (foliageRatio >= 0.22f && isSidePosition && rw < (int) (imgW * 0.40f)) {
+            return true;
+        }
+
+        return false;
     }
 
     private boolean isRoadsideGuardrailOrCurb(BufferedImage img, int x, int y, int w, int h, int gx, int origW) {
@@ -1105,19 +1123,19 @@ public class AiInferenceService {
                 int luma = (int) (0.299 * r + 0.587 * g + 0.114 * b);
                 totalSampled++;
 
-                boolean isWaterReflection = (luma > 225 && Math.abs(r - b) < 25);
+                int diffRG = Math.abs(r - g);
+                int diffGB = Math.abs(g - b);
+                int diffRB = Math.abs(r - b);
+                boolean isNeutralGrayOrWhite = (diffRG <= 18 && diffGB <= 18 && diffRB <= 18);
+
                 boolean isSkyTintWater = (b > r + 15 && b > g + 8 && luma > 105);
                 boolean isMuddyFlood = (r > b + 28 && g > b + 12 && luma >= 60 && luma <= 155);
+                boolean isWaterReflection = (!isNeutralGrayOrWhite && luma > 225 && Math.abs(r - b) < 25);
 
-                if (isWaterReflection || isSkyTintWater || isMuddyFlood) {
+                if (isSkyTintWater || isMuddyFlood || isWaterReflection) {
                     waterLikePixels++;
-                } else {
-                    int diffRG = Math.abs(r - g);
-                    int diffGB = Math.abs(g - b);
-                    int diffRB = Math.abs(r - b);
-                    if (diffRG <= 16 && diffGB <= 16 && diffRB <= 16 && luma >= 50 && luma <= 215) {
-                        dryAsphaltPixels++;
-                    }
+                } else if (isNeutralGrayOrWhite && luma >= 15 && luma <= 250) {
+                    dryAsphaltPixels++;
                 }
             }
         }
@@ -1344,13 +1362,28 @@ public class AiInferenceService {
                                 continue;
                             }
 
-                            // Nếu vật cản nằm trùng với vùng phát hiện ngập nước (cây đổ trên mặt đường ướt mưa):
+                            // Nếu vật cản nằm trùng với vùng phát hiện ngập nước:
                             if ("ROAD_FLOODING".equals(pot.getClassName())) {
-                                // Nếu thân cây đổ/vật cản bao trùm hoặc trùng lặp phần lớn với box ngập nước (interArea / minArea >= 0.50):
-                                // Đây là mặt đường ướt mưa dưới gốc cây đổ bị model nhìn nhầm thành ngập úng -> ƯU TIÊN VẬT CẢN (ROAD_OBSTACLE)
+                                float floodWidthRatio = (float) pot.getWidth() / Math.max(1, origW);
+                                float floodAreaRatio = (float) (pot.getWidth() * pot.getHeight()) / Math.max(1, (origW * origH));
+
+                                // Nếu vùng ngập nước trải rộng khắp lòng đường (ngập úng đô thị / đường ngập sâu):
+                                if (floodWidthRatio >= 0.60f || floodAreaRatio >= 0.25f) {
+                                    // Ưu tiên NGẬP ÚNG (ROAD_FLOODING) là sự cố giao thông chính!
+                                    // Loại bỏ box vật cản ảo (phương tiện, người lội nước, cọc biển báo ngập, bóng tán cây)
+                                    if (aIsObs) {
+                                        suppressed[i] = true;
+                                        break;
+                                    } else {
+                                        suppressed[j] = true;
+                                        continue;
+                                    }
+                                }
+
+                                // Nếu là thân cây đổ/vật cản cục bộ che khuất một vũng nước nhỏ:
                                 if (minArea > 0 && (interArea / minArea >= 0.50f || ioU >= 0.40f)) {
                                     if (aIsObs) {
-                                        suppressed[j] = true; // Loại bỏ box ngập nước ảo
+                                        suppressed[j] = true;
                                     } else {
                                         suppressed[i] = true;
                                         break;
@@ -1358,7 +1391,6 @@ public class AiInferenceService {
                                     continue;
                                 }
 
-                                // Nếu vật cản ở vị trí riêng biệt trên đường ngập thật thì giữ cả hai
                                 if (obs.getWidth() >= origW * 0.30f || obs.getHeight() >= origH * 0.20f) {
                                     continue;
                                 }
@@ -1616,8 +1648,6 @@ public class AiInferenceService {
                 ImageTensorUtil.BoundingBox tightened = tightenSingleObstacleBox(img, b);
                 if (tightened != null) {
                     result.add(tightened);
-                } else {
-                    result.add(b); // Giữ nguyên box gốc, không loại bỏ vật cản
                 }
             } else {
                 result.add(b);
@@ -1728,6 +1758,53 @@ public class AiInferenceService {
 
         if (isRoadsideGuardrailOrCurb(img, bx, by, bw, bh, bx, img.getWidth())) {
             return null;
+        }
+
+        if (isStandingTreeCanopy(img, bx, by, bw, bh, by, img.getHeight())) {
+            return null;
+        }
+
+        // Loại bỏ vật thể lơ lửng trên cao / đường chân trời / mái nhà / ngọn cây xa (không chạm mặt đường)
+        if ((by + bh) < (int) (img.getHeight() * 0.48f) && bw < (int) (img.getWidth() * 0.35f)) {
+            return null;
+        }
+
+        // Lọc đối tượng nằm hoàn toàn ở vỉa hè xa / lề cỏ ngoại vi ngoài hành lang làn xe chạy
+        boolean isExtremeSidewalk = (bx > img.getWidth() * 0.78f || (bx + bw) < img.getWidth() * 0.22f);
+        if (isExtremeSidewalk && bw < (int) (img.getWidth() * 0.25f)) {
+            return null;
+        }
+
+        // Lọc vật cản bên lề / vỉa hè ngoại vi ngoài làn xe chạy
+        boolean isRoadside = (bx > img.getWidth() * 0.65f || (bx + bw) < img.getWidth() * 0.35f);
+        if (isRoadside && bw < (int) (img.getWidth() * 0.30f)) {
+            // Chỉ giữ lại nếu là cọc tiêu phản quang / chóp nón đặt trên mặt đường (nửa dưới ảnh)
+            int conePixelCount = 0;
+            int totalChecked = 0;
+            if ((by + bh) > (int) (img.getHeight() * 0.50f)) {
+                int cStep = Math.max(1, Math.min(bw, bh) / 15);
+                for (int cy = 0; cy < bh; cy += cStep) {
+                    for (int cx = 0; cx < bw; cx += cStep) {
+                        totalChecked++;
+                        int crgb = img.getRGB(bx + cx, by + cy);
+                        int cr = (crgb >> 16) & 0xFF;
+                        int cg = (crgb >> 8) & 0xFF;
+                        int cb = crgb & 0xFF;
+                        // Màu cam huỳnh quang cọc tiêu / chóp nón giao thông chuẩn
+                        if (cr > 195 && cg >= 60 && cg <= 165 && cb <= 85 && (cr - cg) >= 35 && (cr - cb) >= 80) {
+                            conePixelCount++;
+                        }
+                    }
+                }
+            }
+            boolean hasGroundCone = (conePixelCount >= 8 && (float) conePixelCount / Math.max(1, totalChecked) >= 0.05f);
+            if (!hasGroundCone) {
+                return null; // Cây cối / nhà cửa / cột điện mép lề đường ngoài làn xe chạy
+            }
+        }
+
+        if (isDryAsphalt(img, bx, by, bw, bh)) {
+            return null; // Mặt đường nhựa phẳng không có vật cản
         }
 
         int minX = bw, maxX = 0, minY = bh, maxY = 0;
