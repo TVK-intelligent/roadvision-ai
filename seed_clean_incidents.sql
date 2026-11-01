@@ -40,8 +40,8 @@ VALUES (2, '#RC-2022', 37,
   'QL1A & Cao tốc HN - Hải Phòng', 'Khu QLĐB I (Miền Bắc)',
   1, 0, NOW() - INTERVAL 3 HOUR, NOW() - INTERVAL 2 HOUR);
 
-INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, inference_ms)
-VALUES (2, 'ROAD_CRACK', 0.882, 9, 34, 386, 200, 42);
+INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, raw_predictions_json, inference_ms)
+VALUES (2, 'ROAD_CRACK', 0.890, 95, 32, 140, 188, '[{\"className\":\"ROAD_CRACK\",\"confidence\":0.890,\"x\":95,\"y\":32,\"width\":140,\"height\":188}]', 42);
 
 -- #3: INSPECTION_ASSIGNED - Admin đã giao Tổ Khảo sát tiếp cận hầm chui ngập nước
 INSERT INTO incidents (id, ticket_code, citizen_id, title, description, image_url, category, status, severity, inspection_team_id, latitude, longitude, address, route_corridor, zone_name, upvote_count, rework_count, created_at, updated_at)
@@ -72,8 +72,8 @@ VALUES (4, '#RC-4044', 37,
   'QL1A & Đèo Hải Vân', 'Khu QLĐB II & III (Miền Trung)',
   8, 0, NOW() - INTERVAL 8 HOUR, NOW() - INTERVAL 1 HOUR);
 
-INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, inference_ms)
-VALUES (4, 'POTHOLE', 0.912, 120, 190, 680, 450, 48);
+INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, raw_predictions_json, inference_ms)
+VALUES (4, 'POTHOLE', 0.912, 230, 430, 460, 320, '[{\"className\":\"POTHOLE\",\"confidence\":0.912,\"x\":230,\"y\":430,\"width\":460,\"height\":320},{\"className\":\"POTHOLE\",\"confidence\":0.850,\"x\":690,\"y\":530,\"width\":270,\"height\":230}]', 48);
 
 -- #5: INSPECTED - Đã lập biên bản khảo sát hiện trường hằn lún bánh xe (Rutting)
 INSERT INTO incidents (id, ticket_code, citizen_id, title, description, image_url, category, status, severity, inspection_team_id, latitude, longitude, address, route_corridor, zone_name, upvote_count, rework_count, created_at, updated_at)
@@ -88,8 +88,8 @@ VALUES (5, '#RC-5055', 37,
   'QL14 Hồ Chí Minh & QL19', 'Khu QLĐB III (Tây Nguyên)',
   4, 0, NOW() - INTERVAL 14 HOUR, NOW() - INTERVAL 3 HOUR);
 
-INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, inference_ms)
-VALUES (5, 'POTHOLE', 0.895, 110, 210, 640, 420, 45);
+INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, raw_predictions_json, inference_ms)
+VALUES (5, 'POTHOLE', 0.895, 130, 250, 440, 470, '[{\"className\":\"POTHOLE\",\"confidence\":0.895,\"x\":130,\"y\":250,\"width\":440,\"height\":470},{\"className\":\"POTHOLE\",\"confidence\":0.865,\"x\":720,\"y\":330,\"width\":400,\"height\":430}]', 52);
 
 INSERT INTO incident_inspections (incident_id, inspection_team_id, inspector_id, actual_latitude, actual_longitude, confirmed_category, actual_severity, estimated_size, traffic_impact, proposed_solution, notes, inspection_status, gps_accuracy, inspected_at, created_at, updated_at)
 VALUES (5, 9, 23, 15.02342000, 107.72125000, 'POTHOLE', 'HIGH', '15.0m x 0.8m x 7.0cm (S = 12.00 m², V = 0.84 m³ ~ 2.02 tấn BTN)', 'Chiếm 1/2 làn xe tải nặng', 'Cào bóc sâu 7cm, tưới nhựa dính bám 0.5kg/m2, thảm bù BTNC 12.5 đầm lèn K98', 'Cần bố trí biển báo phân luồng từ xa 150m vì nằm ngay đoạn dốc cua', 'SUBMITTED', 2.8, NOW() - INTERVAL 3 HOUR, NOW() - INTERVAL 3 HOUR, NOW() - INTERVAL 3 HOUR);
@@ -110,8 +110,8 @@ VALUES (6, '#RC-6066', 37,
   'QL14 Hồ Chí Minh & QL19', 'Khu QLĐB III (Tây Nguyên)',
   2, 0, NOW() - INTERVAL 18 HOUR, NOW() - INTERVAL 5 HOUR);
 
-INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, inference_ms)
-VALUES (6, 'ROAD_CRACK', 0.870, 150, 200, 600, 410, 41);
+INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, raw_predictions_json, inference_ms)
+VALUES (6, 'ROAD_CRACK', 0.908, 93, 51, 43, 115, '[{\"className\":\"ROAD_CRACK\",\"confidence\":0.882,\"x\":93,\"y\":51,\"width\":43,\"height\":115},{\"className\":\"ROAD_CRACK\",\"confidence\":0.908,\"x\":207,\"y\":41,\"width\":39,\"height\":23}]', 45);
 
 INSERT INTO assignments (incident_id, assigned_by_admin_id, assigned_to_staff_id, verified_category, priority, notes, assigned_at)
 VALUES (6, 22, 26, 'ROAD_CRACK', 'HIGH', 'Tập kết máy nén khí và hoàn thành thi công trước 17h hôm sau.', NOW() - INTERVAL 5 HOUR);
@@ -151,8 +151,8 @@ VALUES (8, '#RC-8088', 37,
   'Cao tốc TP.HCM - Long Thành & QL51', 'Khu QLĐB IV (Phía Nam)',
   9, 0, NOW() - INTERVAL 36 HOUR, NOW() - INTERVAL 1 HOUR);
 
-INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, inference_ms)
-VALUES (8, 'POTHOLE', 0.920, 130, 200, 630, 420, 44);
+INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, raw_predictions_json, inference_ms)
+VALUES (8, 'POTHOLE', 0.920, 230, 430, 460, 320, '[{\"className\":\"POTHOLE\",\"confidence\":0.920,\"x\":230,\"y\":430,\"width\":460,\"height\":320},{\"className\":\"POTHOLE\",\"confidence\":0.860,\"x\":690,\"y\":530,\"width\":270,\"height\":230}]', 48);
 
 INSERT INTO assignments (incident_id, assigned_by_admin_id, assigned_to_staff_id, verified_category, priority, notes, assigned_at)
 VALUES (8, 22, 26, 'POTHOLE', 'HIGH', 'Sửa chữa dứt điểm khe chuyển tiếp.', NOW() - INTERVAL 24 HOUR);
@@ -179,8 +179,8 @@ VALUES (9, '#RC-9099', 37,
   'Cao tốc TP.HCM - Long Thành & QL51', 'Khu QLĐB IV (Phía Nam)',
   3, NOW() - INTERVAL 48 HOUR, NOW() - INTERVAL 2 HOUR);
 
-INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, inference_ms)
-VALUES (9, 'ROAD_CRACK', 0.890, 140, 220, 610, 400, 43);
+INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, raw_predictions_json, inference_ms)
+VALUES (9, 'ROAD_CRACK', 0.890, 95, 32, 140, 188, '[{\"className\":\"ROAD_CRACK\",\"confidence\":0.890,\"x\":95,\"y\":32,\"width\":140,\"height\":188}]', 42);
 
 INSERT INTO assignments (incident_id, assigned_by_admin_id, assigned_to_staff_id, verified_category, priority, notes, assigned_at)
 VALUES (9, 22, 26, 'ROAD_CRACK', 'HIGH', 'Yêu cầu lu lèn lại bề mặt đảm bảo độ phẳng.', NOW() - INTERVAL 30 HOUR);
@@ -200,8 +200,8 @@ VALUES (10, '#RC-1010', 37,
   NOW() - INTERVAL 8 HOUR, NOW() - INTERVAL 2 HOUR,
   NOW() - INTERVAL 72 HOUR, NOW() - INTERVAL 2 HOUR);
 
-INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, inference_ms)
-VALUES (10, 'ROAD_OBSTACLE', 0.980, 80, 150, 750, 520, 55);
+INSERT INTO ai_detections (incident_id, class_name, confidence, bbox_x, bbox_y, bbox_width, bbox_height, raw_predictions_json, inference_ms)
+VALUES (10, 'ROAD_OBSTACLE', 0.980, 90, 260, 620, 180, '[{\"className\":\"ROAD_OBSTACLE\",\"confidence\":0.980,\"x\":90,\"y\":260,\"width\":620,\"height\":180},{\"className\":\"ROAD_OBSTACLE\",\"confidence\":0.935,\"x\":640,\"y\":290,\"width\":330,\"height\":150}]', 40);
 
 INSERT INTO resolutions (incident_id, staff_id, proof_image_url, notes, resolved_at, ai_verification_confidence, ai_verification_status)
 VALUES (10, 24,

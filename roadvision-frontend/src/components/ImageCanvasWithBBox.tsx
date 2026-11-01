@@ -113,7 +113,7 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
                         : box.className === 'ROAD_FLOODING'
                         ? 'Ngập úng'
                         : box.className === 'ROAD_OBSTACLE'
-                        ? 'Vật cản'
+                        ? (aiDetection?.obstacleDetail ? `Vật cản: ${aiDetection.obstacleDetail.split('/')[0].trim()}` : 'Vật cản')
                         : box.className}
                     </span>
                     <span className="opacity-90">
@@ -149,7 +149,7 @@ export const ImageCanvasWithBBox: React.FC<ImageCanvasProps> = ({
                     : aiDetection?.className === 'ROAD_FLOODING'
                     ? 'Ngập úng'
                     : aiDetection?.className === 'ROAD_OBSTACLE'
-                    ? 'Vật cản'
+                    ? (aiDetection?.obstacleDetail ? `Vật cản: ${aiDetection.obstacleDetail.split('/')[0].trim()}` : 'Vật cản')
                     : aiDetection?.className}
                 </span>
                 <span className="opacity-90">

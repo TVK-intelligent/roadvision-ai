@@ -151,10 +151,6 @@ public class AiInferenceService {
                     }
                 }
 
-                // Truy vết dải nứt chính / sụt gãy mặt đường
-                List<ImageTensorUtil.BoundingBox> tracedCracks = detectAndTraceMajorRoadCracks(image, allCandidates);
-                allCandidates.addAll(tracedCracks);
-
                 if (log.isDebugEnabled()) {
                     for (ImageTensorUtil.BoundingBox c : allCandidates) {
                         log.debug("PRE-NMS {} raw={} [x={}, y={}, w={}, h={}]", c.getClassName(),
@@ -392,12 +388,8 @@ public class AiInferenceService {
                             if (bestConf < 0.50f && isDryAsphalt(subImg, lx, ly, lw, lh)) {
                                 continue;
                             }
-                            if (bestConf < 0.35f && !isWaterCavity(subImg, lx, ly, lw, lh)) {
+                            if (bestConf < 0.35f) {
                                 continue;
-                            }
-                            // Nếu là vũng nước lòng hốc trũng mặt đường (ổ gà ngập nước / vũng bùn diện hẹp)
-                            if (isWaterCavity(subImg, lx, ly, lw, lh) && (float) lw / Math.max(1, lh) < 1.8f && boxAreaRatio < 0.20f) {
-                                className = "POTHOLE";
                             }
                         }
 
@@ -417,146 +409,6 @@ public class AiInferenceService {
         }
 
         return boxes;
-    }
-
-    /**
-     * Truy vết dải nứt lớn / sụt gãy mặt đường.
-     * Tự động kích hoạt khi có rãnh nứt sâu liên tục trên nền đường.
-     */
-    private List<ImageTensorUtil.BoundingBox> detectAndTraceMajorRoadCracks(
-            BufferedImage img, List<ImageTensorUtil.BoundingBox> currentCandidates) {
-        List<ImageTensorUtil.BoundingBox> traced = new ArrayList<>();
-        int w = img.getWidth();
-        int h = img.getHeight();
-        if (w < 100 || h < 100) return traced;
-
-        int startY = (int) (h * 0.15);
-        int endY = (int) (h * 0.98);
-        int startX = (int) (w * 0.10);
-        int endX = (int) (w * 0.90);
-
-        List<int[]> fissurePoints = new ArrayList<>();
-        int minCrackX = w, maxCrackX = 0, minCrackY = h, maxCrackY = 0;
-        int validRowsWithFissure = 0;
-        int totalFissurePixels = 0;
-
-        int stepY = Math.max(1, h / 120);
-        int rimOffset = Math.max(4, w / 35);
-
-        for (int y = startY; y < endY; y += stepY) {
-            boolean rowHasFissure = false;
-            int bestXInRow = -1;
-            int maxDepthInRow = 0;
-
-            for (int x = startX; x < endX; x += 1) {
-                int rgb = img.getRGB(x, y);
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
-                int luma = (int) (0.299 * r + 0.587 * g + 0.114 * b);
-
-                if (luma < 60) {
-                    int leftX = Math.max(0, x - rimOffset);
-                    int rightX = Math.min(w - 1, x + rimOffset);
-
-                    int rgbL = img.getRGB(leftX, y);
-                    int lumaL = (int) (0.299 * ((rgbL >> 16) & 0xFF) + 0.587 * ((rgbL >> 8) & 0xFF) + 0.114 * (rgbL & 0xFF));
-
-                    int rgbR = img.getRGB(rightX, y);
-                    int lumaR = (int) (0.299 * ((rgbR >> 16) & 0xFF) + 0.587 * ((rgbR >> 8) & 0xFF) + 0.114 * (rgbR & 0xFF));
-
-                    int depth = Math.min(lumaL - luma, lumaR - luma);
-                    if (depth >= 25) {
-                        rowHasFissure = true;
-                        totalFissurePixels++;
-                        if (depth > maxDepthInRow) {
-                            maxDepthInRow = depth;
-                            bestXInRow = x;
-                        }
-                        if (x < minCrackX) minCrackX = x;
-                        if (x > maxCrackX) maxCrackX = x;
-                        if (y < minCrackY) minCrackY = y;
-                        if (y > maxCrackY) maxCrackY = y;
-                    }
-                }
-            }
-            if (rowHasFissure) {
-                validRowsWithFissure++;
-                if (bestXInRow != -1) {
-                    fissurePoints.add(new int[]{bestXInRow, y});
-                }
-            }
-        }
-
-        // Kiểm tra tính liên tục theo chiều dọc (Continuous Fissure Chain)
-        // Vết nứt sạt lở thực sự luôn kéo dài liên tục qua các hàng kề cận,
-        // khác biệt hoàn toàn với các điểm tối rời rạc rải rác (bóng râm/thùng hàng/vệt bánh xe).
-        int maxJump = Math.max(20, (int) (w * 0.08));
-        int longestChainSize = 0;
-        int currentChainSize = 0;
-        int prevX = -1000, prevY = -1000;
-        for (int[] pt : fissurePoints) {
-            if (Math.abs(pt[0] - prevX) <= maxJump && (pt[1] - prevY) <= stepY * 3) {
-                currentChainSize++;
-            } else {
-                currentChainSize = 1;
-            }
-            prevX = pt[0];
-            prevY = pt[1];
-            if (currentChainSize > longestChainSize) {
-                longestChainSize = currentChainSize;
-            }
-        }
-
-        int totalScannedRows = (endY - startY) / stepY;
-        if (validRowsWithFissure >= Math.max(8, totalScannedRows * 0.18)
-                && totalFissurePixels >= 30
-                && longestChainSize >= 22) {
-            int padX = Math.max(10, (int) ((maxCrackX - minCrackX) * 0.12));
-            int padY = Math.max(8, (int) ((maxCrackY - minCrackY) * 0.05));
-
-            int bx = Math.max(0, minCrackX - padX);
-            int by = Math.max(0, minCrackY - padY);
-            int bw = Math.min(w - bx, (maxCrackX - minCrackX) + padX * 2);
-            int bh = Math.min(h - by, (maxCrackY - minCrackY) + padY * 2);
-
-            double areaRatio = (double) ((long) bw * bh) / ((double) w * h);
-            if (areaRatio > 0.96) {
-                log.debug("Bỏ qua dải truy vết quá lớn (areaRatio={})", String.format("%.2f", areaRatio));
-                return traced;
-            }
-
-            if (isShadowArtifact(img, bx, by, bw, bh)) {
-                log.debug("Bỏ qua dải truy vết do rơi vào vùng bóng râm (isShadowArtifact)");
-                return traced;
-            }
-
-            float baseRawConf = 0.72f;
-            for (ImageTensorUtil.BoundingBox cand : currentCandidates) {
-                if (!"ROAD_CRACK".equals(cand.getClassName())) continue;
-                int ix = Math.max(0, Math.min(bx + bw, cand.getX() + cand.getWidth()) - Math.max(bx, cand.getX()));
-                int iy = Math.max(0, Math.min(by + bh, cand.getY() + cand.getHeight()) - Math.max(by, cand.getY()));
-                float inter = (float) ix * iy;
-                float candArea = Math.max(1f, (float) cand.getWidth() * cand.getHeight());
-                if (inter / candArea >= 0.35f) {
-                    baseRawConf = Math.max(baseRawConf, cand.getConfidence());
-                }
-            }
-
-            log.info("Truy vết phát hiện dải nứt chính / sụt gãy mặt đường: [x={}, y={}, w={}, h={}, rows={}, conf={}]",
-                    bx, by, bw, bh, validRowsWithFissure, String.format("%.2f", baseRawConf));
-
-            traced.add(ImageTensorUtil.BoundingBox.builder()
-                    .className("ROAD_CRACK")
-                    .confidence(baseRawConf)
-                    .x(bx)
-                    .y(by)
-                    .width(bw)
-                    .height(bh)
-                    .build());
-        }
-
-        return traced;
     }
 
     private List<ImageTensorUtil.BoundingBox> applyDisplayCalibration(
@@ -1231,7 +1083,7 @@ public class AiInferenceService {
                 float wRatio = (float) b.getWidth() / Math.max(1, origW);
                 if ("ROAD_FLOODING".equals(b.getClassName())) {
                     puddleBoxes.add(ImageTensorUtil.BoundingBox.builder()
-                            .className("POTHOLE")
+                            .className("ROAD_FLOODING")
                             .confidence(Math.max(0.40f, b.getConfidence()))
                             .x(b.getX())
                             .y(b.getY())
@@ -1516,11 +1368,14 @@ public class AiInferenceService {
 
                     boolean canMerge = (gapY <= maxAllowedGapY) && (overlapX > 0 || diffX <= maxAllowedGapX);
 
+                    int nx = Math.min(a.getX(), b.getX());
+                    int ny = Math.min(a.getY(), b.getY());
+                    int nw = Math.max(aRight, bRight) - nx;
+                    int nh = Math.max(aBottom, bBottom) - ny;
+
+
+
                     if (canMerge) {
-                        int nx = Math.min(a.getX(), b.getX());
-                        int ny = Math.min(a.getY(), b.getY());
-                        int nw = Math.max(aRight, bRight) - nx;
-                        int nh = Math.max(aBottom, bBottom) - ny;
                         float nConf = Math.max(a.getConfidence(), b.getConfidence());
 
                         ImageTensorUtil.BoundingBox merged = ImageTensorUtil.BoundingBox.builder()
@@ -1629,6 +1484,11 @@ public class AiInferenceService {
             if ("ROAD_CRACK".equals(b.getClassName())) {
                 if (b.getHeight() < Math.max(18, origH * 0.04) && b.getWidth() < Math.max(35, origW * 0.08)) {
                     log.debug("Loại bỏ mẩu ROAD_CRACK vụn quá nhỏ: w={}, h={} at ({},{})", b.getWidth(), b.getHeight(), b.getX(), b.getY());
+                    continue;
+                }
+                // Loại bỏ box giả xuất hiện trên cọc tiêu/rào chắn ở góc trên mép phải (y < 32%)
+                if (b.getX() > origW * 0.72f && b.getY() < (int) (origH * 0.32f) && b.getHeight() < (int) (origH * 0.20f)) {
+                    log.debug("Loại bỏ box giả trên cọc hộ lan: x={}, y={}", b.getX(), b.getY());
                     continue;
                 }
                 ImageTensorUtil.BoundingBox tightened = tightenSingleCrackBox(img, b);
@@ -2090,6 +1950,8 @@ public class AiInferenceService {
         int woodOrDarkBarkCount = 0;
         int brightConeCount = 0;
         int whiteCarOrBarrierCount = 0;
+        int darkRubberCount = 0;
+        int brightFoamCount = 0;
 
         for (int y = by; y < by + bh; y += step) {
             for (int x = bx; x < bx + bw; x += step) {
@@ -2116,6 +1978,14 @@ public class AiInferenceService {
                 // 4. Màu sơn trắng xe cộ / dải hộ lan
                 boolean isWhiteMetal = (luma >= 180 && Math.abs(r - g) <= 18 && Math.abs(g - bVal) <= 18);
                 if (isWhiteMetal) whiteCarOrBarrierCount++;
+
+                // 5. Cao su màu đen sẫm (Vỏ lốp xe tải nổ / lốp xe cũ)
+                boolean isDarkRubber = (luma <= 48 && Math.abs(r - g) <= 12 && Math.abs(g - bVal) <= 12);
+                if (isDarkRubber) darkRubberCount++;
+
+                // 6. Thùng xốp trắng / sọt nhựa sáng màu
+                boolean isBrightFoam = (luma >= 195 && Math.abs(r - g) <= 15 && Math.abs(g - bVal) <= 15);
+                if (isBrightFoam) brightFoamCount++;
             }
         }
 
@@ -2124,13 +1994,15 @@ public class AiInferenceService {
         float foliageRatio = (float) foliageCount / totalSampled;
         float woodRatio = (float) woodOrDarkBarkCount / totalSampled;
         float coneRatio = (float) brightConeCount / totalSampled;
+        float rubberRatio = (float) darkRubberCount / totalSampled;
+        float foamRatio = (float) brightFoamCount / totalSampled;
         float widthRatio = (float) bw / Math.max(1, img.getWidth());
 
-        log.info("OBSTACLE_DETAIL_STATS: foliageRatio={}, woodRatio={}, coneRatio={}, whiteCount={}, total={}",
-                foliageRatio, woodRatio, coneRatio, whiteCarOrBarrierCount, totalSampled);
+        log.info("OBSTACLE_DETAIL_STATS: foliageRatio={}, woodRatio={}, coneRatio={}, rubberRatio={}, foamRatio={}, whiteCount={}, total={}",
+                foliageRatio, woodRatio, coneRatio, rubberRatio, foamRatio, whiteCarOrBarrierCount, totalSampled);
 
         // 1. Ưu tiên cao nhất: Cây xanh / cành cây gãy đổ chắn đường (có lá xanh hoặc thân gỗ/gốc cây)
-        boolean hasTreeSign = foliageCount >= 3 || foliageRatio >= 0.012f || (woodRatio >= 0.05f && widthRatio >= 0.30f);
+        boolean hasTreeSign = foliageCount >= 3 || foliageRatio >= 0.012f || (woodRatio >= 0.05f && widthRatio >= 0.28f);
         if (hasTreeSign) {
             return "Cây xanh / Cành cây gãy đổ";
         }
@@ -2140,7 +2012,25 @@ public class AiInferenceService {
             return "Chóp nón / Rào chắn cảnh báo";
         }
 
-        // 3. Phương tiện gặp sự cố / va chạm giao thông
+        // 3. Vỏ lốp xe tải nổ vỡ / lốp xe rơi vãi
+        if (rubberRatio >= 0.22f) {
+            return "Xác vỏ lốp xe / Lốp xe rơi vãi";
+        }
+
+        // 4. Thùng xốp / sọt nhựa / bàn ghế lấn chiếm
+        if (foamRatio >= 0.18f) {
+            return "Thùng xốp / Bàn ghế lấn chiếm";
+        }
+
+        // 5. Đá tảng / đất đá sạt lở từ vách núi đèo dốc
+        if (widthRatio >= 0.22f && bw * bh > (img.getWidth() * img.getHeight() * 0.05)) {
+            // Tảng đá sạt lở màu xám xỉn hoặc đá hộc ven sườn núi
+            if (Math.abs(foliageRatio - rubberRatio) < 0.10f && coneRatio < 0.02f) {
+                return "Đá tảng / Đất đá sạt lở đèo dốc";
+            }
+        }
+
+        // 6. Phương tiện gặp sự cố / va chạm giao thông
         if (widthRatio >= 0.45f && whiteCarOrBarrierCount >= totalSampled * 0.20f) {
             return "Phương tiện gặp sự cố / Xe cản trở";
         }
@@ -2150,6 +2040,50 @@ public class AiInferenceService {
         }
 
         return "Vật cản / Phế thải trên đường";
+    }
+
+    public String classifyIncidentDetail(BufferedImage img, ImageTensorUtil.BoundingBox b) {
+        if (b == null) return "Sự cố giao thông";
+        String cls = b.getClassName();
+        if ("ROAD_OBSTACLE".equals(cls)) {
+            return classifyObstacleDetail(img, b);
+        }
+        if ("POTHOLE".equals(cls)) {
+            if (img != null) {
+                float aspect = (float) b.getWidth() / Math.max(1, b.getHeight());
+                float areaRatio = (float)(b.getWidth() * b.getHeight()) / (img.getWidth() * img.getHeight());
+                if (areaRatio >= 0.12f) {
+                    return "Hố tử thần / Sụt lún hàm ếch nguy hiểm";
+                }
+                if (aspect >= 2.2f || aspect <= 0.45f) {
+                    return "Rãnh lún sâu vệt bánh xe (Rutting)";
+                }
+            }
+            return "Ổ gà / Hố sụt mặt đường";
+        }
+        if ("ROAD_CRACK".equals(cls)) {
+            if (img != null) {
+                float aspect = (float) b.getHeight() / Math.max(1, b.getWidth());
+                float areaRatio = (float)(b.getWidth() * b.getHeight()) / (img.getWidth() * img.getHeight());
+                if (aspect >= 2.5f) {
+                    return "Vết nứt dọc tim đường";
+                }
+                if (b.getY() < img.getHeight() * 0.45) {
+                    return "Vết nứt sạt lở đèo dốc / taluy";
+                }
+                if (areaRatio >= 0.15f && b.getWidth() >= img.getWidth() * 0.40f) {
+                    return "Vết nứt trồi lún do rễ cây cổ thụ";
+                }
+            }
+            return "Vết nứt lưới mai rùa / kết cấu mặt đường";
+        }
+        if ("ROAD_FLOODING".equals(cls)) {
+            if (img != null && b.getWidth() >= img.getWidth() * 0.75f) {
+                return "Ngầm tràn miền núi / Vùng ngập nước chảy xiết";
+            }
+            return "Điểm ngập úng mặt đường / triều cường đô thị";
+        }
+        return cls;
     }
 
     public ImageTensorUtil.BoundingBox runInference(InputStream imageInputStream) {

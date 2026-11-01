@@ -163,14 +163,19 @@ public class IncidentController {
                 : 0.0;
 
         String obstacleDetail = null;
-        if ("ROAD_OBSTACLE".equals(best.getClassName())) {
-            obstacleDetail = aiInferenceService.classifyObstacleDetail(bimg, best);
+        String incidentDetail = null;
+        if (bimg != null && best != null) {
+            incidentDetail = aiInferenceService.classifyIncidentDetail(bimg, best);
+            if ("ROAD_OBSTACLE".equals(best.getClassName())) {
+                obstacleDetail = incidentDetail;
+            }
         }
 
         Map<String, Object> res = new HashMap<>();
         res.put("className", best.getClassName());
         res.put("confidence", best.getConfidence());
         res.put("obstacleDetail", obstacleDetail);
+        res.put("incidentDetail", incidentDetail);
         res.put("bboxX", best.getX());
         res.put("bboxY", best.getY());
         res.put("bboxWidth", best.getWidth());
@@ -229,14 +234,19 @@ public class IncidentController {
                 : 0.0;
 
         String obstacleDetail = null;
-        if ("ROAD_OBSTACLE".equals(best.getClassName())) {
-            obstacleDetail = aiInferenceService.classifyObstacleDetail(bimg, best);
+        String incidentDetail = null;
+        if (bimg != null && best != null) {
+            incidentDetail = aiInferenceService.classifyIncidentDetail(bimg, best);
+            if ("ROAD_OBSTACLE".equals(best.getClassName())) {
+                obstacleDetail = incidentDetail;
+            }
         }
 
         Map<String, Object> res = new HashMap<>();
         res.put("className", best.getClassName());
         res.put("confidence", best.getConfidence());
         res.put("obstacleDetail", obstacleDetail);
+        res.put("incidentDetail", incidentDetail);
         res.put("bboxX", best.getX());
         res.put("bboxY", best.getY());
         res.put("bboxWidth", best.getWidth());

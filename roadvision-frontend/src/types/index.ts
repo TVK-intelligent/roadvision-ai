@@ -57,6 +57,8 @@ export interface AiDetection {
   inferenceMs: number;
   activeThreshold?: number;
   flag?: string;
+  obstacleDetail?: string;
+  incidentDetail?: string;
   count?: number;
   boxes?: Array<{
     x: number;

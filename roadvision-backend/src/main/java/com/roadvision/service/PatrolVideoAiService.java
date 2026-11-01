@@ -196,51 +196,28 @@ public class PatrolVideoAiService {
                     float crackConf = (numClasses > 1) ? output[0][5][i] : 0f;
                     float floodingConf = (numClasses > 2) ? output[0][6][i] : 0f;
 
-                    // PHÂN BIỆT RÕ RÀNG GIỮA VẾT ƯỚT / VŨNG NƯỚC (ROAD_FLOODING) VÀ Ổ GÀ (POTHOLE):
-                    // Tuyệt đối không tự động biến vệt ướt / vũng nước thành Ổ gà!
-                    // Chỉ khi nào mô hình nhận diện rõ hố lõm (potholeConf >= 0.38f và cao hơn hẳn floodingConf) mới coi là ổ gà chứa nước.
-                    boolean isLocalizedCavity = (boxAreaRatio < 0.20f) && (lw < origWidth * 0.50f);
-
-                    if (bestClassId == 2) {
-                        if (isLocalizedCavity && potholeConf >= 0.38f && potholeConf > floodingConf) {
-                            bestClassId = 0;
-                            bestConf = potholeConf;
-                        }
-                    } else if (bestClassId == 1 && isLocalizedCavity) {
-                        // Vết nứt vỡ rỗ mặt đường dạng ổ gà
-                        if (potholeConf >= 0.25f && potholeConf >= crackConf * 0.80f) {
-                            float aspect = (float) Math.max(lw, lh) / Math.max(1, Math.min(lw, lh));
-                            if (aspect < 2.5f) {
-                                bestClassId = 0;
-                                bestConf = Math.max(potholeConf, crackConf);
-                            }
-                        }
-                    }
-
                     String className = (bestClassId < CLASS_NAMES.length)
                             ? CLASS_NAMES[bestClassId]
                             : "ROAD_DAMAGE_" + bestClassId;
 
-                    // Ngưỡng lọc tin cậy chuẩn xác: Lọc bỏ triệt để các vệt ướt/bóng gương mờ nhạt
-                    float minThresh;
+                    // Ngưỡng lọc tin cậy chuẩn xác
+                    float minThresh = effectiveThreshold;
                     if ("ROAD_CRACK".equals(className)) {
                         minThresh = Math.min(0.18f, effectiveThreshold);
-                    } else if ("POTHOLE".equals(className)) {
-                        // Bám sát ngưỡng tin cậy (mặc định 0.22), loại bỏ hoàn toàn nhiễu vết ướt < 20%
-                        minThresh = effectiveThreshold;
                     } else if ("ROAD_OBSTACLE".equals(className)) {
                         minThresh = Math.min(0.20f, effectiveThreshold);
                     } else if ("ROAD_FLOODING".equals(className)) {
                         minThresh = Math.min(0.20f, effectiveThreshold);
-                    } else {
-                        minThresh = effectiveThreshold;
+                    } else if ("POTHOLE".equals(className)) {
+                        // Nâng ngưỡng tin cậy ổ gà video lên 0.30 để khử triệt để bóng mờ thoáng qua và vũng nước nông phản chiếu trời
+                        minThresh = Math.max(0.30f, effectiveThreshold);
                     }
                     if (bestConf < minThresh) continue;
 
-                    // Khử vệt ướt dài dạng vệt bánh xe hoặc vệt trượt dài mỏng (tỷ lệ cạnh > 3.6 không thể là ổ gà)
+                    // Khử các vệt siêu mỏng tỷ lệ cạnh > 4.5 không phải là ổ gà
                     if ("POTHOLE".equals(className)) {
                         float aspect = (float) Math.max(lw, lh) / Math.max(1, Math.min(lw, lh));
-                        if (aspect > 3.6f) continue;
+                        if (aspect > 4.5f) continue;
                     }
 
                     rawCandidates.add(ImageTensorUtil.BoundingBox.builder()
@@ -256,20 +233,56 @@ public class PatrolVideoAiService {
 
             if (rawCandidates.isEmpty()) return result;
 
-            // 1. Hợp nhất trước các mảnh ổ gà gối nhau để bảo toàn kích thước trọn vẹn, không bị NMS cắt xén
-            List<ImageTensorUtil.BoundingBox> mergedCandidates = mergeOverlappingPotholes(rawCandidates);
+            // 1. ÁP DỤNG NMS TRỰC TIẾP TRÊN CANDIDATES NGUYÊN BẢN CỦA YOLO:
+            // Bảo toàn độ sắc nét và kích thước ôm khít 100% của mạng nơ-ron, khử các box đè lên nhau (IoU 0.38)
+            List<ImageTensorUtil.BoundingBox> nmsBoxes = ImageTensorUtil.applyNms(rawCandidates, Math.min(0.38f, iouThreshold));
 
-            // 2. Áp dụng NMS
-            List<ImageTensorUtil.BoundingBox> nmsBoxes = ImageTensorUtil.applyNms(mergedCandidates, iouThreshold);
-
-            // 3. Tinh chỉnh thu gọn (Tighten & Trim) để hộp ôm sát mép thật của ổ gà, triệt tiêu lấn chiếm đường phẳng
+            // 2. PHÂN LOẠI CHUẨN XÁC:
+            // - "Vệt nước / vũng nước nông phản chiếu ánh sáng KHÔNG PHẢI LÀ Ổ GÀ":
+            //   Những vùng là vệt nước phẳng phản chiếu bầu trời (isWaterPuddle == true) không phải hư hại mặt đường -> Loại bỏ hoàn toàn!
+            // - "Chỉ khi ngập cả 1 đoạn đường kín khung hình (wRatio >= 0.50f || aRatio >= 0.25f) mới coi là ngập nước (ROAD_FLOODING)"
+            // - Chỉ những hốc sụt lún vỡ nát mặt đường thực sự mới là Ổ GÀ (POTHOLE).
             List<ImageTensorUtil.BoundingBox> convertedBoxes = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : nmsBoxes) {
-                if ("POTHOLE".equals(b.getClassName())) {
-                    convertedBoxes.add(tightenSinglePotholeBox(image, b));
-                } else {
-                    convertedBoxes.add(b);
+                float wRatio = (float) b.getWidth() / Math.max(1, origWidth);
+                float aRatio = (float) (b.getWidth() * b.getHeight()) / Math.max(1, origWidth * origHeight);
+                boolean isFullRoadFlooding = (wRatio >= 0.50f && aRatio >= 0.15f) || (aRatio >= 0.25f);
+                boolean isPuddle = isWaterPuddle(image, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+
+                if ("ROAD_FLOODING".equals(b.getClassName())) {
+                    if (isFullRoadFlooding) {
+                        // Nước tràn ngập cả đoạn đường kín khung hình -> Giữ nguyên là ROAD_FLOODING
+                        convertedBoxes.add(b);
+                    }
+                    // Nếu không ngập kín cả đoạn đường -> Chỉ là vệt nước/vũng nước, loại bỏ hoàn toàn
+                    continue;
                 }
+
+                if ("POTHOLE".equals(b.getClassName())) {
+                    if (isFullRoadFlooding) {
+                        // Trùm kín cả đoạn đường -> Ngập nước diện rộng
+                        convertedBoxes.add(ImageTensorUtil.BoundingBox.builder()
+                                .className("ROAD_FLOODING")
+                                .confidence(b.getConfidence())
+                                .x(b.getX())
+                                .y(b.getY())
+                                .width(b.getWidth())
+                                .height(b.getHeight())
+                                .build());
+                        continue;
+                    }
+
+                    // Nếu là vệt nước / vũng nước phản chiếu -> Loại bỏ hoàn toàn, không nhận diện là ổ gà!
+                    if (isPuddle) {
+                        continue;
+                    }
+
+                    // Ổ gà thực tế trên mặt đường -> Giữ lại
+                    convertedBoxes.add(b);
+                    continue;
+                }
+
+                convertedBoxes.add(b);
             }
 
             // 3. Phân tách danh sách Ổ gà đã thu gọn
@@ -785,7 +798,12 @@ public class PatrolVideoAiService {
         return (mean < 115 && stdDev < 11.5 && extremeDarkCrackPixels < 2);
     }
 
-    private boolean isWaterCavity(BufferedImage img, int x, int y, int w, int h) {
+    /**
+     * Nhận diện vệt nước / vũng nước phản chiếu bầu trời hoặc ánh sáng.
+     * Vệt nước có độ phản chiếu cao (luma > 165 hoặc ánh xanh da trời b > r + 8),
+     * hoàn toàn không phải là ổ gà sụt lún mặt đường (POTHOLE).
+     */
+    private boolean isWaterPuddle(BufferedImage img, int x, int y, int w, int h) {
         if (img == null || w <= 0 || h <= 0) return false;
 
         int imgW = img.getWidth();
@@ -810,12 +828,10 @@ public class PatrolVideoAiService {
                 int luma = (int) (0.299 * r + 0.587 * g + 0.114 * b);
                 totalSampled++;
 
-                boolean isNeutralDryAsphalt = (Math.abs(r - g) <= 15 && Math.abs(g - b) <= 15 && Math.abs(r - b) <= 15 && luma <= 215);
-                boolean isMirrorWater = !isNeutralDryAsphalt && (luma > 220 && Math.abs(r - b) < 25);
-                boolean isSkyBlueWater = (b > r + 15 && b > g + 8 && luma > 110);
-                boolean isMuddyWater = (r > b + 18 && g > b + 10 && luma >= 65 && luma <= 215);
+                boolean isMirrorWater = (luma > 165);
+                boolean isSkyBlueWater = (b > r + 8 && b > g + 4 && luma > 100);
 
-                if (isMirrorWater || isSkyBlueWater || isMuddyWater) {
+                if (isMirrorWater || isSkyBlueWater) {
                     waterSurfacePixels++;
                 }
             }
@@ -823,7 +839,7 @@ public class PatrolVideoAiService {
 
         if (totalSampled == 0) return false;
         float waterRatio = (float) waterSurfacePixels / totalSampled;
-        return (waterRatio >= 0.28f);
+        return (waterRatio >= 0.12f);
     }
 
     /**

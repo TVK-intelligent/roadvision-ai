@@ -551,21 +551,28 @@ export const PatrolModePage: React.FC = () => {
       formData.append('latitude', incident.latitude.toString());
       formData.append('longitude', incident.longitude.toString());
 
-      const catLabel =
-        incident.category === 'POTHOLE'
-          ? 'Ổ gà mặt đường'
-          : incident.category === 'ROAD_CRACK'
-          ? 'Vết nứt kết cấu'
-          : incident.category === 'ROAD_FLOODING'
-          ? 'Điểm ngập úng'
-          : 'Vật cản giao thông';
+      let catLabel = 'Vật cản giao thông';
+      let specificDesc = 'vật cản cản trở giao thông';
+      if (incident.category === 'POTHOLE') {
+        catLabel = 'Ổ gà mặt đường';
+        specificDesc = 'sự cố ổ gà / hố sụt nguy hiểm';
+      } else if (incident.category === 'ROAD_CRACK') {
+        catLabel = 'Vết nứt kết cấu';
+        specificDesc = 'vết nứt rạn mặt đường';
+      } else if (incident.category === 'ROAD_FLOODING') {
+        catLabel = 'Điểm ngập úng';
+        specificDesc = 'điểm ứ đọng ngập nước';
+      } else {
+        catLabel = 'Vật cản giao thông';
+        specificDesc = 'vật cản (cây đổ, vỏ lốp xe nổ hoặc chướng ngại vật lòng đường)';
+      }
 
       formData.append('title', `[Tuần Tra AI] Phát hiện ${catLabel}`);
       formData.append(
         'description',
-        `Phát hiện tự động qua luồng Video hành trình xe tuần tra (Độ tin cậy: ${(
+        `Hệ thống AI camera tuần tra xác định 1 ${specificDesc} (Độ tin cậy: ${(
           incident.confidence * 100
-        ).toFixed(1)}%). Đề nghị trung tâm điều phối xử lý theo quy trình.`
+        ).toFixed(1)}%). Đề nghị trung tâm điều phối cử lực lượng xử lý khẩn trương.`
       );
       formData.append('address', incident.address);
       formData.append('category', incident.category);
@@ -642,7 +649,7 @@ export const PatrolModePage: React.FC = () => {
             const isVideoMoving = isPlaying && !video.paused;
             const playRate = video.playbackRate || 1.0;
 
-            // 1. Vẽ Vạch Đếm & Vùng Kiểm Soát AI (AI Counting Gate & Scanning Zone)
+            // 1. Vẽ Vạch Đếm & Vùng Kiểm Soát AI (AI Counting Gate & Scanning Zone - Phong cách HUD Kỹ thuật tối giản)
             if (showCountingLineRef.current) {
               const lineYRatio = countingLineYRef.current;
               const linePixelY = offsetY + lineYRatio * renderedH;
@@ -650,73 +657,57 @@ export const PatrolModePage: React.FC = () => {
               const lineEndX = offsetX + renderedW;
 
               const isFlashing = now < lineFlashUntilRef.current;
-              const lineGlowColor = isFlashing ? '#22c55e' : '#06b6d4';
-              const lineStrokeColor = isFlashing ? 'rgba(34, 197, 94, 0.98)' : 'rgba(6, 182, 212, 0.90)';
+              const strokeColor = isFlashing ? 'rgba(16, 185, 129, 0.95)' : 'rgba(56, 189, 248, 0.70)';
 
               ctx.save();
-
-              // A. Dải sáng kiểm soát quét đếm (Counting Beam Zone)
-              const zoneHalfH = Math.max(14, renderedH * 0.04);
-              const zoneGrad = ctx.createLinearGradient(0, linePixelY - zoneHalfH, 0, linePixelY + zoneHalfH);
-              zoneGrad.addColorStop(0, 'rgba(6, 182, 212, 0)');
-              zoneGrad.addColorStop(0.5, isFlashing ? 'rgba(34, 197, 94, 0.28)' : 'rgba(6, 182, 212, 0.14)');
-              zoneGrad.addColorStop(1, 'rgba(6, 182, 212, 0)');
-              ctx.fillStyle = zoneGrad;
-              ctx.fillRect(lineStartX, linePixelY - zoneHalfH, renderedW, zoneHalfH * 2);
-
-              // B. Trụ cảm biến laser 2 bên mép đường (Gate Sensors)
-              ctx.fillStyle = isFlashing ? '#22c55e' : '#06b6d4';
-              ctx.shadowColor = lineGlowColor;
-              ctx.shadowBlur = isFlashing ? 18 : 10;
-              ctx.fillRect(lineStartX, linePixelY - 16, 8, 32);
-              ctx.fillRect(lineEndX - 8, linePixelY - 16, 8, 32);
-
-              // C. Đường laser nét đứt công nghệ cao
-              ctx.strokeStyle = lineStrokeColor;
-              ctx.lineWidth = isFlashing ? 4.0 : 2.5;
+              // Đường laser nét đứt mảnh chuẩn kỹ thuật
+              ctx.strokeStyle = strokeColor;
+              ctx.lineWidth = isFlashing ? 2.0 : 1.5;
+              ctx.setLineDash([8, 6]);
               ctx.beginPath();
-              ctx.setLineDash([14, 6]);
               ctx.moveTo(lineStartX, linePixelY);
               ctx.lineTo(lineEndX, linePixelY);
               ctx.stroke();
               ctx.setLineDash([]);
 
-              // D. Nhãn Cổng Đếm AI Trung Tâm
-              const lineBadgeText = isFlashing
-                ? `⚡ KÍCH HOẠT VẠCH ĐẾM AI (${Math.round(lineYRatio * 100)}%)`
-                : `VẠCH ĐẾM AI TẬP TRUNG (${Math.round(lineYRatio * 100)}%)`;
-              ctx.font = 'bold 10px monospace';
-              const lMetrics = ctx.measureText(lineBadgeText);
-              const lBadgeW = lMetrics.width + 18;
-              const lBadgeH = 22;
+              // Hai mốc đo biên độ trái phải
+              ctx.strokeStyle = strokeColor;
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(lineStartX, linePixelY - 5);
+              ctx.lineTo(lineStartX, linePixelY + 5);
+              ctx.moveTo(lineEndX, linePixelY - 5);
+              ctx.lineTo(lineEndX, linePixelY + 5);
+              ctx.stroke();
 
-              ctx.fillStyle = isFlashing ? 'rgba(34, 197, 94, 0.98)' : 'rgba(6, 182, 212, 0.92)';
-              ctx.shadowBlur = 0;
+              // Nhãn Vạch Kiểm Định AI thanh lịch ở mép phải
+              const badgeText = isFlashing
+                ? `✓ KÍCH HOẠT VẠCH ĐẾM (${Math.round(lineYRatio * 100)}%)`
+                : `VẠCH KIỂM ĐỊNH AI (${Math.round(lineYRatio * 100)}%)`;
+              ctx.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+              const lMetrics = ctx.measureText(badgeText);
+              const lBadgeW = lMetrics.width + 14;
+              const lBadgeH = 18;
+              const lBadgeX = lineEndX - lBadgeW - 10;
+              const lBadgeY = linePixelY - lBadgeH / 2;
+
+              ctx.fillStyle = isFlashing ? 'rgba(16, 185, 129, 0.92)' : 'rgba(15, 23, 42, 0.85)';
               if (ctx.roundRect) {
-                ctx.roundRect(lineStartX + 16, linePixelY - lBadgeH / 2, lBadgeW, lBadgeH, 5);
+                ctx.roundRect(lBadgeX, lBadgeY, lBadgeW, lBadgeH, 3);
               } else {
-                ctx.rect(lineStartX + 16, linePixelY - lBadgeH / 2, lBadgeW, lBadgeH);
+                ctx.rect(lBadgeX, lBadgeY, lBadgeW, lBadgeH);
               }
               ctx.fill();
 
+              if (!isFlashing) {
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+              }
+
               ctx.fillStyle = '#ffffff';
               ctx.textBaseline = 'middle';
-              ctx.fillText(lineBadgeText, lineStartX + 25, linePixelY);
-
-              // Mũi tên chỉ hướng quét đếm theo chiều tiến xe
-              const numArrows = 6;
-              const arrowSpacing = renderedW / (numArrows + 1);
-              ctx.fillStyle = lineStrokeColor;
-              for (let i = 1; i <= numArrows; i++) {
-                const ax = lineStartX + i * arrowSpacing;
-                const ay = linePixelY + 5;
-                ctx.beginPath();
-                ctx.moveTo(ax - 5, ay);
-                ctx.lineTo(ax, ay + 7);
-                ctx.lineTo(ax + 5, ay);
-                ctx.closePath();
-                ctx.fill();
-              }
+              ctx.fillText(badgeText, lBadgeX + 7, linePixelY);
               ctx.restore();
             }
 
@@ -727,8 +718,18 @@ export const PatrolModePage: React.FC = () => {
               const timeSinceSeen = now - track.lastSeenTime;
               const prevCenterY = track.y + track.h / 2;
 
-              // Nội suy mượt mà LERP bám sát 100% tọa độ chuẩn xác của mô hình AI
-              const lerpFactor = Math.min(1.0, 16 * dt);
+              // 1. Quán tính phối cảnh tiến thẳng của xe (Perspective Forward Motion):
+              // Khi video đang chạy, mặt đường trôi xuống (+Y), các hộp tự động trôi nhịp nhàng ăn khớp theo video
+              if (isVideoMoving) {
+                const ageDampening = timeSinceSeen > 800 ? Math.max(0.2, 1.0 - (timeSinceSeen - 800) / 1200.0) : 1.0;
+                const currentVy = (track.vy > 0 ? track.vy : Math.max(0.12, track.y * 0.38)) * ageDampening;
+                const step = currentVy * playRate * dt;
+                track.y += step;
+                track.targetY += step;
+              }
+
+              // 2. Nội suy dứt khoát không gây trôi lướt bồng bềnh (Crisp Snappy Tracking)
+              const lerpFactor = Math.min(1.0, 30 * dt);
               track.x += (track.targetX - track.x) * lerpFactor;
               track.y += (track.targetY - track.y) * lerpFactor;
               track.w += (track.targetW - track.w) * lerpFactor;
@@ -763,7 +764,9 @@ export const PatrolModePage: React.FC = () => {
               // Bắt trọn 100% các ổ gà đi qua vạch (kể cả ổ gà nhỏ hoặc frame nhảy nhanh), không để sót
               const isCrossingAction = centroidCrossed || touchesLine || (passedLine && (track.spawnY === undefined || track.spawnY <= lineY + 0.14));
 
-              if (showCountingLineRef.current && !track.hasCrossedLine && isCrossingAction) {
+              // Chỉ đếm các track đã được xác nhận (tối thiểu 2 hit hoặc độ tin cậy cao >= 0.55), loại trừ nhiễu 1-frame
+              const isConfirmedTrack = track.hitCount >= 2 || track.confidence >= 0.55;
+              if (showCountingLineRef.current && !track.hasCrossedLine && isCrossingAction && isConfirmedTrack && timeSinceSeen < 1400) {
                 // Khóa chống đếm trùng siêu nhạy (Local Fast Debounce):
                 // - Chỉ chặn nếu 2 box gần như đè khít lên nhau trong cùng 1 frame hoặc < 180ms (dx < 0.03 && dy < 0.03).
                 // - Sau 180ms: Xe đã chạy qua vị trí mới, toàn bộ các ổ gà liên tiếp chạy ngay phía sau ĐỀU ĐƯỢC ĐẾM ĐẦY ĐỦ!
@@ -823,23 +826,26 @@ export const PatrolModePage: React.FC = () => {
                     id: `${now}_${Math.random()}`,
                     x: currCenterX,
                     y: lineY,
-                    radius: 6,
-                    maxRadius: 44,
+                    radius: 0,
+                    maxRadius: 24,
                     alpha: 1.0,
-                    color: '#22c55e',
-                    label: '+1 ĐÃ QUA VẠCH',
+                    color: '#10b981',
+                    label: '+1 ĐÃ ĐẾM',
                   });
                 }
               }
 
-              // Quản lý độ trong suốt (Fade In / Fade Out)
-              if (timeSinceSeen > 450 || track.y > 0.96) {
-                track.alpha = Math.max(0, track.alpha - dt * 4.0);
-              } else {
-                track.alpha = Math.min(1.0, track.alpha + dt * 6.0);
+              // Quản lý độ trong suốt (Fade In / Fade Out mượt mà khi video đang chạy; giữ nguyên khi tạm dừng)
+              // Đồng bộ thời gian lưu vết với chu kỳ trích xuất & suy luận của backend (~1.2s)
+              if (isVideoMoving) {
+                if (timeSinceSeen > 1600 || track.y > 0.96) {
+                  track.alpha = Math.max(0, track.alpha - dt * 2.5);
+                } else {
+                  track.alpha = Math.min(1.0, track.alpha + dt * 6.0);
+                }
               }
 
-              if (track.alpha > 0.02 && timeSinceSeen < 1200) {
+              if (track.alpha > 0.02 && (timeSinceSeen < 2400 || !isVideoMoving)) {
                 updatedTracks.push(track);
 
                 // Tọa độ vẽ canvas theo chuẩn letterbox
@@ -853,46 +859,37 @@ export const PatrolModePage: React.FC = () => {
                   const isFlood = track.category.includes('FLOOD');
                   const isObstacle = track.category.includes('OBSTACLE');
 
-                  // MÀU SẮC ĐỒNG BỘ NỔI BẬT THEO VẠCH ĐẾM:
-                  // 1. Nếu đã đếm qua vạch -> Xanh lá dạ quang rực rỡ
-                  // 2. Nếu đang chạm ngay vạch -> Vàng laser chói lọi
-                  // 3. Nếu chưa đến vạch -> Màu nhận diện tiêu chuẩn
+                  // MÀU SẮC CHUẨN KỸ THUẬT GIAO THÔNG (Production AI Vision Palette):
                   let strokeColor: string;
                   let fillColor: string;
-                  let badgeBg: string;
+                  let labelColor: string;
 
                   if (track.hasCrossedLine) {
-                    strokeColor = `rgba(34, 197, 94, ${track.alpha})`;
-                    fillColor = `rgba(34, 197, 94, ${track.alpha * 0.22})`;
-                    badgeBg = `rgba(22, 163, 74, ${track.alpha * 0.95})`;
+                    strokeColor = `rgba(16, 185, 129, ${track.alpha})`; // Xanh ngọc lục bảo đã kiểm định
+                    fillColor = `rgba(16, 185, 129, ${track.alpha * 0.10})`;
+                    labelColor = '#10b981';
                   } else if (touchesLine) {
-                    strokeColor = `rgba(250, 204, 21, ${track.alpha})`;
-                    fillColor = `rgba(250, 204, 21, ${track.alpha * 0.25})`;
-                    badgeBg = `rgba(202, 138, 4, ${track.alpha * 0.95})`;
+                    strokeColor = `rgba(245, 158, 11, ${track.alpha})`; // Vàng cam chạm vạch
+                    fillColor = `rgba(245, 158, 11, ${track.alpha * 0.12})`;
+                    labelColor = '#f59e0b';
                   } else {
-                    strokeColor = isCrack
-                      ? `rgba(245, 158, 11, ${track.alpha})`
-                      : isFlood
-                      ? `rgba(6, 182, 212, ${track.alpha})`
-                      : isObstacle
-                      ? `rgba(244, 63, 94, ${track.alpha})`
-                      : `rgba(236, 72, 153, ${track.alpha})`; // Hồng cánh sen rực rỡ đặc trưng Ultralytics YOLO!
-
-                    fillColor = isCrack
-                      ? `rgba(245, 158, 11, ${track.alpha * 0.14})`
-                      : isFlood
-                      ? `rgba(6, 182, 212, ${track.alpha * 0.14})`
-                      : isObstacle
-                      ? `rgba(244, 63, 94, ${track.alpha * 0.14})`
-                      : `rgba(236, 72, 153, ${track.alpha * 0.14})`;
-
-                    badgeBg = isCrack
-                      ? `rgba(217, 119, 6, ${track.alpha * 0.95})`
-                      : isFlood
-                      ? `rgba(8, 145, 178, ${track.alpha * 0.95})`
-                      : isObstacle
-                      ? `rgba(225, 29, 72, ${track.alpha * 0.95})`
-                      : `rgba(219, 39, 119, ${track.alpha * 0.95})`; // Badge hồng sen nổi bật
+                    if (isCrack) {
+                      strokeColor = `rgba(245, 158, 11, ${track.alpha})`; // Vàng hổ phách
+                      fillColor = `rgba(245, 158, 11, ${track.alpha * 0.08})`;
+                      labelColor = '#f59e0b';
+                    } else if (isFlood) {
+                      strokeColor = `rgba(2, 132, 199, ${track.alpha})`; // Xanh dương
+                      fillColor = `rgba(2, 132, 199, ${track.alpha * 0.08})`;
+                      labelColor = '#0284c7';
+                    } else if (isObstacle) {
+                      strokeColor = `rgba(220, 38, 38, ${track.alpha})`; // Đỏ đậm cảnh báo
+                      fillColor = `rgba(220, 38, 38, ${track.alpha * 0.08})`;
+                      labelColor = '#dc2626';
+                    } else {
+                      strokeColor = `rgba(239, 68, 68, ${track.alpha})`; // Đỏ cam ổ gà chuẩn cứu hộ
+                      fillColor = `rgba(239, 68, 68, ${track.alpha * 0.08})`;
+                      labelColor = '#ef4444';
+                    }
                   }
 
                   const labelTitle = isCrack
@@ -903,56 +900,18 @@ export const PatrolModePage: React.FC = () => {
                     ? 'Vật cản'
                     : 'Ổ gà';
 
-                  // 2. Vẽ Vết Quỹ Đạo Chuyển Động (Vệt đuôi vàng dạ quang chuẩn Ultralytics YOLO Tracking)
-                  if (track.history && track.history.length > 1 && track.alpha > 0.08) {
-                    ctx.save();
-                    ctx.strokeStyle = '#facc15'; // Màu vàng tươi rực rỡ bám dính đuôi đối tượng
-                    ctx.shadowColor = 'rgba(234, 179, 8, 0.9)';
-                    ctx.shadowBlur = 8;
-                    ctx.lineWidth = 2.8;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.beginPath();
-                    for (let i = 0; i < track.history.length; i++) {
-                      const hx = offsetX + track.history[i].x * renderedW;
-                      const hy = offsetY + track.history[i].y * renderedH;
-                      if (i === 0) ctx.moveTo(hx, hy);
-                      else ctx.lineTo(hx, hy);
-                    }
-                    ctx.stroke();
-                    ctx.restore();
-                  }
-
-                  // 3. Vẽ Chấm Tâm Đối Tượng (Centroid Dot) màu vàng dạ quang
-                  const cx = offsetX + currCenterX * renderedW;
-                  const cy = offsetY + currCenterY * renderedH;
-                  ctx.save();
-                  ctx.beginPath();
-                  ctx.arc(cx, cy, 4.5, 0, 2 * Math.PI);
-                  ctx.fillStyle = '#facc15';
-                  ctx.shadowColor = 'rgba(234, 179, 8, 0.9)';
-                  ctx.shadowBlur = 8;
-                  ctx.fill();
-                  ctx.restore();
-
-                  // 4. Nền bán trong suốt và khung viền bo góc
+                  // 1. Khung hộp sắc nét kỹ thuật: Viền thanh mảnh 1.8px - 2.2px, nền trong mờ tinh tế nhìn rõ mặt đường
                   ctx.fillStyle = fillColor;
                   ctx.strokeStyle = strokeColor;
-                  ctx.lineWidth = track.hasCrossedLine || touchesLine ? 3.0 : 2.5;
-                  const radius = Math.min(8, bw / 4, bh / 4);
-
+                  ctx.lineWidth = track.hasCrossedLine || touchesLine ? 2.2 : 1.8;
                   ctx.beginPath();
-                  if (ctx.roundRect) {
-                    ctx.roundRect(bx, by, bw, bh, radius);
-                  } else {
-                    ctx.rect(bx, by, bw, bh);
-                  }
+                  ctx.rect(bx, by, bw, bh);
                   ctx.fill();
                   ctx.stroke();
 
-                  // 5. 4 góc định vị Reticle Corners phong cách xe tuần tra AI
-                  const cornerLen = Math.min(12, bw / 3, bh / 3);
-                  ctx.lineWidth = 3.5;
+                  // 2. Bốn góc định vị quang học Reticle tinh tế (HUD brackets, góc 7px sắc nét)
+                  const cornerLen = Math.min(8, bw * 0.25, bh * 0.25);
+                  ctx.lineWidth = 2.4;
                   ctx.strokeStyle = strokeColor;
 
                   // Góc trên trái
@@ -983,65 +942,68 @@ export const PatrolModePage: React.FC = () => {
                   ctx.lineTo(bx + bw, by + bh - cornerLen);
                   ctx.stroke();
 
-                  // 6. Nhãn Badge nổi bật trên đỉnh kèm trạng thái Vạch Đếm
-                  let statusPrefix = '';
-                  if (track.hasCrossedLine) {
-                    statusPrefix = '✓ ĐÃ ĐẾM ';
-                  } else if (touchesLine) {
-                    statusPrefix = '⚡ CHẠM VẠCH ';
-                  }
-
-                  const labelText = `${statusPrefix}#${track.numericId || 1} ${labelTitle} (${(track.confidence * 100).toFixed(0)}%)`;
-                  ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+                  // 3. Nhãn thông số kỹ thuật tối giản (Clean Monospace Engineering Tag)
+                  const statusIcon = track.hasCrossedLine ? '✓ ' : '';
+                  const labelText = `${statusIcon}#${track.numericId || 1} ${labelTitle} ${(track.confidence * 100).toFixed(0)}%`;
+                  ctx.font = '600 10.5px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
                   const textMetrics = ctx.measureText(labelText);
-                  const badgeWidth = textMetrics.width + 16;
-                  const badgeHeight = 22;
+                  const badgeWidth = textMetrics.width + 12;
+                  const badgeHeight = 18;
                   const badgeX = bx;
-                  const badgeY = Math.max(2, by - badgeHeight - 4);
+                  const badgeY = Math.max(2, by - badgeHeight - 2);
 
-                  ctx.fillStyle = badgeBg;
+                  // Khối nhãn nền tối kỹ thuật cao (Dark Glassmorphism)
+                  ctx.fillStyle = `rgba(15, 23, 42, ${track.alpha * 0.90})`;
                   ctx.beginPath();
                   if (ctx.roundRect) {
-                    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 5);
+                    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 2);
                   } else {
                     ctx.rect(badgeX, badgeY, badgeWidth, badgeHeight);
                   }
                   ctx.fill();
 
+                  // Vạch màu phân loại ở cạnh trái nhãn
+                  ctx.fillStyle = labelColor;
+                  ctx.fillRect(badgeX, badgeY, 2.5, badgeHeight);
+
+                  // Chữ nhãn sắc nét
                   ctx.fillStyle = '#ffffff';
                   ctx.textBaseline = 'middle';
-                  ctx.fillText(labelText, badgeX + 8, badgeY + badgeHeight / 2);
+                  ctx.fillText(labelText, badgeX + 7, badgeY + badgeHeight / 2);
                 }
               }
             }
 
-            // 7. Hiệu ứng Sóng Xung Kích khi Vật Thể Cắt Qua Vạch (Pulse Effects)
+            // 7. Hiệu ứng nổi tinh tế khi đối tượng qua vạch (Floating Pill)
             const pulses = pulseEffectsRef.current;
             const activePulses: LinePulseEffect[] = [];
             for (const p of pulses) {
-              p.radius += 55 * dt;
-              p.alpha = Math.max(0, p.alpha - 2.2 * dt);
-              if (p.alpha > 0.02 && p.radius <= p.maxRadius) {
+              p.radius += 22 * dt; // Bay nhẹ lên trên
+              p.alpha = Math.max(0, p.alpha - 2.5 * dt);
+              if (p.alpha > 0.02) {
                 activePulses.push(p);
 
                 const px = offsetX + p.x * renderedW;
-                const py = offsetY + p.y * renderedH;
+                const py = offsetY + p.y * renderedH - p.radius;
 
                 ctx.save();
-                ctx.strokeStyle = p.color;
-                ctx.lineWidth = 2.5;
-                ctx.globalAlpha = p.alpha;
-                ctx.beginPath();
-                ctx.arc(px, py, p.radius, 0, 2 * Math.PI);
-                ctx.stroke();
+                ctx.font = 'bold 10px ui-monospace, SFMono-Regular, monospace';
+                const tm = ctx.measureText(p.label);
+                const pw = tm.width + 10;
+                const ph = 16;
 
-                // Nhãn nổi +1 ĐÃ ĐẾM
-                ctx.font = 'bold 11px monospace';
+                ctx.fillStyle = `rgba(16, 185, 129, ${p.alpha * 0.92})`;
+                if (ctx.roundRect) {
+                  ctx.roundRect(px - pw / 2, py - ph / 2, pw, ph, 3);
+                } else {
+                  ctx.rect(px - pw / 2, py - ph / 2, pw, ph);
+                }
+                ctx.fill();
+
                 ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = p.color;
-                ctx.shadowBlur = 8;
                 ctx.textAlign = 'center';
-                ctx.fillText(p.label, px, py - p.radius - 6);
+                ctx.textBaseline = 'middle';
+                ctx.fillText(p.label, px, py);
                 ctx.restore();
               }
             }
@@ -1063,13 +1025,7 @@ export const PatrolModePage: React.FC = () => {
   // Vòng lặp AI trích xuất frame liên tục siêu tốc với Adaptive Sampling, Lọc Trùng IoU & Chọn Frame Tối Ưu
   useEffect(() => {
     if (!isPlaying) {
-      setActiveBoxes([]);
-      setIsBoxFading(false);
-      if (boxFadeTimeoutRef.current) {
-        clearTimeout(boxFadeTimeoutRef.current);
-      }
-      activeTracksRef.current = [];
-      visualTracksRef.current = [];
+      setIsScanning(false);
       return;
     }
 
@@ -1257,15 +1213,43 @@ export const PatrolModePage: React.FC = () => {
 
                 if (bestTrack) {
                   matchedVisualIds.add(bestTrack.id);
+                  const timeElapsed = (vNow - bestTrack.lastSeenTime) / 1000.0;
+                  if (timeElapsed > 0.04 && timeElapsed < 1.0) {
+                    const measuredVy = (box.normY - bestTrack.y) / timeElapsed;
+                    if (measuredVy > 0 && measuredVy < 1.5) {
+                      bestTrack.vy = bestTrack.vy > 0 ? (bestTrack.vy * 0.35 + measuredVy * 0.65) : measuredVy;
+                    }
+                  }
+
+                  // Bù trừ độ trễ mạng (latency) giữa thời điểm capture frame và khi AI trả về kết quả
+                  const latencySec = Math.max(0.04, Math.min(0.25, latency / 1000.0));
+                  const driftCompY = (bestTrack.vy > 0 ? bestTrack.vy : Math.max(0.12, box.normY * 0.35)) * latencySec;
+                  const compensatedY = Math.min(0.96, box.normY + driftCompY);
+
                   bestTrack.targetX = box.normX;
-                  bestTrack.targetY = box.normY;
-                  bestTrack.targetW = box.normW;
-                  bestTrack.targetH = box.normH;
+                  bestTrack.targetY = compensatedY;
+                  // Chống giật kích thước (EMA Size Smoothing)
+                  bestTrack.targetW = bestTrack.targetW * 0.70 + box.normW * 0.30;
+                  bestTrack.targetH = bestTrack.targetH * 0.70 + box.normH * 0.30;
                   bestTrack.confidence = Math.max(bestTrack.confidence, boxConf);
                   bestTrack.lastSeenTime = vNow;
                   bestTrack.hitCount += 1;
                 } else {
-                  // Khởi tạo track trực quan mới ôm sát ngay tại vị trí phát hiện
+                  // Khởi tạo track trực quan mới với bù trừ độ trễ
+                  const latencySec = Math.max(0.04, Math.min(0.25, latency / 1000.0));
+                  const initialVy = Math.max(0.12, box.normY * 0.35);
+                  const compY = Math.min(0.96, box.normY + initialVy * latencySec);
+
+                  // Chống tạo track trùng đè lên track đã có (Deduplication)
+                  const isOverlapping = curVisuals.some(existing => {
+                    const iou = calculateIoU(
+                      { x: existing.targetX, y: existing.targetY, width: existing.targetW, height: existing.targetH },
+                      { x: box.normX, y: compY, width: box.normW, height: box.normH }
+                    );
+                    return iou > 0.35;
+                  });
+                  if (isOverlapping) continue;
+
                   const assignedNumId = nextTrackNumericIdRef.current++;
                   curVisuals.push({
                     id: `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
@@ -1273,24 +1257,24 @@ export const PatrolModePage: React.FC = () => {
                     category: boxCat,
                     confidence: boxConf,
                     x: box.normX,
-                    y: box.normY,
+                    y: compY,
                     w: box.normW,
                     h: box.normH,
                     targetX: box.normX,
-                    targetY: box.normY,
+                    targetY: compY,
                     targetW: box.normW,
                     targetH: box.normH,
                     vx: 0,
-                    vy: 0,
+                    vy: initialVy,
                     vw: 0,
                     vh: 0,
                     lastSeenTime: vNow,
                     hitCount: 1,
                     committed: false,
                     alpha: 1.0,
-                    history: [{ x: box.normX + box.normW / 2, y: box.normY + box.normH / 2 }],
+                    history: [{ x: box.normX + box.normW / 2, y: compY + box.normH / 2 }],
                     hasCrossedLine: false,
-                    spawnY: box.normY + box.normH / 2,
+                    spawnY: compY + box.normH / 2,
                   });
                 }
               }
@@ -1328,10 +1312,13 @@ export const PatrolModePage: React.FC = () => {
 
                 if (bestTrack) {
                   matchedVisualIds.add(bestTrack.id);
+                  const latencySec = Math.max(0.04, Math.min(0.25, latency / 1000.0));
+                  const driftCompY = (bestTrack.vy > 0 ? bestTrack.vy : Math.max(0.12, box.normY * 0.35)) * latencySec;
+                  const compensatedY = Math.min(0.96, box.normY + driftCompY);
                   bestTrack.targetX = box.normX;
-                  bestTrack.targetY = box.normY;
-                  bestTrack.targetW = box.normW;
-                  bestTrack.targetH = box.normH;
+                  bestTrack.targetY = compensatedY;
+                  bestTrack.targetW = bestTrack.targetW * 0.75 + box.normW * 0.25;
+                  bestTrack.targetH = bestTrack.targetH * 0.75 + box.normH * 0.25;
                   bestTrack.lastSeenTime = vNow;
                   bestTrack.hitCount += 1;
                 }

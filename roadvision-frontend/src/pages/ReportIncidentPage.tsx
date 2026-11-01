@@ -400,40 +400,122 @@ export const ReportIncidentPage: React.FC = () => {
           setCategory(singleCat);
           const count = counts[singleCat] || totalCount;
 
+          const subDetail = data.incidentDetail || data.obstacleDetail || '';
+
           if (singleCat === 'POTHOLE') {
-            setTitle(`Phát hiện ${count} ổ gà mặt đường tại ${loc}`);
-            setDescription(
-              `AI phát hiện ${count} ổ gà mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị tổ duy tu xử lý vá đường tránh tai nạn cho người tham gia giao thông.`
-            );
+            const isSinkhole = subDetail.toLowerCase().includes('tử thần') || subDetail.toLowerCase().includes('hàm ếch');
+            const isRutting = subDetail.toLowerCase().includes('lún') || subDetail.toLowerCase().includes('vệt bánh');
+            const isManhole = subDetail.toLowerCase().includes('cống') || subDetail.toLowerCase().includes('hố ga');
+
+            if (isSinkhole) {
+              setTitle(`Phát hiện hố tử thần sụt lún hàm ếch tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định 1 sự cố hố sụt nguy hiểm là hố tử thần sụt lún hàm ếch khoét sâu dưới lòng đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần căng dây rào chắn khẩn cấp và tiến hành đào hoàn trả kết cấu móng đường.`
+              );
+            } else if (isRutting) {
+              setTitle(`Phát hiện ổ gà là rãnh lún sâu vệt bánh xe tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định ổ gà là rãnh lún sâu vệt bánh xe (Rutting) lượn sóng dọc tim đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị đơn vị quản lý đường bộ cào bóc thảm lại nhựa mặt đường.`
+              );
+            } else if (isManhole) {
+              setTitle(`Phát hiện ổ gà nguy hiểm là nắp hố ga sụt lún tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định 1 sự cố ổ gà / hố sụt nguy hiểm là miệng cống / nắp hố ga bị vỡ tụt lún (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần căng dây cảnh báo và thay nắp mới khẩn cấp tránh tai nạn giao thông.`
+              );
+            } else {
+              setTitle(`Phát hiện ${count} ổ gà mặt đường tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định ${count} ổ gà mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị tổ duy tu xử lý vá đường tránh tai nạn cho người tham gia giao thông.`
+              );
+            }
           } else if (singleCat === 'ROAD_CRACK') {
-            setTitle(`Phát hiện ${count} vết nứt rạn mặt đường tại ${loc}`);
-            setDescription(
-              `AI phát hiện ${count} vết nứt rạn mặt đường nhựa (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần xử lý chống thấm sụt lún.`
-            );
+            const isTreeRoot = subDetail.toLowerCase().includes('rễ cây') || subDetail.toLowerCase().includes('trồi lún');
+            const isTalus = subDetail.toLowerCase().includes('taluy') || subDetail.toLowerCase().includes('đèo dốc');
+            const isLongitudinal = subDetail.toLowerCase().includes('dọc');
+
+            if (isTreeRoot) {
+              setTitle(`Phát hiện vết nứt trồi lún do rễ cây cổ thụ tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định vết nứt trồi lún gồ ghề do rễ cây ăn ngầm đội nứt toác mặt đường nhựa (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần phối hợp công ty cây xanh cắt tỉa rễ ăn ngang và thảm phẳng lại mặt đường.`
+              );
+            } else if (isTalus) {
+              setTitle(`Phát hiện vết nứt sạt lở taluy đèo dốc tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định 1 vết nứt lớn dọc mái taluy sạt lở đèo dốc (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị khẩn trương gia cố taluy chống sạt trượt đất đá xuống lòng đường.`
+              );
+            } else if (isLongitudinal) {
+              setTitle(`Phát hiện vết nứt dọc tim đường tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định vết nứt xẻ dọc tim đường / rãnh phân làn (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần xử lý trám bitum chống thấm nước ngấm làm mục nền đường.`
+              );
+            } else {
+              setTitle(`Phát hiện ${count} vết nứt rạn mặt đường tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định ${count} vết nứt rạn lưới mai rùa mặt đường bê tông nhựa (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần xử lý chống thấm sụt lún.`
+              );
+            }
           } else if (singleCat === 'ROAD_FLOODING') {
-            setTitle(`Phát hiện ${count} điểm ngập úng mặt đường tại ${loc}`);
-            setDescription(
-              `AI phát hiện ${count} điểm ứ đọng ngập nước trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần nạo vét khơi thông dòng chảy thoát nước.`
-            );
+            const isCauseway = subDetail.toLowerCase().includes('ngầm tràn') || subDetail.toLowerCase().includes('chảy xiết');
+            const isUnderpass = subDetail.toLowerCase().includes('hầm chui');
+
+            if (isCauseway) {
+              setTitle(`Phát hiện ngập đập tràn / ngầm tràn nước chảy xiết tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định 1 điểm ngập đập ngầm / ngầm tràn miền núi nước lũ cuồn cuộn chảy xiết qua mặt đường bê tông (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần cắt cử chốt chặn cảnh báo cấm người và phương tiện cố vượt qua.`
+              );
+            } else if (isUnderpass) {
+              setTitle(`Phát hiện điểm ngập sâu tại hầm chui dân sinh tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định 1 điểm ngập sâu tại hầm chui dân sinh sau mưa (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần vận hành máy bơm và cảnh báo các phương tiện không đi vào.`
+              );
+            } else {
+              setTitle(`Phát hiện ${count} điểm ngập úng mặt đường tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định ${count} điểm ứ đọng ngập nước trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần nạo vét khơi thông dòng chảy thoát nước.`
+              );
+            }
           } else {
-            const specificObst = data.obstacleDetail || 'vật cản / chướng ngại vật';
+            const specificObst = data.obstacleDetail || data.incidentDetail || 'vật cản / chướng ngại vật';
+            const isRockfall = specificObst.toLowerCase().includes('đá tảng') || specificObst.toLowerCase().includes('sạt lở đèo');
             const isFallenTree = specificObst.toLowerCase().includes('cây');
+            const isTire = specificObst.toLowerCase().includes('lốp') || specificObst.toLowerCase().includes('vỏ lốp');
+            const isFoamOrCrate = specificObst.toLowerCase().includes('thùng xốp') || specificObst.toLowerCase().includes('bàn ghế');
+            const isBarrier = specificObst.toLowerCase().includes('rào chắn') || specificObst.toLowerCase().includes('chóp nón');
+
+            if (isRockfall) {
+              setTitle(`Phát hiện vật cản là đá tảng sạt lở đèo dốc tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định 1 vật cản nguy hiểm là đá tảng sạt lở từ vách núi lăn xuống chắn ngang làn xe chạy (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần huy động xe ủi và máy xúc giải tỏa chướng ngại vật ngay lập tức.`
+              );
+            } else if (isFallenTree) {
+            const isTire = specificObst.toLowerCase().includes('lốp') || specificObst.toLowerCase().includes('vỏ lốp');
+            const isFoamOrCrate = specificObst.toLowerCase().includes('thùng xốp') || specificObst.toLowerCase().includes('bàn ghế');
             const isBarrier = specificObst.toLowerCase().includes('rào chắn') || specificObst.toLowerCase().includes('chóp nón');
 
             if (isFallenTree) {
-              setTitle(`Phát hiện ${specificObst.toLowerCase()} chắn ngang đường tại ${loc}`);
+              setTitle(`Phát hiện vật cản là cây đổ chắn ngang đường tại ${loc}`);
               setDescription(
-                `AI phát hiện ${specificObst.toLowerCase()} chắn ngang lòng đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị cử đội cây xanh đô thị và cứu hộ môi trường khẩn trương cưa cắt, thu dọn giải tỏa hiện trường để thông tuyến giao thông.`
+                `Hệ thống AI xác định 1 vật cản là cây xanh / cành cây gãy đổ chắn ngang lòng đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị cử đội cây xanh đô thị và cứu hộ môi trường khẩn trương cưa cắt, thu dọn giải tỏa hiện trường để thông tuyến giao thông.`
+              );
+            } else if (isTire) {
+              setTitle(`Phát hiện vật cản là vỏ lốp xe rơi vãi tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định 1 vật cản là xác vỏ lốp xe tải nổ / lốp xe cũ rơi vãi trên làn đường chạy (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần thu dọn ngay tránh nguy cơ gây tai nạn cho xe cộ tốc độ cao.`
+              );
+            } else if (isFoamOrCrate) {
+              setTitle(`Phát hiện vật cản là thùng xốp / bàn ghế lấn chiếm tại ${loc}`);
+              setDescription(
+                `Hệ thống AI xác định 1 vật cản là thùng xốp / bàn ghế buôn bán chiếm dụng lòng lề đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị trật tự đô thị nhắc nhở và giải tỏa hoàn trả hành lang an toàn giao thông.`
               );
             } else if (isBarrier) {
-              setTitle(`Phát hiện ${specificObst.toLowerCase()} cản trở giao thông tại ${loc}`);
+              setTitle(`Phát hiện vật cản là ${specificObst.toLowerCase()} tại ${loc}`);
               setDescription(
-                `AI phát hiện ${specificObst.toLowerCase()} cản trở an toàn giao thông trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị kiểm tra giấy phép thi công và thu dọn hiện trường gọn gàng.`
+                `Hệ thống AI xác định 1 vật cản là ${specificObst.toLowerCase()} cản trở an toàn giao thông trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị kiểm tra giấy phép thi công và thu dọn hiện trường gọn gàng.`
               );
             } else {
-              setTitle(`Phát hiện ${specificObst.toLowerCase()} trên mặt đường tại ${loc}`);
+              setTitle(`Phát hiện vật cản là ${specificObst.toLowerCase()} trên mặt đường tại ${loc}`);
               setDescription(
-                `AI phát hiện ${count} ${specificObst.toLowerCase()} gây mất an toàn giao thông trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị cử kỹ thuật viên xử lý và thu dọn hiện trường.`
+                `Hệ thống AI xác định ${count} vật cản là ${specificObst.toLowerCase()} gây mất an toàn giao thông trên mặt đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị cử kỹ thuật viên xử lý và thu dọn hiện trường.`
               );
             }
           }

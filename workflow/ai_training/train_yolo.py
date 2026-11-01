@@ -146,14 +146,14 @@ def main():
     # 2. Rà soát tổng thể bộ dữ liệu trước khi train
     inspect_dataset_totals(data_config)
 
-    # 3. Khởi tạo mô hình nền tảng YOLOv8m (Medium - 25.9M tham số tối ưu mAP & FPS)
-    model_name = 'yolov8m.pt'
-    print(f"🚀 Nạp mô hình nền tảng: {model_name}")
+    # 3. Khởi tạo mô hình nền tảng Ultralytics YOLO11m (C3k2 + Spatial Attention C2PSA - Bám sát viền đối tượng)
+    model_name = 'yolo11m.pt'
+    print(f"🚀 Nạp mô hình nền tảng Ultralytics thế hệ mới: {model_name}")
     model = YOLO(model_name)
 
     # 4. Huấn luyện với tham số tối ưu kép cho cả Ảnh hiện trường và Video tuần tra
-    run_name = 'roadcare_4class_unified'
-    print(f"📊 Bắt đầu huấn luyện mô hình đa lớp...")
+    run_name = 'roadcare_4class_v3_yolo11m'
+    print(f"📊 Bắt đầu huấn luyện mô hình đa lớp Ultralytics YOLO11m...")
     results = model.train(
         data=data_config,
         epochs=80,             # 80 Epochs đảm bảo cả 4 lớp hội tụ cân bằng
@@ -165,7 +165,7 @@ def main():
         device=device,
         project='roadvision_runs',
         name=run_name,
-        # Tối ưu hóa Augmentation chống nhầm lẫn Vạch Kẻ Đường & Bóng Râm:
+        # Tối ưu hóa Augmentation & Siết viền đối tượng:
         mosaic=0.5,            # Ghép đa tỉ lệ để nhận diện tốt vật thể từ xa đến gần
         close_mosaic=10,       # Tắt mosaic 10 epoch cuối để hộp bao viền sắc nét tối đa
         mixup=0.15,            # Xử lý tốt hiện tượng bóng râm, tán cây đổ bóng, phản chiếu mặt nước
@@ -174,8 +174,10 @@ def main():
         fliplr=0.5,            # Lật ngang ảnh
         hsv_h=0.015,           # Thay đổi sắc độ màu nhẹ
         hsv_s=0.5,             # Thay đổi độ bão hòa (vạch sơn trắng mờ, bạc màu)
-        hsv_v=0.4,             # Thay đổi độ sáng: xử lý bóng râm gắt (Shadow Invariance) và nắng chói
-        cls=1.5                # Tăng trọng số phạt phân loại nhầm lớp
+        hsv_v=0.45,            # Thay đổi độ sáng: xử lý bóng râm gắt (Shadow Invariance) và nắng chói
+        cls=1.0,               # Trọng số cân bằng phân loại lớp
+        box=8.5,               # Siết chặt viền hộp bao bám khít mép đối tượng
+        dfl=2.0                # Distribution Focal Loss tăng cường độ bám dính biên viền
     )
 
     # LƯU Ý QUAN TRỌNG VỀ DỮ LIỆU ĐỂ TRIỆT TIÊU BÁO NHẦM VẠCH TRẮNG & BÓNG RÂM:
@@ -207,12 +209,14 @@ def main():
         opset=12
     )
 
-    final_name = "yolov8_multiclass_roadcare.onnx"
+    final_name = "yolo11_multiclass_roadcare.onnx"
+    backend_compat_name = "yolov8_multiclass_roadcare.onnx"
     shutil.copy(exported_onnx, final_name)
+    shutil.copy(exported_onnx, backend_compat_name)
     size_mb = os.path.getsize(final_name) / (1024 * 1024)
-    print(f" Xuất mô hình ONNX thành công: {final_name} ({size_mb:.2f} MB)")
+    print(f" Xuất mô hình ONNX thành công: {final_name} & {backend_compat_name} ({size_mb:.2f} MB)")
     print("\n📌 HƯỚNG DẪN TÍCH HỢP HỆ THỐNG:")
-    print(f"1. Tệp '{final_name}' đã sẵn sàng nạp vào hệ thống RoadVision.")
+    print(f"1. Tệp '{backend_compat_name}' đã sẵn sàng nạp vào hệ thống RoadVision.")
     print("2. Đặt vào thư mục: roadvision-backend/src/main/resources/models/yolov8_multiclass_roadcare.onnx")
     print("3. Hệ thống Spring Boot và Giao diện Web đã đồng bộ hoàn toàn 4 lớp:")
     print("   [0: POTHOLE] - [1: ROAD_CRACK] - [2: ROAD_FLOODING] - [3: ROAD_OBSTACLE]\n")
