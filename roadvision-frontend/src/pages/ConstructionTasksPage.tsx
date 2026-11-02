@@ -536,33 +536,26 @@ export const ConstructionTasksPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {/* Hành động dành riêng cho ADMIN */}
+                    {/* Hành động dành riêng cho ADMIN - CHỈ XEM (ACTION VIEW) */}
                     {isAdmin ? (
-                      <>
-                        {['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(task.status) && (
-                          <button
-                            onClick={() => {
-                              setReviewAcceptanceTask(task);
-                              setAdminDecision('APPROVE');
-                              setReworkInstructions('');
-                              setAcceptanceNotesAdmin('Nghiệm thu đạt yêu cầu kỹ thuật và an toàn giao thông.');
-                            }}
-                            className="px-3.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs"
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>Thẩm định nghiệm thu</span>
-                          </button>
-                        )}
-
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => setGalleryTask(task)}
-                          className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1 transition-colors"
-                          title="Xem toàn bộ ảnh Before, Progress, After của công trình"
+                          className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                          title="Xem toàn bộ ảnh Trước, Trong và Sau thi công của công trình"
                         >
                           <Camera className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Xem bằng chứng</span>
+                          <span>Xem bằng chứng & Tiến độ</span>
                         </button>
-                      </>
+                        <Link
+                          to={`/incidents/${task.id}`}
+                          className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-blue-700 font-medium text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
+                          title="Xem hồ sơ chi tiết sự cố"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Xem chi tiết</span>
+                        </Link>
+                      </div>
                     ) : (
                       /* Hành động dành cho Kỹ thuật viên (STAFF) */
                       <>
@@ -1131,11 +1124,18 @@ export const ConstructionTasksPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                <Link
+                  to={`/incidents/${galleryTask.id}`}
+                  className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-xs"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Xem hồ sơ chi tiết đầy đủ</span>
+                </Link>
                 <button
                   type="button"
                   onClick={() => setGalleryTask(null)}
-                  className="px-4 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium"
+                  className="px-4 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer transition-colors"
                 >
                   Đóng
                 </button>

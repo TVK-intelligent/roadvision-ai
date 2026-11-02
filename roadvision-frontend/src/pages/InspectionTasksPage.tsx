@@ -745,34 +745,27 @@ export const InspectionTasksPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {/* Hành động dành riêng cho ADMIN */}
+                    {/* Hành động dành riêng cho ADMIN - CHỈ XEM (ACTION VIEW) */}
                     {isAdmin ? (
-                      <>
-                        {task.status === 'INSPECTED' && (
+                      <div className="flex items-center gap-2">
+                        {(isInspectedDone || isTransferredToConstruction(task) || Boolean(task.inspection?.confirmedCategory)) ? (
                           <button
                             onClick={() => {
                               setReviewTask(task);
-                              setIsRevisionMode(false);
-                              setRevisionNotes('');
                             }}
-                            className="px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                            className="px-3 py-1.5 rounded-md bg-white hover:bg-slate-50 text-blue-700 font-medium text-xs flex items-center gap-1.5 transition-colors border border-blue-200 shadow-2xs cursor-pointer"
                           >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Xem biên bản & Thẩm định</span>
-                          </button>
-                        )}
-                        {isTransferredToConstruction(task) && (
-                          <button
-                            onClick={() => {
-                              setReviewTask(task);
-                              setIsRevisionMode(false);
-                              setRevisionNotes('');
-                            }}
-                            className="px-3 py-1.5 rounded-md bg-teal-50 hover:bg-teal-100 text-teal-800 font-medium text-xs flex items-center gap-1.5 transition-colors border border-teal-300 cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-teal-600" />
+                            <Eye className="w-3.5 h-3.5 text-blue-600" />
                             <span>Xem biên bản khảo sát</span>
                           </button>
+                        ) : (
+                          <Link
+                            to={`/incidents/${task.id}`}
+                            className="px-3 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors border border-slate-200 shadow-2xs"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Xem chi tiết</span>
+                          </Link>
                         )}
                         {task.status === 'INSPECTING' && (
                           <span className="text-[11px] font-medium text-sky-700 bg-sky-50 px-2 py-1 rounded border border-sky-200 flex items-center gap-1">
@@ -784,7 +777,7 @@ export const InspectionTasksPage: React.FC = () => {
                             <Clock className="w-3 h-3" /> Chờ tổ tiếp cận
                           </span>
                         )}
-                      </>
+                      </div>
                     ) : (
                       /* Hành động dành cho Kỹ thuật viên hiện trường (STAFF) */
                       <>
@@ -1190,16 +1183,13 @@ export const InspectionTasksPage: React.FC = () => {
                     Biên bản Khảo sát Hiện trường #{reviewTask.ticketCode}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Thẩm định số liệu đo đạc kỹ thuật & Phê duyệt phương án thi công
+                    Chi tiết số liệu đo đạc thực địa, khối lượng vật tư và giải pháp kỹ thuật đề xuất
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => {
-                  setReviewTask(null);
-                  setIsRevisionMode(false);
-                }}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                onClick={() => setReviewTask(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1287,79 +1277,36 @@ export const InspectionTasksPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Chế độ yêu cầu khảo sát lại */}
-              {isRevisionMode && (
-                <div className="p-3 bg-amber-50 rounded-lg border border-amber-300 flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5 font-semibold text-amber-900">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span>Nội dung yêu cầu Tổ khảo sát đo đạc lại hoặc bổ sung:</span>
-                  </div>
-                  <textarea
-                    rows={2}
-                    value={revisionNotes}
-                    onChange={(e) => setRevisionNotes(e.target.value)}
-                    placeholder="Ví dụ: Kích thước độ sâu chưa chuẩn xác, yêu cầu kiểm tra lại bề rộng rãnh nứt..."
-                    className="w-full px-2.5 py-1.5 rounded bg-white border border-amber-300 text-xs text-slate-800 focus:outline-hidden"
-                  />
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsRevisionMode(false)}
-                      className="px-3 py-1 rounded text-slate-600 hover:bg-slate-100"
-                    >
-                      Hủy
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isRejectingSurvey}
-                      onClick={() => handleAdminRejectInspection(reviewTask.id)}
-                      className="px-3 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs"
-                    >
-                      {isRejectingSurvey ? 'Đang gửi...' : 'Xác nhận gửi yêu cầu'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Các nút hành động của Admin */}
+              {/* Footer Modal: Chỉ View & Link xem chi tiết hồ sơ */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
                 <Link
                   to={`/incidents/${reviewTask.id}`}
-                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium text-xs"
+                  className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-xs"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Xem hồ sơ gốc đầy đủ</span>
+                  <span>Xem hồ sơ chi tiết đầy đủ</span>
                 </Link>
 
-                {isTransferredToConstruction(reviewTask) ? (
-                  <div className="flex items-center gap-1.5 text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-md border border-emerald-200 text-xs font-semibold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Hồ sơ đã phê duyệt & chuyển sang Tổ Thi Công</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    {!isRevisionMode && (
-                      <button
-                        type="button"
-                        onClick={() => setIsRevisionMode(true)}
-                        className="px-3 py-1.5 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium text-xs flex items-center gap-1 cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Yêu cầu khảo sát lại</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      disabled={isApprovingSurvey}
-                      onClick={() => handleAdminApproveInspection(reviewTask.id)}
-                      className="px-4 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>{isApprovingSurvey ? 'Đang duyệt...' : 'Phê duyệt phương án'}</span>
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {isTransferredToConstruction(reviewTask) ? (
+                    <span className="flex items-center gap-1.5 text-emerald-800 bg-emerald-50 px-3 py-1 rounded-md border border-emerald-200 text-xs font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Đã bàn giao thi công</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-blue-800 bg-blue-50 px-3 py-1 rounded-md border border-blue-200 text-xs font-semibold">
+                      <FileCheck className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Báo cáo hoàn tất</span>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setReviewTask(null)}
+                    className="px-4 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs cursor-pointer transition-colors"
+                  >
+                    Đóng
+                  </button>
+                </div>
               </div>
             </div>
           </div>
