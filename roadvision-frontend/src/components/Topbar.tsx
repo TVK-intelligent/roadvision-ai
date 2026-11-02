@@ -589,10 +589,25 @@ export const Topbar: React.FC<TopbarProps> = ({
                           type="button"
                           onClick={() => {
                             setIsUserMenuOpen(false);
+                            switchRoleWithCredentials('patrol.khu1@roadcare.gov.vn');
+                          }}
+                          className={`px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                            user.email === 'patrol.khu1@roadcare.gov.vn' || user.teamType === 'PATROL'
+                              ? 'bg-cyan-100 text-cyan-800 font-bold border border-cyan-200'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'
+                          }`}
+                        >
+                          <span>📹 Tuần tra</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
                             switchRoleWithCredentials('staff.khu1@roadcare.gov.vn');
                           }}
                           className={`px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                            user.email === 'staff.khu1@roadcare.gov.vn'
+                            user.email === 'staff.khu1@roadcare.gov.vn' || user.teamType === 'INSPECTION'
                               ? 'bg-sky-100 text-sky-800 font-bold border border-sky-200'
                               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'
                           }`}
@@ -607,7 +622,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                             switchRoleWithCredentials('staff.khu4@roadcare.gov.vn');
                           }}
                           className={`px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                            user.email === 'staff.khu4@roadcare.gov.vn'
+                            user.email === 'staff.khu4@roadcare.gov.vn' || user.teamType === 'CONSTRUCTION'
                               ? 'bg-amber-100 text-amber-800 font-bold border border-amber-200'
                               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'
                           }`}
@@ -621,7 +636,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                             setIsUserMenuOpen(false);
                             switchRoleWithCredentials('citizen.an@gmail.com');
                           }}
-                          className={`px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                          className={`col-span-2 px-2 py-1.5 rounded-md text-left font-medium transition-colors cursor-pointer flex items-center justify-center gap-1 ${
                             user.role === 'ROLE_CITIZEN'
                               ? 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-200'
                               : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'

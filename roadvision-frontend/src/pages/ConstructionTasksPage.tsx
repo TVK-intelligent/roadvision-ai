@@ -164,8 +164,8 @@ export const ConstructionTasksPage: React.FC = () => {
             const constructionOnly = res.data.content.filter((i) => {
               const isConstructionStatus = ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED'].includes(i.status);
               if (!isConstructionStatus) return false;
-              // Nếu là nhân viên khảo sát, không nhận việc thi công
-              if (user?.teamType === 'INSPECTION') return false;
+              // Nếu là nhân viên tuần tra hoặc khảo sát, không nhận việc thi công
+              if (user?.teamType === 'PATROL' || user?.teamType === 'INSPECTION') return false;
               // Nếu có teamId, kiểm tra xem có đúng tổ thi công được giao không
               if (user?.teamId && i.assignedTeamId && i.assignedTeamId !== user.teamId) return false;
               return true;

@@ -33,6 +33,7 @@ import {
   Building2,
   Calendar,
   Lock,
+  Video,
   Unlock,
   UserPlus,
   ArrowUpRight,
@@ -162,6 +163,7 @@ export const AdminTeamsPage: React.FC = () => {
   // KPI counts
   const kpiStats = useMemo(() => {
     const totalTeams = teams.length;
+    const patrolTeams = teams.filter((t) => t.teamType === 'PATROL').length;
     const inspectionTeams = teams.filter((t) => t.teamType === 'INSPECTION').length;
     const constructionTeams = teams.filter((t) => t.teamType === 'CONSTRUCTION').length;
     const emergencyTeams = teams.filter((t) => t.teamType === 'EMERGENCY').length;
@@ -177,6 +179,7 @@ export const AdminTeamsPage: React.FC = () => {
 
     return {
       totalTeams,
+      patrolTeams,
       inspectionTeams,
       constructionTeams,
       emergencyTeams,
@@ -193,6 +196,13 @@ export const AdminTeamsPage: React.FC = () => {
   // Helper for Team Type badges
   const renderTeamTypeBadge = (type: TeamType) => {
     switch (type) {
+      case 'PATROL':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-cyan-50 text-cyan-700 border border-cyan-200">
+            <Video className="w-3.5 h-3.5 text-cyan-600" />
+            Tuần tra camera AI
+          </span>
+        );
       case 'INSPECTION':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
@@ -429,8 +439,8 @@ export const AdminTeamsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. CÁC THẺ KPI TỔNG QUAN (4 THẺ NỀN TRẮNG CHUẨN) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 2. CÁC THẺ KPI TỔNG QUAN (5 THẺ CHUYÊN MÔN HÓA) */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Card 1: Tổng số đội */}
         <div className="p-4 rounded-lg bg-white border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
@@ -440,12 +450,24 @@ export const AdminTeamsPage: React.FC = () => {
               {kpiStats.assignedStaff}/{kpiStats.totalStaff} nhân sự đã vào đội
             </div>
           </div>
-          <div className="w-9 h-9 rounded-md bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-md bg-slate-50 text-slate-600 border border-slate-200 flex items-center justify-center">
             <Building2 className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Card 2: Đội Khảo sát */}
+        {/* Card 2: Đội Tuần tra */}
+        <div className="p-4 rounded-lg bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-medium text-slate-500">Tổ Tuần tra Tuyến (AI)</div>
+            <div className="text-xl font-bold text-cyan-600 mt-0.5">{kpiStats.patrolTeams} đội</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Quét Camera AI hành trình</div>
+          </div>
+          <div className="w-9 h-9 rounded-md bg-cyan-50 text-cyan-600 border border-cyan-100 flex items-center justify-center">
+            <Video className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 3: Đội Khảo sát */}
         <div className="p-4 rounded-lg bg-white border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <div className="text-[11px] font-medium text-slate-500">Tổ Khảo sát hiện trường</div>
@@ -457,7 +479,7 @@ export const AdminTeamsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 3: Đội Thi công */}
+        {/* Card 4: Đội Thi công */}
         <div className="p-4 rounded-lg bg-white border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <div className="text-[11px] font-medium text-slate-500">Tổ Thi công sửa chữa</div>
@@ -469,7 +491,7 @@ export const AdminTeamsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 4: Cơ động khẩn cấp */}
+        {/* Card 5: Cơ động khẩn cấp */}
         <div className="p-4 rounded-lg bg-white border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <div className="text-[11px] font-medium text-slate-500">Cơ động khẩn cấp 24/7</div>
@@ -519,7 +541,7 @@ export const AdminTeamsPage: React.FC = () => {
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                 Lọc:
               </span>
-              {(['ALL', 'INSPECTION', 'CONSTRUCTION', 'EMERGENCY'] as const).map((type) => (
+              {(['ALL', 'PATROL', 'INSPECTION', 'CONSTRUCTION', 'EMERGENCY'] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setTeamTypeFilter(type)}
@@ -531,6 +553,8 @@ export const AdminTeamsPage: React.FC = () => {
                 >
                   {type === 'ALL'
                     ? 'Tất cả tổ đội'
+                    : type === 'PATROL'
+                    ? 'Tuần tra Camera AI'
                     : type === 'INSPECTION'
                     ? 'Khảo sát hiện trường'
                     : type === 'CONSTRUCTION'
@@ -659,8 +683,22 @@ export const AdminTeamsPage: React.FC = () => {
             <div className="flex flex-col gap-6">
               {[
                 {
+                  key: 'PATROL' as const,
+                  title: '1. NHÓM TỔ TUẦN TRA TUYẾN ĐƯỜNG (CAMERA AI HÀNH TRÌNH)',
+                  desc: 'Di chuyển theo tuyến bằng camera hành trình AI, tự động phát hiện sớm ổ gà, rạn nứt, ngập úng và lập Sổ tuần đường điện tử',
+                  icon: Video,
+                  teams: filteredTeams.filter((t) => t.teamType === 'PATROL'),
+                  theme: {
+                    border: 'border-l-4 border-l-cyan-600',
+                    headerBg: 'bg-cyan-50/70 border-cyan-200',
+                    titleColor: 'text-cyan-950',
+                    iconBg: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+                    pill: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+                  },
+                },
+                {
                   key: 'INSPECTION' as const,
-                  title: '1. NHÓM TỔ KHẢO SÁT & THẨM ĐỊNH HIỆN TRƯỜNG',
+                  title: '2. NHÓM TỔ KHẢO SÁT & ĐÁNH GIÁ KỸ THUẬT',
                   desc: 'Tiếp cận thực địa trong 60 phút, đo đạc kích thước rạn nứt/ổ gà, bay Flycam trắc địa và thẩm định tính xác thực của AI',
                   icon: Compass,
                   teams: filteredTeams.filter((t) => t.teamType === 'INSPECTION'),
@@ -674,7 +712,7 @@ export const AdminTeamsPage: React.FC = () => {
                 },
                 {
                   key: 'CONSTRUCTION' as const,
-                  title: '2. NHÓM TỔ THI CÔNG & DUY TU SỬA CHỮA',
+                  title: '3. NHÓM TỔ THI CÔNG & DUY TU SỬA CHỮA',
                   desc: 'Trang bị cơ giới cào bóc thảm nhựa nóng polymer, lu lèn đầm nén vá hố sụt triệt để và hoàn thiện êm thuận mặt đường',
                   icon: HardHat,
                   teams: filteredTeams.filter((t) => t.teamType === 'CONSTRUCTION'),
@@ -688,8 +726,8 @@ export const AdminTeamsPage: React.FC = () => {
                 },
                 {
                   key: 'EMERGENCY' as const,
-                  title: '3. NHÓM TỔ PHẢN ỨNG KHẨN CẤP & TUẦN TRA CƠ ĐỘNG',
-                  desc: 'Tuần tra video camera hành trình AI, trực chiến 24/7 giải tỏa cây đổ, chướng ngại vật lòng đường, sạt trượt và ngập úng mùa mưa lũ',
+                  title: '4. NHÓM TỔ CƠ ĐỘNG PHẢN ỨNG NHANH 24/7',
+                  desc: 'Trực chiến 24/7 giải tỏa cây đổ, chướng ngại vật lòng đường, sạt trượt và ngập úng mùa mưa bão',
                   icon: AlertTriangle,
                   teams: filteredTeams.filter((t) => t.teamType === 'EMERGENCY'),
                   theme: {
@@ -1179,7 +1217,8 @@ export const AdminTeamsPage: React.FC = () => {
                     onChange={(e) => setTeamFormData({ ...teamFormData, teamType: e.target.value as TeamType })}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
                   >
-                    <option value="INSPECTION">Quản lý nhiệm vụ khảo sát</option>
+                    <option value="PATROL">Tuần tra camera AI hành trình</option>
+                    <option value="INSPECTION">Khảo sát & đánh giá kỹ thuật</option>
                     <option value="CONSTRUCTION">Thi công sửa chữa</option>
                     <option value="EMERGENCY">Cơ động khẩn cấp 24/7</option>
                   </select>

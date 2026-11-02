@@ -128,6 +128,7 @@ export const InspectionTasksPage: React.FC = () => {
             const inspectionOnly = res.data.content.filter((i) => {
               const isInspectionStatus = ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(i.status);
               if (!isInspectionStatus) return false;
+              if (user?.teamType === 'PATROL' || user?.teamType === 'CONSTRUCTION') return false;
               if (user?.teamId && i.inspectionTeamId && i.inspectionTeamId !== user.teamId) return false;
               return true;
             });

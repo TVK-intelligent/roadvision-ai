@@ -145,17 +145,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="border-t border-[#243048] my-2" />
               )}
               <nav className="space-y-1">
-                <Link
-                  to="/patrol"
-                  onClick={closeMobile}
-                  className={navItemClass('/patrol')}
-                  title="Tuần tra tuyến đường bằng Camera AI hành trình"
-                >
-                  <Video className="w-4 h-4 shrink-0 text-cyan-400" />
-                  {!isCollapsed && <span>Tuần tra Tuyến đường (AI)</span>}
-                </Link>
-                {/* 1. Khảo sát hiện trường: Dành riêng cho Admin, hoặc Nhân viên thuộc Đội Khảo sát (INSPECTION) / Khẩn cấp */}
-                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'INSPECTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && !user?.email?.includes('khu4'))) && (
+                {/* 1. Tuần tra Tuyến đường: Dành riêng cho Admin, hoặc Nhân viên thuộc Tổ Tuần tra (PATROL) / Khẩn cấp */}
+                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'PATROL' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && user?.email?.includes('patrol'))) && (
+                  <Link
+                    to="/patrol"
+                    onClick={closeMobile}
+                    className={navItemClass('/patrol')}
+                    title="Tuần tra tuyến đường bằng Camera AI hành trình"
+                  >
+                    <Video className="w-4 h-4 shrink-0 text-cyan-400" />
+                    {!isCollapsed && <span>Tuần tra Tuyến đường (AI)</span>}
+                  </Link>
+                )}
+
+                {/* 2. Khảo sát hiện trường: Dành riêng cho Admin, hoặc Nhân viên thuộc Tổ Khảo sát (INSPECTION) / Khẩn cấp */}
+                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'INSPECTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && !user?.email?.includes('khu4') && !user?.email?.includes('patrol'))) && (
                   <Link
                     to="/inspection-tasks"
                     onClick={closeMobile}
@@ -167,8 +171,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </Link>
                 )}
 
-                {/* 2. Thi công sửa chữa: Dành riêng cho Admin, hoặc Nhân viên thuộc Đội Thi công (CONSTRUCTION) / Khẩn cấp */}
-                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'CONSTRUCTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && user?.email?.includes('khu4'))) && (
+                {/* 3. Thi công sửa chữa: Dành riêng cho Admin, hoặc Nhân viên thuộc Tổ Thi công (CONSTRUCTION) / Khẩn cấp */}
+                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'CONSTRUCTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && (user?.email?.includes('khu4') || user?.email?.includes('construct')))) && (
                   <Link
                     to="/construction-tasks"
                     onClick={closeMobile}

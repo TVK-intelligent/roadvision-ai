@@ -336,7 +336,7 @@ export interface AdminAnalyticsResponse {
   urgentIncidents: Incident[];
 }
 
-export type TeamType = 'INSPECTION' | 'CONSTRUCTION' | 'EMERGENCY';
+export type TeamType = 'PATROL' | 'INSPECTION' | 'CONSTRUCTION' | 'EMERGENCY';
 
 export interface TeamMemberSummary {
   id: number;

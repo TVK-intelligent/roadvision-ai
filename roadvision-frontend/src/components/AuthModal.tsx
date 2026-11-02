@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/authApi';
-import { Shield, ShieldCheck, Lock, Mail, User, Phone, AlertCircle, X, Compass, HardHat, ArrowRight } from 'lucide-react';
+import { Shield, ShieldCheck, Lock, Mail, User, Phone, AlertCircle, X, Compass, HardHat, ArrowRight, Video } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -33,10 +33,21 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     description: 'Điều hành toàn diện, duyệt thẩm định & giao việc',
   },
   {
+    id: 'PATROL',
+    label: '2. Đội trưởng Tuần tra (AI)',
+    roleBadge: 'Tổ Tuần tra',
+    fullName: 'Trần Tuần Kiểm (Phía Bắc Hà Nội)',
+    email: 'patrol.khu1@roadcare.gov.vn',
+    icon: <Video className="w-4 h-4 text-cyan-600 shrink-0" />,
+    badgeClass: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    cardClass: 'hover:border-cyan-400 hover:bg-cyan-50/50 border-cyan-200/80 bg-cyan-50/20',
+    description: 'Chạy xe camera AI tuần đường & lập sổ nhật ký ca',
+  },
+  {
     id: 'INSPECTION',
-    label: '2. Cán bộ Khảo sát',
+    label: '3. Cán bộ Khảo sát',
     roleBadge: 'Tổ Khảo sát',
-    fullName: 'Nguyễn Văn Kỹ Thuật (Khu QLĐB I)',
+    fullName: 'Nguyễn Văn Kỹ Thuật (Cầu Giấy)',
     email: 'staff.khu1@roadcare.gov.vn',
     icon: <Compass className="w-4 h-4 text-sky-600 shrink-0" />,
     badgeClass: 'bg-sky-100 text-sky-800 border-sky-200',
@@ -45,9 +56,9 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     id: 'CONSTRUCTION',
-    label: '3. Đội trưởng Thi công',
+    label: '4. Đội trưởng Thi công',
     roleBadge: 'Tổ Thi công',
-    fullName: 'Phạm Văn Phương Nam (Khu QLĐB IV)',
+    fullName: 'Phạm Văn Phương Nam (Ba Đình)',
     email: 'staff.khu4@roadcare.gov.vn',
     icon: <HardHat className="w-4 h-4 text-amber-600 shrink-0" />,
     badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -56,7 +67,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     id: 'CITIZEN',
-    label: '4. Người dân (Công dân)',
+    label: '5. Người dân (Công dân)',
     roleBadge: 'Người dân',
     fullName: 'Lê Hoàng An',
     email: 'citizen.an@gmail.com',

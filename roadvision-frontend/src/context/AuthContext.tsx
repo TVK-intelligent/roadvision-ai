@@ -81,7 +81,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchRoleWithCredentials = async (roleOrEmail: string, customPassword = '12345678') => {
     let targetEmail = 'admin@roadcare.gov.vn';
-    if (roleOrEmail === 'ROLE_STAFF' || roleOrEmail === 'INSPECTION') {
+    if (roleOrEmail === 'PATROL') {
+      targetEmail = 'patrol.khu1@roadcare.gov.vn';
+    } else if (roleOrEmail === 'ROLE_STAFF' || roleOrEmail === 'INSPECTION') {
       targetEmail = 'staff.khu1@roadcare.gov.vn';
     } else if (roleOrEmail === 'CONSTRUCTION') {
       targetEmail = 'staff.khu4@roadcare.gov.vn';
