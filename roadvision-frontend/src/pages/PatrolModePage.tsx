@@ -2015,19 +2015,21 @@ export const PatrolModePage: React.FC = () => {
             )}
           </button>
 
-          {/* Tab 2: Theo Dõi & Quét Video AI */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('CAMERA')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'CAMERA'
-                ? 'bg-primary text-on-primary shadow-sm'
-                : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-            }`}
-          >
-            <Video className="w-4 h-4 text-blue-400" />
-            <span>{isAdmin ? 'Theo Dõi & Quét Video AI' : 'Thực Hiện Tuần Tra (AI Video)'}</span>
-          </button>
+          {/* Tab 2: Theo Dõi & Quét Video AI (Chỉ hiển thị cho Nhân viên Tuần tra, Admin không cần) */}
+          {!isAdmin && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('CAMERA')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'CAMERA'
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+              }`}
+            >
+              <Video className="w-4 h-4 text-blue-400" />
+              <span>Thực Hiện Tuần Tra (AI Video)</span>
+            </button>
+          )}
 
           {/* Tab 3: Sổ Nhật Ký & Giám Sát Tuyến Đường (PCI) */}
           <button
@@ -2239,39 +2241,47 @@ export const PatrolModePage: React.FC = () => {
                           <div className="flex items-center justify-end gap-1.5">
                             {asg.status === 'SCHEDULED' && (
                               <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStartAssignment(asg)}
-                                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                                  title="Kích hoạt tuyến đường và bật camera AI"
-                                >
-                                  <Play className="w-3.5 h-3.5 fill-current" />
-                                  <span>Bắt đầu ca</span>
-                                </button>
-                                {isAdmin && (
+                                {!isAdmin ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartAssignment(asg)}
+                                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                    title="Kích hoạt tuyến đường và bật camera AI"
+                                  >
+                                    <Play className="w-3.5 h-3.5 fill-current" />
+                                    <span>Bắt đầu ca</span>
+                                  </button>
+                                ) : (
                                   <button
                                     type="button"
                                     onClick={() => handleCancelAssignment(asg.id)}
-                                    className="p-1.5 rounded-xl hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
-                                    title="Hủy lệnh tuần tra"
+                                    className="px-2.5 py-1.5 rounded-xl hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/30 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Hủy lệnh tuần tra này"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Hủy ca</span>
                                   </button>
                                 )}
                               </>
                             )}
 
                             {asg.status === 'IN_PROGRESS' && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleStartAssignment(asg);
-                                }}
-                                className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                              >
-                                <Video className="w-3.5 h-3.5" />
-                                <span>Giám sát camera</span>
-                              </button>
+                              <>
+                                {!isAdmin ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartAssignment(asg)}
+                                    className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                  >
+                                    <Video className="w-3.5 h-3.5" />
+                                    <span>Mở Camera</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-cyan-400 font-mono font-medium">
+                                    Đang tuần tra
+                                  </span>
+                                )}
+                              </>
                             )}
 
                             {asg.status === 'COMPLETED' && (
