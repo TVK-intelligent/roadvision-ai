@@ -50,6 +50,9 @@ const LeaderboardPage = lazy(() =>
 const PhotoGuidePage = lazy(() =>
   import('./pages/PhotoGuidePage').then((m) => ({ default: m.PhotoGuidePage }))
 );
+const IncidentReportsPage = lazy(() =>
+  import('./pages/IncidentReportsPage').then((m) => ({ default: m.IncidentReportsPage }))
+);
 
 
 export function App() {
@@ -115,6 +118,16 @@ export function App() {
                     element={
                       <ProtectedRoute allowedRoles={['ROLE_STAFF', 'ROLE_ADMIN']}>
                         <InspectionTasksPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Tuyến Nghiệp Vụ: Báo cáo sự cố toàn diện (Dành cho Admin & Cán bộ) */}
+                  <Route
+                    path="/reports"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_ADMIN', 'ROLE_STAFF']}>
+                        <IncidentReportsPage />
                       </ProtectedRoute>
                     }
                   />

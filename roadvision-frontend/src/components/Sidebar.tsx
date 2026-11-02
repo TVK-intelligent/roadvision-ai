@@ -190,17 +190,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* GROUP 3: QUẢN TRỊ ĐIỀU HÀNH (ADMIN) */}
+          {/* GROUP 2: QUẢN LÝ NGHIỆP VỤ (ADMIN) */}
           {user?.role === 'ROLE_ADMIN' && (
             <div>
               {!isCollapsed ? (
                 <div className="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Quản trị hệ thống
+                  Quản lý nghiệp vụ
                 </div>
               ) : (
                 <div className="border-t border-[#243048] my-2" />
               )}
               <nav className="space-y-1">
+                <Link
+                  to="/reports"
+                  onClick={closeMobile}
+                  className={navItemClass('/reports')}
+                  title="Danh sách báo cáo sự cố từ Người dân & Camera AI"
+                >
+                  <FileText className="w-4 h-4 shrink-0 text-blue-400" />
+                  {!isCollapsed && <span>Báo cáo sự cố</span>}
+                </Link>
+
+                <Link
+                  to="/inspection-tasks"
+                  onClick={closeMobile}
+                  className={navItemClass('/inspection-tasks')}
+                  title="Khảo sát đo đạc hiện trường (4 Tổ Khảo sát)"
+                >
+                  <Compass className="w-4 h-4 shrink-0 text-teal-400" />
+                  {!isCollapsed && <span>Khảo sát hiện trường</span>}
+                </Link>
+
+                <Link
+                  to="/construction-tasks"
+                  onClick={closeMobile}
+                  className={navItemClass('/construction-tasks')}
+                  title="Thi công sửa chữa & Nghiệm thu (4 Tổ Thi công)"
+                >
+                  <HardHat className="w-4 h-4 shrink-0 text-amber-400" />
+                  {!isCollapsed && <span>Thi công sửa chữa</span>}
+                </Link>
+
                 <Link
                   to="/dispatch"
                   onClick={closeMobile}
@@ -210,22 +240,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
                   {!isCollapsed && <span>Điều phối & Phân công</span>}
                 </Link>
+              </nav>
+            </div>
+          )}
 
+          {/* GROUP 3: GIÁM SÁT & QUẢN TRỊ (ADMIN) */}
+          {user?.role === 'ROLE_ADMIN' && (
+            <div>
+              {!isCollapsed ? (
+                <div className="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Giám sát & Quản trị
+                </div>
+              ) : (
+                <div className="border-t border-[#243048] my-2" />
+              )}
+              <nav className="space-y-1">
                 <Link
                   to="/patrol"
                   onClick={closeMobile}
                   className={navItemClass('/patrol')}
-                  title="Giám sát & Sổ nhật ký ca tuần đường toàn tuyến"
+                  title="Kế hoạch giao ca & Sổ nhật ký ca tuần đường toàn tuyến"
                 >
-                  <History className="w-4 h-4 shrink-0 text-cyan-400" />
-                  {!isCollapsed && <span>Nhật ký Tuần tra (AI)</span>}
+                  <Video className="w-4 h-4 shrink-0 text-cyan-400" />
+                  {!isCollapsed && <span>Nhật ký tuần tra (AI)</span>}
                 </Link>
 
                 <Link
                   to="/admin/teams"
                   onClick={closeMobile}
                   className={navItemClass('/admin/teams')}
-                  title="Quản lý 12 tổ đội chuyên trách & nhân lực"
+                  title="Quản lý 13 tổ đội chuyên trách & nhân lực"
                 >
                   <Users className="w-4 h-4 shrink-0 text-sky-400" />
                   {!isCollapsed && <span>Tổ đội & Nhân sự</span>}

@@ -51,7 +51,117 @@ import {
   ShieldCheck,
   AlertTriangle,
   Navigation,
+  Calendar,
+  Plus,
+  Clock,
+  Truck,
+  ShieldAlert,
+  ArrowRight,
+  X,
+  AlertCircle,
+  Copy,
+  Users,
+  UserCheck,
 } from 'lucide-react';
+
+export interface PatrolAssignment {
+  id: string;
+  assignmentCode: string;
+  teamId: number;
+  teamName: string;
+  leaderName: string;
+  leaderEmail: string;
+  routeName: string;
+  routeCode: 'SAMPLE_1' | 'SAMPLE_2' | 'SAMPLE_3';
+  routeDistanceKm: number;
+  shift: 'MORNING' | 'AFTERNOON' | 'EMERGENCY';
+  shiftLabel: string;
+  scheduledDate: string;
+  vehicleNumber: string;
+  instructions: string;
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  createdAt: string;
+  assignedByAdminName: string;
+}
+
+const DEFAULT_PATROL_ASSIGNMENTS: PatrolAssignment[] = [
+  {
+    id: 'asg-1',
+    assignmentCode: '#TT-2026-001',
+    teamId: 10,
+    teamName: 'Tổ Tuần Tra 1 - Phía Bắc',
+    leaderName: 'Đ/c Trần Văn Tuần (Trưởng tổ)',
+    leaderEmail: 'patrol.khu1@roadcare.gov.vn',
+    routeName: 'Tuyến ĐH.08 (Xã Thanh Lâm - Phố Cà, Thanh Liêm, Hà Nam)',
+    routeCode: 'SAMPLE_1',
+    routeDistanceKm: 0.99,
+    shift: 'MORNING',
+    shiftLabel: 'Ca Sáng (07:30 - 11:30)',
+    scheduledDate: '2026-11-02',
+    vehicleNumber: '29C-882.11 (Xe bán tải chuyên dụng + Camera AI 4K)',
+    instructions: 'Tuần tra toàn tuyến ĐH.08, chú ý ranh giới cầu Đáy và ngã ba Phố Cà, vận tốc ≤ 40km/h để camera AI bắt nét.',
+    status: 'SCHEDULED',
+    createdAt: '2026-11-02T07:00:00Z',
+    assignedByAdminName: 'KS. Nguyễn Thị Phương (Admin Sở GTVT)',
+  },
+  {
+    id: 'asg-2',
+    assignmentCode: '#TT-2026-002',
+    teamId: 11,
+    teamName: 'Tổ Tuần Tra 2 - Phía Nam',
+    leaderName: 'Đ/c Lê Văn Nam',
+    leaderEmail: 'patrol.khu2@roadcare.gov.vn',
+    routeName: 'Tuyến Quốc Lộ 1A (Đoạn Kiện Khê - Phố Cà, Hà Nam)',
+    routeCode: 'SAMPLE_2',
+    routeDistanceKm: 1.12,
+    shift: 'AFTERNOON',
+    shiftLabel: 'Ca Chiều (13:30 - 17:30)',
+    scheduledDate: '2026-11-02',
+    vehicleNumber: '29C-741.05 (Xe tuần tra giám sát)',
+    instructions: 'Kiểm tra làn xe máy và các vị trí vết nứt mặt đường dọc tuyến Quốc Lộ 1A.',
+    status: 'SCHEDULED',
+    createdAt: '2026-11-02T07:15:00Z',
+    assignedByAdminName: 'KS. Nguyễn Thị Phương (Admin Sở GTVT)',
+  },
+  {
+    id: 'asg-3',
+    assignmentCode: '#TT-2026-003',
+    teamId: 12,
+    teamName: 'Tổ Tuần Tra 3 - Phía Đông',
+    leaderName: 'Đ/c Hoàng Văn Đông',
+    leaderEmail: 'patrol.khu3@roadcare.gov.vn',
+    routeName: 'Đường Tỉnh ĐT.494 (Nút giao Liêm Tuyền - Thanh Liêm)',
+    routeCode: 'SAMPLE_3',
+    routeDistanceKm: 1.45,
+    shift: 'MORNING',
+    shiftLabel: 'Ca Sáng (07:30 - 11:30)',
+    scheduledDate: '2026-11-02',
+    vehicleNumber: '29C-553.89 (Camera Dashcam AI HDR)',
+    instructions: 'Đã hoàn thành quét video và đồng bộ chỉ số PCI (PCI = 82/100).',
+    status: 'COMPLETED',
+    createdAt: '2026-11-02T06:30:00Z',
+    assignedByAdminName: 'KS. Nguyễn Thị Phương (Admin Sở GTVT)',
+  },
+  {
+    id: 'asg-4',
+    assignmentCode: '#TT-2026-004',
+    teamId: 13,
+    teamName: 'Tổ Tuần Tra 4 - Phía Tây',
+    leaderName: 'Đ/c Phạm Văn Tây',
+    leaderEmail: 'patrol.khu4@roadcare.gov.vn',
+    routeName: 'Trục Đại Lộ Thăng Long & Đường gom Vành Đai 3',
+    routeCode: 'SAMPLE_1',
+    routeDistanceKm: 2.1,
+    shift: 'EMERGENCY',
+    shiftLabel: 'Đột Xuất (Sau Giông Lốc)',
+    scheduledDate: '2026-11-02',
+    vehicleNumber: '29C-992.34 (Xe tuần tra cơ động)',
+    instructions: 'Kiểm tra phát hiện điểm úng ngập và cành cây rơi vãi sau giông lốc.',
+    status: 'IN_PROGRESS',
+    createdAt: '2026-11-02T08:00:00Z',
+    assignedByAdminName: 'KS. Nguyễn Thị Phương (Admin Sở GTVT)',
+  },
+];
 
 interface RepresentativeSnapshot {
   blob: Blob;
@@ -171,6 +281,7 @@ const centerDistanceRatio = (
 export const PatrolModePage: React.FC = () => {
   const toast = useToast();
   const { user, isAuthenticated } = useAuth();
+  const isAdmin = user?.role === 'ROLE_ADMIN';
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -318,12 +429,129 @@ export const PatrolModePage: React.FC = () => {
   const [lastCreatedSession, setLastCreatedSession] = useState<PatrolSession | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
 
-  // Tab & Lịch sử phiên tuần tra (Admin mặc định vào tab Giám sát / Nhật ký)
-  const [activeTab, setActiveTab] = useState<'CAMERA' | 'HISTORY'>(user?.role === 'ROLE_ADMIN' ? 'HISTORY' : 'CAMERA');
+  // Tab: Admin mặc định vào 'SCHEDULE' (Kế hoạch & Giao ca tuần tra), Nhân viên vào 'CAMERA'
+  const [activeTab, setActiveTab] = useState<'SCHEDULE' | 'HISTORY' | 'CAMERA'>(
+    user?.role === 'ROLE_ADMIN' ? 'SCHEDULE' : 'CAMERA'
+  );
   const [patrolSessions, setPatrolSessions] = useState<PatrolSession[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(false);
   const [selectedSessionForReport, setSelectedSessionForReport] = useState<PatrolSession | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+
+  // Quản lý Lệnh Giao Ca Tuần Tra (Persistent trong localStorage)
+  const [assignments, setAssignments] = useState<PatrolAssignment[]>(() => {
+    try {
+      const stored = localStorage.getItem('roadvision_patrol_assignments');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      // ignore
+    }
+    return DEFAULT_PATROL_ASSIGNMENTS;
+  });
+
+  const saveAssignments = (newAssignments: PatrolAssignment[]) => {
+    setAssignments(newAssignments);
+    try {
+      localStorage.setItem('roadvision_patrol_assignments', JSON.stringify(newAssignments));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // State Modal Giao ca tuần tra mới
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+  const [assignForm, setAssignForm] = useState({
+    teamId: 10,
+    routeName: 'Tuyến ĐH.08 (Xã Thanh Lâm - Phố Cà, Thanh Liêm, Hà Nam)',
+    routeCode: 'SAMPLE_1' as 'SAMPLE_1' | 'SAMPLE_2' | 'SAMPLE_3',
+    routeDistanceKm: 0.99,
+    shift: 'MORNING' as 'MORNING' | 'AFTERNOON' | 'EMERGENCY',
+    scheduledDate: new Date().toISOString().split('T')[0],
+    vehicleNumber: '29C-882.11 (Xe bán tải + Camera AI 4K)',
+    instructions: 'Tuần tra toàn tuyến, chú ý vị trí giao cắt và làn xe máy, vận tốc ≤ 40km/h.',
+  });
+
+  // Hủy ca tuần tra
+  const handleCancelAssignment = (id: string) => {
+    const updated = assignments.map((a) => (a.id === id ? { ...a, status: 'CANCELLED' as const } : a));
+    saveAssignments(updated);
+    toast.info('Đã hủy lệnh tuần tra');
+  };
+
+  // Bắt đầu ca tuần tra được giao (Kích hoạt tuyến đường và bật tab Camera)
+  const handleStartAssignment = (asg: PatrolAssignment) => {
+    // 1. Cập nhật trạng thái ca
+    const updated = assignments.map((a) => (a.id === asg.id ? { ...a, status: 'IN_PROGRESS' as const } : a));
+    saveAssignments(updated);
+
+    // 2. Nạp tọa độ tuyến tương ứng
+    if (asg.routeCode === 'SAMPLE_2') {
+      setRoutePoints(SAMPLE_ROUTE_2);
+      setCurrentCarPosition(SAMPLE_ROUTE_2[0]);
+    } else if (asg.routeCode === 'SAMPLE_3') {
+      setRoutePoints(SAMPLE_ROUTE_3);
+      setCurrentCarPosition(SAMPLE_ROUTE_3[0]);
+    } else {
+      setRoutePoints(SAMPLE_ROUTE_1);
+      setCurrentCarPosition(SAMPLE_ROUTE_1[0]);
+    }
+
+    // 3. Cập nhật địa chỉ tuyến
+    setPatrolLocation({
+      lat: asg.routeCode === 'SAMPLE_2' ? SAMPLE_ROUTE_2[0][0] : SAMPLE_ROUTE_1[0][0],
+      lng: asg.routeCode === 'SAMPLE_2' ? SAMPLE_ROUTE_2[0][1] : SAMPLE_ROUTE_1[0][1],
+      address: asg.routeName,
+    });
+
+    // 4. Chuyển sang Tab Camera
+    setActiveTab('CAMERA');
+    toast.success(`Đã kích hoạt ca ${asg.assignmentCode}! Tuyến đường và camera đã sẵn sàng.`);
+  };
+
+  // Tạo mới lệnh giao ca tuần tra
+  const handleCreateAssignment = (e: React.FormEvent) => {
+    e.preventDefault();
+    const teamMap: Record<number, { name: string; leader: string; email: string }> = {
+      10: { name: 'Tổ Tuần Tra 1 - Phía Bắc', leader: 'Đ/c Trần Văn Tuần', email: 'patrol.khu1@roadcare.gov.vn' },
+      11: { name: 'Tổ Tuần Tra 2 - Phía Nam', leader: 'Đ/c Lê Văn Nam', email: 'patrol.khu2@roadcare.gov.vn' },
+      12: { name: 'Tổ Tuần Tra 3 - Phía Đông', leader: 'Đ/c Hoàng Văn Đông', email: 'patrol.khu3@roadcare.gov.vn' },
+      13: { name: 'Tổ Tuần Tra 4 - Phía Tây', leader: 'Đ/c Phạm Văn Tây', email: 'patrol.khu4@roadcare.gov.vn' },
+    };
+
+    const team = teamMap[assignForm.teamId] || teamMap[10];
+    const shiftLabels = {
+      MORNING: 'Ca Sáng (07:30 - 11:30)',
+      AFTERNOON: 'Ca Chiều (13:30 - 17:30)',
+      EMERGENCY: 'Đột Xuất (Sau Bão / Khiếu Nại Gấp)',
+    };
+
+    const nextId = `asg-${Date.now()}`;
+    const nextCode = `#TT-2026-${String(assignments.length + 1).padStart(3, '0')}`;
+
+    const newAsg: PatrolAssignment = {
+      id: nextId,
+      assignmentCode: nextCode,
+      teamId: assignForm.teamId,
+      teamName: team.name,
+      leaderName: team.leader,
+      leaderEmail: team.email,
+      routeName: assignForm.routeName,
+      routeCode: assignForm.routeCode,
+      routeDistanceKm: assignForm.routeDistanceKm,
+      shift: assignForm.shift,
+      shiftLabel: shiftLabels[assignForm.shift],
+      scheduledDate: assignForm.scheduledDate,
+      vehicleNumber: assignForm.vehicleNumber,
+      instructions: assignForm.instructions,
+      status: 'SCHEDULED',
+      createdAt: new Date().toISOString(),
+      assignedByAdminName: user?.fullName || 'Admin Điều Phối',
+    };
+
+    saveAssignments([newAsg, ...assignments]);
+    setIsAssignModalOpen(false);
+    toast.success(`Đã giao ca tuần tra ${nextCode} thành công cho ${team.name}!`);
+  };
 
   // Lấy tọa độ GPS thực tế của thiết bị (có fallback IP mạng cực mạnh khi chạy trên desktop/PC không có GPS)
   const handleGetCurrentLocation = () => {
@@ -1762,43 +1990,350 @@ export const PatrolModePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tab Điều Hướng Nghiệp Vụ: Tuần Tra Trực Tiếp vs Lịch Sử Phiên Tuần Tra */}
-      <div className="flex items-center gap-2 border-b border-outline-variant/20 pb-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('CAMERA')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'CAMERA'
-              ? 'bg-primary text-on-primary shadow-sm'
-              : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-          }`}
-        >
-          <Video className="w-4 h-4" />
-          <span>Thực Hiện Tuần Tra (AI Video)</span>
-        </button>
+      {/* Tab Điều Hướng Nghiệp Vụ: Kế hoạch & Giao ca vs Sổ nhật ký ca tuần vs Thực hiện trực tiếp */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 pb-2">
+        <div className="flex items-center gap-2">
+          {/* Tab 1: Kế Hoạch & Giao Ca Tuần Tra (Admin & Staff) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('SCHEDULE')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'SCHEDULE'
+                ? 'bg-primary text-on-primary shadow-sm'
+                : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-amber-400" />
+            <span>{isAdmin ? 'Kế Hoạch & Giao Ca Tuần' : 'Ca Tuần Tra Của Tôi'}</span>
+            {assignments.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
+                {assignments.length}
+              </span>
+            )}
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('HISTORY')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'HISTORY'
-              ? 'bg-primary text-on-primary shadow-sm'
-              : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span>{user?.role === 'ROLE_ADMIN' ? 'Nhật Ký & Giám Sát Ca Tuần Tra' : 'Lịch Sử Phiên Tuần Tra Của Tôi'}</span>
-          {patrolSessions.length > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
-              {patrolSessions.length}
-            </span>
-          )}
-        </button>
+          {/* Tab 2: Sổ Nhật Ký & Giám Sát Tuyến Đường (PCI) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('HISTORY')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'HISTORY'
+                ? 'bg-primary text-on-primary shadow-sm'
+                : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+          >
+            <History className="w-4 h-4 text-cyan-400" />
+            <span>{isAdmin ? 'Nhật Ký & Giám Sát Ca Tuần (PCI)' : 'Lịch Sử Phiên Của Tôi'}</span>
+            {patrolSessions.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
+                {patrolSessions.length}
+              </span>
+            )}
+          </button>
+
+          {/* Tab 3: Thực Hiện Tuần Tra (AI Video) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('CAMERA')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'CAMERA'
+                ? 'bg-primary text-on-primary shadow-sm'
+                : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+          >
+            <Video className="w-4 h-4 text-blue-400" />
+            <span>{isAdmin ? 'Thử Nghiệm Quét AI Video' : 'Thực Hiện Tuần Tra (AI Video)'}</span>
+          </button>
+        </div>
+
+        {/* Nút Giao Ca Tuần Tra Mới (Dành cho Admin) */}
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setIsAssignModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Giao Ca Tuần Tra Mới</span>
+          </button>
+        )}
       </div>
 
-      {activeTab === 'CAMERA' ? (
+      {activeTab === 'SCHEDULE' ? (
+        /* GIAO DIỆN KẾ HOẠCH & GIAO CA TUẦN TRA */
+        <div className="flex flex-col gap-5">
+          {/* 1. Thẻ KPI Tổng quan Ca tuần tra */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 flex flex-col">
+              <span className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-cyan-400" /> Tổ Tuần Tra Thường Trực
+              </span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-extrabold text-on-surface font-mono">4</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-800 font-mono">
+                  100% Sẵn sàng
+                </span>
+              </div>
+              <span className="text-[10px] text-on-surface-variant/70 mt-1">
+                Khu vực: Bắc • Nam • Đông • Tây
+              </span>
+            </div>
+
+            <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 flex flex-col">
+              <span className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-blue-400" /> Tổng Ca Tuần Hôm Nay
+              </span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-extrabold text-on-surface font-mono">{assignments.length}</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-950/60 text-blue-300 border border-blue-800 font-mono">
+                  Lệnh điều xe
+                </span>
+              </div>
+              <span className="text-[10px] text-on-surface-variant/70 mt-1">
+                Hà Nội & Hà Nam
+              </span>
+            </div>
+
+            <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 flex flex-col">
+              <span className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
+                <Truck className="w-4 h-4 text-blue-400" /> Đang Chạy Ngoài Tuyến
+              </span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-extrabold text-blue-400 font-mono">
+                  {assignments.filter((a) => a.status === 'IN_PROGRESS').length}
+                </span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-950/60 text-blue-300 border border-blue-800 font-mono animate-pulse">
+                  Live GPS
+                </span>
+              </div>
+              <span className="text-[10px] text-on-surface-variant/70 mt-1">
+                Quét camera AI thời gian thực
+              </span>
+            </div>
+
+            <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 flex flex-col">
+              <span className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Hoàn Thành & PCI
+              </span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-extrabold text-emerald-400 font-mono">
+                  {assignments.filter((a) => a.status === 'COMPLETED').length}
+                </span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800 font-mono">
+                  Đã đồng bộ
+                </span>
+              </div>
+              <span className="text-[10px] text-on-surface-variant/70 mt-1">
+                Sổ nhật ký ca tuần
+              </span>
+            </div>
+          </div>
+
+          {/* 2. Bảng Lệnh Điều Xe & Phân Công Ca Tuần */}
+          <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-outline-variant/20">
+              <div>
+                <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  <span>Danh Sách Lệnh Điều Phối & Giao Ca Tuần Tra Tuyến Đường</span>
+                </h2>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  Phân công tuyến đường và phương tiện chuyên dụng cho 4 Tổ Tuần Tra đường bộ.
+                </p>
+              </div>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsAssignModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Giao Ca Tuần Tra Mới</span>
+                </button>
+              )}
+            </div>
+
+            {/* Bảng dữ liệu */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-outline-variant/30 text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+                    <th className="py-3 px-4">Mã Lệnh</th>
+                    <th className="py-3 px-4">Tổ Tuần Tra Phụ Trách</th>
+                    <th className="py-3 px-4">Tuyến Đường & Cự Ly</th>
+                    <th className="py-3 px-4">Khung Giờ & Ngày</th>
+                    <th className="py-3 px-4">Phương Tiện / Thiết Bị AI</th>
+                    <th className="py-3 px-4">Trạng Thái</th>
+                    <th className="py-3 px-4 text-right">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/20">
+                  {assignments.map((asg) => {
+                    const statusBadgeClass =
+                      asg.status === 'COMPLETED'
+                        ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800'
+                        : asg.status === 'IN_PROGRESS'
+                        ? 'bg-blue-950/70 text-blue-300 border-blue-800 animate-pulse'
+                        : asg.status === 'CANCELLED'
+                        ? 'bg-slate-800 text-slate-400 border-slate-700'
+                        : 'bg-amber-950/70 text-amber-300 border-amber-800';
+
+                    const statusLabel =
+                      asg.status === 'COMPLETED'
+                        ? 'Đã hoàn thành'
+                        : asg.status === 'IN_PROGRESS'
+                        ? 'Đang tuần tra'
+                        : asg.status === 'CANCELLED'
+                        ? 'Đã hủy'
+                        : 'Chờ xuất phát';
+
+                    return (
+                      <tr key={asg.id} className="hover:bg-surface-container/40 transition-colors">
+                        <td className="py-3.5 px-4 font-mono font-bold text-primary">
+                          {asg.assignmentCode}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-on-surface">{asg.teamName}</span>
+                            <span className="text-[11px] text-on-surface-variant/80">
+                              {asg.leaderName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 max-w-xs">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-on-surface truncate" title={asg.routeName}>
+                              {asg.routeName}
+                            </span>
+                            <span className="text-[11px] text-cyan-400 font-mono">
+                              Cự ly: ~{asg.routeDistanceKm} km
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex flex-col">
+                            <span className="font-medium text-on-surface">{asg.shiftLabel}</span>
+                            <span className="text-[10px] text-on-surface-variant font-mono">
+                              {asg.scheduledDate}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="text-on-surface font-mono text-[11px] bg-surface-container px-2 py-0.5 rounded border border-outline-variant/30">
+                            {asg.vehicleNumber}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusBadgeClass}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                            <span>{statusLabel}</span>
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {asg.status === 'SCHEDULED' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartAssignment(asg)}
+                                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                  title="Kích hoạt tuyến đường và bật camera AI"
+                                >
+                                  <Play className="w-3.5 h-3.5 fill-current" />
+                                  <span>Bắt đầu ca</span>
+                                </button>
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelAssignment(asg.id)}
+                                    className="p-1.5 rounded-xl hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                                    title="Hủy lệnh tuần tra"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </>
+                            )}
+
+                            {asg.status === 'IN_PROGRESS' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleStartAssignment(asg);
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                              >
+                                <Video className="w-3.5 h-3.5" />
+                                <span>Giám sát camera</span>
+                              </button>
+                            )}
+
+                            {asg.status === 'COMPLETED' && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab('HISTORY')}
+                                className="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs border border-outline-variant/30 flex items-center gap-1 transition-all cursor-pointer"
+                              >
+                                <History className="w-3.5 h-3.5" />
+                                <span>Xem nhật ký PCI</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'CAMERA' ? (
         /* Bố Cục Chính: Màn hình Video bên trái (7 cột) & Bản đồ + Feed bắt lỗi bên phải (5 cột) */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Banner Thông Tin Ca Tuần Tra Đang Kích Hoạt */}
+          {assignments.find((a) => a.status === 'IN_PROGRESS' || a.status === 'SCHEDULED') && (
+            <div className="col-span-12 bg-gradient-to-r from-blue-950/80 via-slate-900 to-blue-950/80 border border-blue-500/40 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/50 flex items-center justify-center text-blue-400 shrink-0">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-xs text-blue-400">
+                      {assignments.find((a) => a.status === 'IN_PROGRESS')?.assignmentCode || assignments.find((a) => a.status === 'SCHEDULED')?.assignmentCode}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-semibold">
+                      {assignments.find((a) => a.status === 'IN_PROGRESS') ? 'ĐANG TUẦN TRA' : 'CA ĐƯỢC GIAO HÔM NAY'}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white mt-0.5">
+                    {assignments.find((a) => a.status === 'IN_PROGRESS')?.routeName || assignments.find((a) => a.status === 'SCHEDULED')?.routeName}
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Phụ trách: <strong className="text-slate-200">{assignments.find((a) => a.status === 'IN_PROGRESS')?.teamName || assignments.find((a) => a.status === 'SCHEDULED')?.teamName}</strong> • Phương tiện: <span className="font-mono text-cyan-300">{assignments.find((a) => a.status === 'IN_PROGRESS')?.vehicleNumber || assignments.find((a) => a.status === 'SCHEDULED')?.vehicleNumber}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const asg = assignments.find((a) => a.status === 'IN_PROGRESS') || assignments.find((a) => a.status === 'SCHEDULED');
+                    if (asg) handleStartAssignment(asg);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Nạp Tuyến Này & Quét AI</span>
+                </button>
+              </div>
+            </div>
+          )}
         {/* CỘT TRÁI: MÀN HÌNH VIDEO & ĐIỀU KHIỂN (7 CỘT) */}
         <div className="lg:col-span-7 flex flex-col gap-4">
           <div className="relative aspect-video w-full rounded-3xl bg-slate-950 border border-outline-variant/30 overflow-hidden shadow-md flex items-center justify-center">
@@ -2682,6 +3217,177 @@ export const PatrolModePage: React.FC = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal Lập Lệnh Giao Ca Tuần Tra Tuyến Đường */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#192233] border border-slate-700 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            {/* Header Modal */}
+            <div className="px-6 py-4 border-b border-slate-700/80 flex items-center justify-between bg-[#111726]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Lập Lệnh Giao Ca Tuần Tra Tuyến Đường
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Chỉ định tuyến đường, phương tiện và tổ tuần tra AI chuyên trách
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAssignModalOpen(false)}
+                className="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <form onSubmit={handleCreateAssignment} className="p-6 space-y-4 text-xs">
+              {/* 1. Chọn Tổ Tuần Tra */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1.5">
+                  1. Chọn Tổ Tuần Tra Tiếp Nhận Lệnh:
+                </label>
+                <select
+                  value={assignForm.teamId}
+                  onChange={(e) => setAssignForm({ ...assignForm, teamId: Number(e.target.value) })}
+                  className="w-full bg-[#111726] border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
+                >
+                  <option value={10}>Tổ Tuần Tra 1 - Phía Bắc (QL1A, ĐH.08 Hà Nam & Bắc Hà Nội)</option>
+                  <option value={11}>Tổ Tuần Tra 2 - Phía Nam (Vành Đai 3, Giải Phóng, QL1A Nam)</option>
+                  <option value={12}>Tổ Tuần Tra 3 - Phía Đông (QL5, ĐT.494, Cầu Vĩnh Tuy, Long Biên)</option>
+                  <option value={13}>Tổ Tuần Tra 4 - Phía Tây (Đại Lộ Thăng Long, Tố Hữu, Hà Đông)</option>
+                </select>
+              </div>
+
+              {/* 2. Chọn Tuyến Đường / Hành Lang */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1.5">
+                  2. Tuyến Đường & Lộ Trình Mục Tiêu:
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+                  {[
+                    { code: 'SAMPLE_1', dist: 0.99, name: 'Tuyến ĐH.08 (Xã Thanh Lâm - Phố Cà, Thanh Liêm, Hà Nam)' },
+                    { code: 'SAMPLE_2', dist: 1.12, name: 'Tuyến Quốc Lộ 1A (Đoạn Kiện Khê - Phố Cà, Hà Nam)' },
+                    { code: 'SAMPLE_3', dist: 1.45, name: 'Đường Tỉnh ĐT.494 (Nút giao Liêm Tuyền - Thanh Liêm)' },
+                  ].map((rt) => (
+                    <button
+                      key={rt.code}
+                      type="button"
+                      onClick={() =>
+                        setAssignForm({
+                          ...assignForm,
+                          routeCode: rt.code as any,
+                          routeName: rt.name,
+                          routeDistanceKm: rt.dist,
+                        })
+                      }
+                      className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                        assignForm.routeCode === rt.code
+                          ? 'bg-blue-600/20 border-blue-500 text-white font-semibold'
+                          : 'bg-[#111726] border-slate-700 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span className="text-[11px] truncate">{rt.name.split('(')[0]}</span>
+                      <span className="text-[10px] text-cyan-400 font-mono mt-1">~{rt.dist} km</span>
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={assignForm.routeName}
+                  onChange={(e) => setAssignForm({ ...assignForm, routeName: e.target.value })}
+                  className="w-full bg-[#111726] border border-slate-700 rounded-xl px-3.5 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                  placeholder="Nhập tên tuyến đường cụ thể..."
+                  required
+                />
+              </div>
+
+              {/* 3. Khung Giờ & Ngày Thực Hiện */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1.5">
+                    3. Khung Giờ / Ca Tuần:
+                  </label>
+                  <select
+                    value={assignForm.shift}
+                    onChange={(e) => setAssignForm({ ...assignForm, shift: e.target.value as any })}
+                    className="w-full bg-[#111726] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="MORNING">Ca Sáng (07:30 - 11:30)</option>
+                    <option value="AFTERNOON">Ca Chiều (13:30 - 17:30)</option>
+                    <option value="EMERGENCY">Đột Xuất (Sau Mưa Bão / Khiếu Nại Gấp)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1.5">
+                    Ngày Thực Hiện:
+                  </label>
+                  <input
+                    type="date"
+                    value={assignForm.scheduledDate}
+                    onChange={(e) => setAssignForm({ ...assignForm, scheduledDate: e.target.value })}
+                    className="w-full bg-[#111726] border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* 4. Phương Tiện & Thiết Bị AI */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1.5">
+                  4. Phương Tiện & Thiết Bị Gắn Xe:
+                </label>
+                <input
+                  type="text"
+                  value={assignForm.vehicleNumber}
+                  onChange={(e) => setAssignForm({ ...assignForm, vehicleNumber: e.target.value })}
+                  className="w-full bg-[#111726] border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500 font-mono"
+                  placeholder="Biển kiểm soát xe và loại camera..."
+                  required
+                />
+              </div>
+
+              {/* 5. Ghi Chú & Hướng Dẫn Tác Nghiệp */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1.5">
+                  5. Hướng Dẫn Tác Nghiệp Đặc Biệt:
+                </label>
+                <textarea
+                  rows={2}
+                  value={assignForm.instructions}
+                  onChange={(e) => setAssignForm({ ...assignForm, instructions: e.target.value })}
+                  className="w-full bg-[#111726] border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 resize-none"
+                  placeholder="Yêu cầu tốc độ xe, kiểm tra đặc thù các đoạn giao cắt hoặc làn xe máy..."
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition-colors cursor-pointer"
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-md shadow-blue-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Xác Nhận Giao Lệnh</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
