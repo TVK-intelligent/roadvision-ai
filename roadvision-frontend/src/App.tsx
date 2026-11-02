@@ -53,6 +53,9 @@ const PhotoGuidePage = lazy(() =>
 const IncidentReportsPage = lazy(() =>
   import('./pages/IncidentReportsPage').then((m) => ({ default: m.IncidentReportsPage }))
 );
+const AdminSettingsPage = lazy(() =>
+  import('./pages/AdminSettingsPage').then((m) => ({ default: m.AdminSettingsPage }))
+);
 
 
 export function App() {
@@ -176,6 +179,24 @@ export function App() {
                     element={
                       <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
                         <AdminUsersPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Tuyến Quản Trị Viên: Cài Đặt & Cấu Hình Tham Số Hệ Thống */}
+                  <Route
+                    path="/admin/settings"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
+                        <AdminSettingsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
+                        <AdminSettingsPage />
                       </ProtectedRoute>
                     }
                   />

@@ -20,6 +20,7 @@ import {
   Trophy,
   BookOpen,
   History,
+  Settings,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -293,6 +294,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <BarChart3 className="w-4 h-4 shrink-0 text-indigo-400" />
                   {!isCollapsed && <span>Báo cáo KPI & Phân tích</span>}
+                </Link>
+
+                <Link
+                  to="/admin/settings"
+                  onClick={closeMobile}
+                  className={navItemClass('/admin/settings')}
+                  title="Cài đặt hệ thống, tham số AI Vision và cấu hình SLA"
+                >
+                  <Settings className="w-4 h-4 shrink-0 text-slate-300 group-hover:rotate-45 transition-transform duration-200" />
+                  {!isCollapsed && <span>Cài đặt hệ thống</span>}
                 </Link>
               </nav>
             </div>

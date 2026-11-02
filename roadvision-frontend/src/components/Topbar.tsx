@@ -27,6 +27,7 @@ import {
   Radio,
   Clock,
   Calendar,
+  Settings,
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 
@@ -94,6 +95,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     if (pathname.startsWith('/analytics')) return 'Báo cáo KPI & Phân tích chất lượng';
     if (pathname.startsWith('/admin/teams')) return 'Quản lý Tổ đội & Nhân sự';
     if (pathname.startsWith('/admin/users')) return 'Quản lý Người Dùng & Phân Quyền';
+    if (pathname.startsWith('/admin/settings')) return 'Cài đặt & Cấu hình hệ thống';
     if (pathname.startsWith('/my-reports')) return 'Lịch sử phản ánh của tôi';
     if (pathname.startsWith('/leaderboard')) return 'Bảng vinh danh cộng đồng';
     if (pathname.startsWith('/photo-guide')) return 'Cẩm nang chụp ảnh hiện trường chuẩn AI';
@@ -554,14 +556,24 @@ export const Topbar: React.FC<TopbarProps> = ({
                       </Link>
                     )}
                     {user.role === 'ROLE_ADMIN' && (
-                      <Link
-                        to="/admin/users"
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
-                      >
-                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                        <span>Người dùng & Phân quyền</span>
-                      </Link>
+                      <>
+                        <Link
+                          to="/admin/users"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                          <span>Người dùng & Phân quyền</span>
+                        </Link>
+                        <Link
+                          to="/admin/settings"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                        >
+                          <Settings className="w-4 h-4 text-slate-500" />
+                          <span>Cài đặt hệ thống</span>
+                        </Link>
+                      </>
                     )}
 
                     {/* Chuyển nhanh tài khoản mẫu */}
