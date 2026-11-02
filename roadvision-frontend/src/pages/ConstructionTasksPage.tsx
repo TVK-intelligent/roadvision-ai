@@ -729,8 +729,8 @@ export const ConstructionTasksPage: React.FC = () => {
 
       {/* MODAL 2: NỘP HỒ SƠ NGHIỆM THU & QUÉT AI YOLOV8 */}
       {selectedAcceptanceTask && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white max-w-lg w-full rounded-lg border border-slate-200 shadow-xl overflow-hidden animate-in fade-in">
+        <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-2xl w-full max-h-[92vh] overflow-y-auto rounded-2xl border border-slate-200 shadow-2xl animate-in fade-in my-6">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
@@ -890,8 +890,8 @@ export const ConstructionTasksPage: React.FC = () => {
 
       {/* Modal Thẩm định Nghiệm thu Hoàn công (Dành cho Admin) */}
       {reviewAcceptanceTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto border border-slate-200 my-6">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
@@ -1064,8 +1064,8 @@ export const ConstructionTasksPage: React.FC = () => {
 
       {/* Modal Thư viện Bằng chứng ảnh & Tiến độ công trình (Gallery) */}
       {galleryTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto border border-slate-200 my-6">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">

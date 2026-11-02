@@ -41,10 +41,58 @@ export interface User {
   phone?: string;
   role: Role;
   avatarUrl?: string;
+  isActive?: boolean;
   reputationScore?: number;
   spamStrikes?: number;
   suspendedUntil?: string;
   suspendReason?: string;
+  teamId?: number;
+  teamName?: string;
+  isTeamLeader?: boolean;
+  specialization?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdminUser extends User {
+  isActive: boolean;
+  teamId?: number;
+  teamName?: string;
+  isTeamLeader?: boolean;
+  specialization?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UserStats {
+  totalUsers: number;
+  adminCount: number;
+  staffCount: number;
+  citizenCount: number;
+  activeCount: number;
+  lockedCount: number;
+}
+
+export interface AdminCreateUserData {
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+  role: Role;
+  teamId?: number;
+  specialization?: string;
+  isTeamLeader?: boolean;
+}
+
+export interface UpdateUserStatusData {
+  isActive: boolean;
+  suspendReason?: string;
+  suspendedUntil?: string;
+}
+
+export interface UpdateReputationData {
+  reputationScore: number;
+  resetStrikes?: boolean;
 }
 
 export interface AiDetection {
@@ -312,6 +360,10 @@ export interface Team {
   corridor?: string;
   zoneName?: string;
   description?: string;
+  baseLatitude?: number;
+  baseLongitude?: number;
+  baseAddress?: string;
+  distanceKm?: number;
   leaderId?: number;
   leaderName?: string;
   leaderPhone?: string;
@@ -332,6 +384,9 @@ export interface TeamRequest {
   corridor?: string;
   zoneName?: string;
   description?: string;
+  baseLatitude?: number;
+  baseLongitude?: number;
+  baseAddress?: string;
   leaderId?: number;
 }
 

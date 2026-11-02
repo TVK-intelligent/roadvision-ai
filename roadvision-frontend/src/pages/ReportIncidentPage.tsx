@@ -400,7 +400,7 @@ export const ReportIncidentPage: React.FC = () => {
           setCategory(singleCat);
           const count = counts[singleCat] || totalCount;
 
-          const subDetail = data.incidentDetail || data.obstacleDetail || '';
+          const subDetail = (data as any).incidentDetail || data.obstacleDetail || '';
 
           if (singleCat === 'POTHOLE') {
             const isSinkhole = subDetail.toLowerCase().includes('tử thần') || subDetail.toLowerCase().includes('hàm ếch');
@@ -475,7 +475,7 @@ export const ReportIncidentPage: React.FC = () => {
               );
             }
           } else {
-            const specificObst = data.obstacleDetail || data.incidentDetail || 'vật cản / chướng ngại vật';
+            const specificObst = data.obstacleDetail || (data as any).incidentDetail || 'vật cản / chướng ngại vật';
             const isRockfall = specificObst.toLowerCase().includes('đá tảng') || specificObst.toLowerCase().includes('sạt lở đèo');
             const isFallenTree = specificObst.toLowerCase().includes('cây');
             const isTire = specificObst.toLowerCase().includes('lốp') || specificObst.toLowerCase().includes('vỏ lốp');
@@ -488,11 +488,6 @@ export const ReportIncidentPage: React.FC = () => {
                 `Hệ thống AI xác định 1 vật cản nguy hiểm là đá tảng sạt lở từ vách núi lăn xuống chắn ngang làn xe chạy (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Cần huy động xe ủi và máy xúc giải tỏa chướng ngại vật ngay lập tức.`
               );
             } else if (isFallenTree) {
-            const isTire = specificObst.toLowerCase().includes('lốp') || specificObst.toLowerCase().includes('vỏ lốp');
-            const isFoamOrCrate = specificObst.toLowerCase().includes('thùng xốp') || specificObst.toLowerCase().includes('bàn ghế');
-            const isBarrier = specificObst.toLowerCase().includes('rào chắn') || specificObst.toLowerCase().includes('chóp nón');
-
-            if (isFallenTree) {
               setTitle(`Phát hiện vật cản là cây đổ chắn ngang đường tại ${loc}`);
               setDescription(
                 `Hệ thống AI xác định 1 vật cản là cây xanh / cành cây gãy đổ chắn ngang lòng đường (độ tin cậy ${(data.confidence * 100).toFixed(1)}%, chiếm ${(data.footprintPercent || 0).toFixed(1)}% diện tích ảnh). Đề nghị cử đội cây xanh đô thị và cứu hộ môi trường khẩn trương cưa cắt, thu dọn giải tỏa hiện trường để thông tuyến giao thông.`

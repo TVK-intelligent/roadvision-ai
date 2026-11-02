@@ -20,6 +20,7 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  ShieldCheck,
   Info,
   MapPin,
   Star,
@@ -92,6 +93,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     if (pathname.startsWith('/dispatch')) return 'Hàng đợi điều phối nhiệm vụ';
     if (pathname.startsWith('/analytics')) return 'Báo cáo KPI & Phân tích chất lượng';
     if (pathname.startsWith('/admin/teams')) return 'Quản lý Tổ đội & Nhân sự';
+    if (pathname.startsWith('/admin/users')) return 'Quản lý Người Dùng & Phân Quyền';
     if (pathname.startsWith('/my-reports')) return 'Lịch sử phản ánh của tôi';
     if (pathname.startsWith('/leaderboard')) return 'Bảng vinh danh cộng đồng';
     if (pathname.startsWith('/photo-guide')) return 'Cẩm nang chụp ảnh hiện trường chuẩn AI';
@@ -549,6 +551,16 @@ export const Topbar: React.FC<TopbarProps> = ({
                       >
                         <Bell className="w-4 h-4 text-slate-400" />
                         <span>Phản ánh của tôi</span>
+                      </Link>
+                    )}
+                    {user.role === 'ROLE_ADMIN' && (
+                      <Link
+                        to="/admin/users"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                        <span>Người dùng & Phân quyền</span>
                       </Link>
                     )}
 

@@ -39,9 +39,9 @@ const SOLUTION_PRESETS: Record<string, string[]> = {
   ],
   ROAD_OBSTACLE: [
     'Huy động máy cưa xẻ phân đoạn thân cành cây ngã, dùng xe cẩu giải phóng lòng đường, chở phế thải dọn sạch',
-    'Điều động xe xúc lật và 02 xe ben xúc hót vận chuyển đất đá sạt lở, dùng xe bồn rửa sạch bùn đất mặt đường',
-    'Thu gom toàn bộ phế liệu, lốp xe, vật liệu rơi vãi vào lề an toàn, bốc xếp lên xe tải giải tỏa lòng đường',
-    'Rải cát khô và mùn cưa thấm hút dầu nhớt loang, dùng dung dịch sinh học tẩy rửa và đặt biển cảnh báo đường trơn'
+    'Thu gom vỏ lốp xe nổ, lốp giữ chỗ lấn chiếm, vận chuyển dọn sạch khỏi lòng đường đảm bảo an toàn lưu thông',
+    'Thu dọn toàn bộ thùng xốp, sọt nhựa, bàn ghế lấn chiếm lòng lề đường, giải phóng tĩnh không thông thoáng',
+    'Dựng lại cọc tiêu rào chắn cảnh báo xô lệch, thu dọn đất đá sạt trượt rơi vãi, bảo đảm an toàn lưu thông'
   ],
   ROAD_FLOODING: [
     'Bố trí rào chắn và biển báo cấm xe ngập sâu, khơi thông rác hố ga thu nước, bơm dã chiến công suất lớn',
@@ -72,7 +72,7 @@ export const StaffTasksPage: React.FC = () => {
   const [surveyLatitude, setSurveyLatitude] = useState<number>(21.0285);
   const [surveyLongitude, setSurveyLongitude] = useState<number>(105.8542);
   const [confirmedCategory, setConfirmedCategory] = useState<Category>('POTHOLE');
-  const [obstacleSubType, setObstacleSubType] = useState<'TREE' | 'LANDSLIDE' | 'DEBRIS' | 'OIL_SPILL'>('TREE');
+  const [obstacleSubType, setObstacleSubType] = useState<'TREE' | 'TIRE' | 'DEBRIS' | 'BARRIER'>('TREE');
   const [actualSeverity, setActualSeverity] = useState<Severity>('HIGH');
   const [estimatedLengthM, setEstimatedLengthM] = useState<number>(1.2);
   const [estimatedWidthM, setEstimatedWidthM] = useState<number>(0.8);
@@ -195,56 +195,56 @@ export const StaffTasksPage: React.FC = () => {
   const getCategoryDetails = () => {
     switch (confirmedCategory) {
       case 'ROAD_OBSTACLE':
-        if (obstacleSubType === 'LANDSLIDE') {
+        if (obstacleSubType === 'TIRE') {
           return {
-            title: 'Quy mô Đất đá sạt lở / Đá tảng tràn lòng đường:',
-            lLabel: 'Chiều dài vệt sạt (m)',
-            wLabel: 'Bề rộng tràn mặt đường (m)',
-            dLabel: 'Độ dày lớp đất đá (cm)',
-            card1Title: 'Diện tích tràn mặt đường (S)',
-            card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
-            card1Sub: 'S = Dài × Rộng',
-            card2Title: 'Khối lượng đất đá xúc hốt (V)',
-            card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(2)} m³`,
-            card2Sub: 'V = S × Độ dày',
-            card3Title: 'Phương tiện huy động',
-            card3Val: 'Xe xúc lật + Xe ben + Xe bồn',
-            card3Sub: 'Múc đất đá & Rửa mặt đường',
-            formula: '* Phương án cứu hộ: Điều động xe xúc lật múc đất đá lên xe ben vận chuyển, xe bồn phun nước rửa sạch bùn đất trơn trượt'
-          };
-        } else if (obstacleSubType === 'DEBRIS') {
-          return {
-            title: 'Quy mô Phế liệu / Vật liệu rơi vãi (Lốp xe, thùng hàng, sắt vụn):',
+            title: 'Quy mô Lốp xe nổ / Vỏ lốp rơi vãi trên lòng đường:',
             lLabel: 'Chiều dài phạm vi rơi vãi (m)',
-            wLabel: 'Bề rộng chiếm dụng (m)',
-            dLabel: 'Chiều cao kiện hàng / Khối vật cản (cm)',
+            wLabel: 'Bề rộng lấn chiếm lòng đường (m)',
+            dLabel: 'Chiều cao / Kích thước vỏ lốp (cm)',
             card1Title: 'Lòng đường chiếm dụng (S)',
             card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
             card1Sub: 'S = Dài × Rộng',
-            card2Title: 'Khối lượng phế thải ước tính',
-            card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(2)} m³`,
-            card2Sub: 'Cần bốc xếp thu dọn',
-            card3Title: 'Phương tiện & Nhân lực',
-            card3Val: 'Công nhân + Xe tải thu gom',
+            card2Title: 'Số lượng vỏ lốp thu gom',
+            card2Val: `~ ${Math.max(1, Math.round(estimatedLengthM * estimatedWidthM * 1.5))} chiếc`,
+            card2Sub: 'Ước tính theo phạm vi',
+            card3Title: 'Phương tiện huy động',
+            card3Val: 'Xe tuần tra + Xe tải thu gom',
             card3Sub: 'Thu gom giải phóng lòng đường',
-            formula: '* Phương án cứu hộ: Phân luồng điều tiết giao thông, thu gom toàn bộ vật liệu rơi vãi vào lề an toàn, chở xe tải đi'
+            formula: '* Phương án cứu hộ: Phân luồng khẩn cấp, bốc dỡ toàn bộ vỏ lốp xe nổ/rơi vãi lên thùng xe tải chở về bãi tập kết an toàn'
           };
-        } else if (obstacleSubType === 'OIL_SPILL') {
+        } else if (obstacleSubType === 'DEBRIS') {
           return {
-            title: 'Phạm vi Vệt dầu nhớt / Hóa chất loang trơn trượt nguy hiểm:',
-            lLabel: 'Chiều dài vệt dầu loang (m)',
-            wLabel: 'Bề rộng vệt dầu (m)',
-            dLabel: 'Mức độ loang trượt (cm)',
-            card1Title: 'Diện tích dầu nhớt loang (S)',
+            title: 'Quy mô Thùng xốp / Sọt nhựa / Bàn ghế lấn chiếm lòng lề đường:',
+            lLabel: 'Chiều dài phạm vi lấn chiếm (m)',
+            wLabel: 'Bề rộng chiếm dụng lòng đường (m)',
+            dLabel: 'Chiều cao đống vật cản (cm)',
+            card1Title: 'Lòng đường chiếm dụng (S)',
             card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
             card1Sub: 'S = Dài × Rộng',
-            card2Title: 'Cát khô / mùn cưa thấm hút',
-            card2Val: `~ ${(estimatedLengthM * estimatedWidthM * 1.5).toFixed(1)} kg`,
-            card2Sub: 'Định mức thấm hút dầu nhớt',
-            card3Title: 'Biện pháp xử lý chống trượt',
-            card3Val: 'Rải cát + Tẩy rửa sinh học',
-            card3Sub: 'Khử trơn trượt bề mặt đường',
-            formula: '* Phương án xử lý: Đặt biển cảnh báo trơn trượt từ xa, rải cát/mùn cưa thấm hút váng dầu, phun dung dịch tẩy rửa và rửa sạch'
+            card2Title: 'Khối lượng vật phẩm thu gom',
+            card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(2)} m³`,
+            card2Sub: 'Cần bốc dỡ dọn dẹp',
+            card3Title: 'Phương tiện & Lực lượng',
+            card3Val: 'Đội trật tự + Xe tải dọn dẹp',
+            card3Sub: 'Giải phóng tĩnh không mặt đường',
+            formula: '* Phương án xử lý: Thu dọn toàn bộ thùng xốp, sọt nhựa, bàn ghế lấn chiếm lòng lề đường, lập biên bản trả lại lòng đường thông thoáng'
+          };
+        } else if (obstacleSubType === 'BARRIER') {
+          return {
+            title: 'Quy mô Cọc tiêu / Rào chắn xô lệch / Đất đá rơi vãi:',
+            lLabel: 'Chiều dài đoạn bị ảnh hưởng (m)',
+            wLabel: 'Bề rộng tràn lòng đường (m)',
+            dLabel: 'Chiều cao cọc / Độ dày đất đá (cm)',
+            card1Title: 'Diện tích lòng đường ảnh hưởng (S)',
+            card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
+            card1Sub: 'S = Dài × Rộng',
+            card2Title: 'Khối lượng đất đá / Cọc tiêu',
+            card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(2)} m³`,
+            card2Sub: 'Cần xúc dọn / chỉnh nắn',
+            card3Title: 'Phương tiện khắc phục',
+            card3Val: 'Xe chuyên dụng + Biển cảnh báo',
+            card3Sub: 'Dựng lại rào chắn / Hót dọn',
+            formula: '* Phương án xử lý: Dựng lại cọc tiêu rào chắn cảnh báo xô lệch, thu dọn đất đá rơi vãi, bảo đảm an toàn lưu thông'
           };
         } else {
           return {
@@ -255,13 +255,13 @@ export const StaffTasksPage: React.FC = () => {
             card1Title: 'Lòng đường chiếm dụng (S)',
             card1Val: `${(estimatedLengthM * estimatedWidthM).toFixed(2)} m²`,
             card1Sub: 'S = Dài × Rộng',
-            card2Title: 'Khối lượng cưa cắt giải tỏa',
+            card2Title: 'Khối lượng gỗ cành ước tính',
             card2Val: `${((estimatedLengthM * estimatedWidthM) * (estimatedDepthCm / 100)).toFixed(2)} m³`,
-            card2Sub: 'Cưa xẻ & Cẩu dọn',
-            card3Title: 'Phương tiện & Biện pháp',
-            card3Val: 'Cưa máy + Xe cẩu + Xe ben',
-            card3Sub: 'Giải phóng & Chở phế thải',
-            formula: '* Phương án cứu hộ: Cưa xẻ phân đoạn thân cành, cẩu giải tỏa khỏi lòng đường, xe ben chở phế thải hoàn trả mặt đường sạch sẽ'
+            card2Sub: 'Cần cưa xẻ vận chuyển',
+            card3Title: 'Phương tiện huy động',
+            card3Val: 'Xe cẩu tự hành + Máy cưa + Xe ben',
+            card3Sub: 'Cắt tỉa & Giải tỏa khẩn cấp',
+            formula: '* Phương án cứu hộ: Cưa phân đoạn thân cành cây đổ chắn đường, cẩu bốc lên xe ben chở đi, dọn quét sạch cành lá giải tỏa ùn tắc'
           };
         }
       case 'ROAD_CRACK':
@@ -746,23 +746,25 @@ export const StaffTasksPage: React.FC = () => {
 
       {/* MODAL 1: BÁO CÁO KHẢO SÁT HIỆN TRƯỜNG (GIAI ĐOẠN 4) */}
       {selectedSurveyTask && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white max-w-xl w-full rounded-lg border border-slate-200 shadow-xl overflow-hidden animate-in fade-in my-8">
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-3xl w-full max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in my-6">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
-                <Compass className="w-4 h-4 text-teal-600" />
+                <Compass className="w-5 h-5 text-teal-600" />
                 <span>Biên bản khảo sát hiện trường kỹ thuật</span>
-                <span className="font-mono text-xs text-blue-700 font-medium">{selectedSurveyTask.ticketCode?.startsWith('#') ? selectedSurveyTask.ticketCode : `#${selectedSurveyTask.ticketCode}`}</span>
+                <span className="font-mono text-xs text-blue-700 font-medium px-2 py-0.5 bg-blue-50 rounded border border-blue-200">
+                  {selectedSurveyTask.ticketCode?.startsWith('#') ? selectedSurveyTask.ticketCode : `#${selectedSurveyTask.ticketCode}`}
+                </span>
               </div>
               <button
                 onClick={() => setSelectedSurveyTask(null)}
-                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitSurvey} className="p-6 flex flex-col gap-4 text-xs">
+            <form onSubmit={handleSubmitSurvey} className="p-6 flex flex-col gap-4 text-xs overflow-y-auto">
               {/* Vị trí GPS & Lấy vị trí */}
               <div className="p-3 bg-slate-50 rounded-md border border-slate-200 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
@@ -836,16 +838,19 @@ export const StaffTasksPage: React.FC = () => {
 
               {/* Phân loại vật cản cụ thể khi là ROAD_OBSTACLE */}
               {confirmedCategory === 'ROAD_OBSTACLE' && (
-                <div className="p-2.5 rounded-md bg-amber-50/70 border border-amber-200">
-                  <span className="text-[11px] font-semibold text-amber-900 block mb-1.5">
-                    Phân loại vật cản cụ thể ngoài hiện trường:
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                      <span>🚧</span> Phân loại vật cản cụ thể ngoài hiện trường:
+                    </span>
+                    <span className="text-[11px] text-amber-700">Khớp đối tượng mô hình AI nhận diện</span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {[
-                      { id: 'TREE', label: '🌲 Cây ngã / cành đổ', solutionIdx: 0, l: 4.5, w: 2.5, d: 40 },
-                      { id: 'LANDSLIDE', label: '🪨 Đất đá sạt trượt', solutionIdx: 1, l: 8.0, w: 3.5, d: 25 },
-                      { id: 'DEBRIS', label: '📦 Phế liệu / Hàng rơi', solutionIdx: 2, l: 3.0, w: 1.8, d: 30 },
-                      { id: 'OIL_SPILL', label: '🛢️ Vệt dầu loang trượt', solutionIdx: 3, l: 15.0, w: 2.0, d: 2 },
+                      { id: 'TREE', label: '🌲 Cây ngã / cành đổ', sub: 'Thân cành chắn đường', solutionIdx: 0, l: 4.5, w: 2.5, d: 40 },
+                      { id: 'TIRE', label: '🛞 Lốp xe nổ / vỏ rơi', sub: 'Vỏ lốp rơi cao tốc/đường', solutionIdx: 1, l: 1.5, w: 1.0, d: 30 },
+                      { id: 'DEBRIS', label: '📦 Thùng xốp / sọt nhựa', sub: 'Bàn ghế / vật lấn chiếm', solutionIdx: 2, l: 2.5, w: 1.5, d: 40 },
+                      { id: 'BARRIER', label: '🚧 Cọc tiêu / rào chắn / đá', sub: 'Rào ngã, đá sạt trượt', solutionIdx: 3, l: 3.5, w: 2.0, d: 35 },
                     ].map((item) => (
                       <button
                         key={item.id}
@@ -857,13 +862,16 @@ export const StaffTasksPage: React.FC = () => {
                           setEstimatedWidthM(item.w);
                           setEstimatedDepthCm(item.d);
                         }}
-                        className={`px-2 py-1.5 rounded text-xs font-medium border text-center transition-colors cursor-pointer truncate ${
+                        className={`p-2.5 rounded-lg text-xs border text-left transition-all cursor-pointer ${
                           obstacleSubType === item.id
-                            ? 'bg-amber-600 text-white border-amber-600 shadow-2xs font-semibold'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/70'
                         }`}
                       >
-                        {item.label}
+                        <div className="font-semibold leading-tight">{item.label}</div>
+                        <div className={`text-[10px] mt-0.5 ${obstacleSubType === item.id ? 'text-amber-100' : 'text-slate-500'}`}>
+                          {item.sub}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -914,26 +922,26 @@ export const StaffTasksPage: React.FC = () => {
                       <span>Dự toán diện tích, khối lượng & phương án (BoQ Real-time):</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="bg-white p-2 rounded border border-blue-100 shadow-2xs">
-                        <span className="text-[10px] text-slate-500 block truncate">{getCategoryDetails().card1Title}</span>
-                        <span className="text-xs font-bold text-blue-700 font-mono">
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-100 shadow-2xs">
+                        <span className="text-[11px] text-slate-600 block leading-tight font-medium mb-1">{getCategoryDetails().card1Title}</span>
+                        <span className="text-sm font-bold text-blue-700 font-mono">
                           {getCategoryDetails().card1Val}
                         </span>
-                        <span className="text-[9px] text-slate-400 block mt-0.5">{getCategoryDetails().card1Sub}</span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">{getCategoryDetails().card1Sub}</span>
                       </div>
-                      <div className="bg-white p-2 rounded border border-blue-100 shadow-2xs">
-                        <span className="text-[10px] text-slate-500 block truncate">{getCategoryDetails().card2Title}</span>
-                        <span className="text-xs font-bold text-indigo-700 font-mono">
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-100 shadow-2xs">
+                        <span className="text-[11px] text-slate-600 block leading-tight font-medium mb-1">{getCategoryDetails().card2Title}</span>
+                        <span className="text-sm font-bold text-indigo-700 font-mono">
                           {getCategoryDetails().card2Val}
                         </span>
-                        <span className="text-[9px] text-slate-400 block mt-0.5">{getCategoryDetails().card2Sub}</span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">{getCategoryDetails().card2Sub}</span>
                       </div>
-                      <div className="bg-white p-2 rounded border border-blue-100 shadow-2xs">
-                        <span className="text-[10px] text-slate-500 block truncate">{getCategoryDetails().card3Title}</span>
-                        <span className="text-xs font-bold text-emerald-700 font-mono">
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-100 shadow-2xs">
+                        <span className="text-[11px] text-slate-600 block leading-tight font-medium mb-1">{getCategoryDetails().card3Title}</span>
+                        <span className="text-sm font-bold text-emerald-700 font-mono">
                           {getCategoryDetails().card3Val}
                         </span>
-                        <span className="text-[9px] text-slate-400 block mt-0.5">{getCategoryDetails().card3Sub}</span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">{getCategoryDetails().card3Sub}</span>
                       </div>
                     </div>
                     <span className="text-[10px] text-slate-500 italic block mt-1.5 text-center">
@@ -953,21 +961,29 @@ export const StaffTasksPage: React.FC = () => {
                 </div>
 
                 {/* Gợi ý phương án nhanh 1-Click theo từng loại hư hỏng */}
-                <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                  <span className="text-[10px] font-semibold text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
-                    Gợi ý mẫu:
-                  </span>
-                  {(SOLUTION_PRESETS[confirmedCategory] || SOLUTION_PRESETS.POTHOLE).map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setProposedSolution(preset)}
-                      className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-300 transition-colors truncate max-w-[240px] text-left cursor-pointer"
-                      title={preset}
-                    >
-                      {preset}
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-1.5 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                      💡 Gợi ý giải pháp mẫu (Click để chọn):
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {(SOLUTION_PRESETS[confirmedCategory] || SOLUTION_PRESETS.POTHOLE).map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setProposedSolution(preset)}
+                        className={`text-[11px] px-3 py-1.5 rounded-lg border transition-all text-left cursor-pointer leading-relaxed ${
+                          proposedSolution === preset
+                            ? 'bg-sky-50 text-sky-800 border-sky-400 font-semibold shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                        }`}
+                        title="Nhấn để áp dụng giải pháp này"
+                      >
+                        • {preset}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <textarea

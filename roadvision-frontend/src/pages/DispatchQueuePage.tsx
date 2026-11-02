@@ -29,7 +29,13 @@ import {
   Star,
   Globe,
   Users,
+  Zap,
+  Navigation,
+  Car,
+  ChevronDown,
+  Send,
 } from 'lucide-react';
+import { routingService, RouteResult } from '../services/routingService';
 
 export const DispatchQueuePage: React.FC = () => {
   const toast = useToast();
@@ -44,6 +50,7 @@ export const DispatchQueuePage: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(0);
   const [totalElements, setTotalElements] = useState<number>(0);
+  const [dispatchDropdownIncidentId, setDispatchDropdownIncidentId] = useState<number | null>(null);
 
   // Teams & Staff
   const [teams, setTeams] = useState<Team[]>([]);
@@ -67,6 +74,9 @@ export const DispatchQueuePage: React.FC = () => {
   // Modal Từ chối
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [rejectionReason, setRejectionReason] = useState<string>('Ảnh chụp không rõ ràng hoặc nằm ngoài quyền hạn quản lý');
+
+  // Lộ trình OSRM thời gian thực
+  const [routeDetails, setRouteDetails] = useState<Record<number, RouteResult>>({});
 
   const fetchIncidents = (targetPage = page, targetSize = pageSize) => {
     setLoading(true);
@@ -132,66 +142,193 @@ export const DispatchQueuePage: React.FC = () => {
     setPage(0);
   };
 
-  // Helper kiểm tra địa bàn phụ trách có khớp với địa chỉ sự cố hay không
-  const checkZoneMatch = (incidentAddress?: string, teamZone?: string, teamCorridor?: string): boolean => {
-    if (!incidentAddress || (!teamZone && !teamCorridor)) return false;
-    const addr = incidentAddress.toLowerCase();
-    
-    // So khớp theo hành lang tuyến
-    if (teamCorridor) {
-      const corridors = teamCorridor.toLowerCase().split(/[&,+/]/).map((s) => s.trim()).filter(Boolean);
-      for (const c of corridors) {
-        if (c && addr.includes(c)) return true;
-      }
-    }
-
-    // So khớp theo khu vực địa lý / miền
-    if (teamZone) {
-      const zone = teamZone.toLowerCase();
-      if ((zone.includes('miền bắc') || zone.includes('khu qlđb i')) && 
-          (addr.includes('hà nội') || addr.includes('hải phòng') || addr.includes('bắc') || addr.includes('hà nam') || addr.includes('quảng ninh') || addr.includes('hn'))) {
-        return true;
-      }
-      if ((zone.includes('miền trung') || zone.includes('khu qlđb ii')) && 
-          (addr.includes('đà nẵng') || addr.includes('huế') || addr.includes('quảng nam') || addr.includes('nghệ an') || addr.includes('hải vân'))) {
-        return true;
-      }
-      if ((zone.includes('tây nguyên') || zone.includes('khu qlđb iii')) && 
-          (addr.includes('tây nguyên') || addr.includes('đắk') || addr.includes('gia lai') || addr.includes('kon tum') || addr.includes('ql14'))) {
-        return true;
-      }
-      if ((zone.includes('phía nam') || zone.includes('miền nam') || zone.includes('khu qlđb iv')) && 
-          (addr.includes('tp.hcm') || addr.includes('hồ chí minh') || addr.includes('long thành') || addr.includes('đồng nai') || addr.includes('bình dương') || addr.includes('ql51') || addr.includes('cần thơ'))) {
-        return true;
-      }
-    }
-
-    return false;
+  // Helper tính cự ly địa lý (Haversine Formula - Đơn vị: km)
+  const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Bán kính Trái Đất (km)
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c * 10) / 10;
   };
 
-  // Helper sắp xếp tổ đội theo độ ưu tiên: Đúng địa bàn + Sẵn sàng -> Ít việc -> Khác địa bàn
+  // Helper ước tính thời gian di chuyển (vận tốc nội đô ~22km/h + 3 phút chuẩn bị xuất phát)
+  const getEstimatedTravelMinutes = (distanceKm: number): number => {
+    return Math.max(5, Math.round((distanceKm / 22) * 60) + 3);
+  };
+
+  // Helper kiểm tra địa bàn phụ trách (Quận / Hành lang tuyến)
+  const checkZoneMatch = (
+    incidentAddress?: string,
+    teamZone?: string,
+    teamCorridor?: string
+  ): { isMatch: boolean; districtLabel: string } => {
+    if (!incidentAddress) {
+      return { isMatch: false, districtLabel: 'Chưa rõ địa bàn' };
+    }
+    const addr = incidentAddress.toLowerCase();
+
+    // Đội cơ động khẩn cấp 24/7 trực thuộc toàn thành phố
+    if (teamZone && (teamZone.toLowerCase().includes('khẩn cấp') || teamZone.toLowerCase().includes('toàn thành phố') || teamZone.toLowerCase().includes('24/7'))) {
+      return { isMatch: true, districtLabel: 'Toàn TP Hà Nội (Khẩn cấp 24/7)' };
+    }
+
+    const districts = [
+      { key: 'cầu giấy', name: 'Quận Cầu Giấy' },
+      { key: 'đống đa', name: 'Quận Đống Đa' },
+      { key: 'thanh xuân', name: 'Quận Thanh Xuân' },
+      { key: 'ba đình', name: 'Quận Ba Đình' },
+      { key: 'hoàn kiếm', name: 'Quận Hoàn Kiếm' },
+      { key: 'hai bà trưng', name: 'Quận Hai Bà Trưng' },
+      { key: 'tây hồ', name: 'Quận Tây Hồ' },
+      { key: 'hà đông', name: 'Quận Hà Đông' },
+      { key: 'nam từ liêm', name: 'Quận Nam Từ Liêm' },
+      { key: 'bắc từ liêm', name: 'Quận Bắc Từ Liêm' },
+      { key: 'hoàng mai', name: 'Quận Hoàng Mai' },
+      { key: 'long biên', name: 'Quận Long Biên' },
+    ];
+
+    // 1. So khớp theo hành lang tuyến đường
+    if (teamCorridor) {
+      const corridors = teamCorridor.toLowerCase().split(/[&,+/()]/).map((s) => s.trim()).filter((s) => s.length > 3);
+      for (const c of corridors) {
+        if (c && addr.includes(c)) {
+          return { isMatch: true, districtLabel: 'Cùng tuyến đường phụ trách' };
+        }
+      }
+    }
+
+    // 2. So khớp theo quận huyện địa bàn
+    if (teamZone) {
+      const zone = teamZone.toLowerCase();
+      for (const d of districts) {
+        if (zone.includes(d.key) && addr.includes(d.key)) {
+          return { isMatch: true, districtLabel: d.name };
+        }
+      }
+    }
+
+    let teamDistrict = 'Quận khác';
+    if (teamZone) {
+      for (const d of districts) {
+        if (teamZone.toLowerCase().includes(d.key)) {
+          teamDistrict = d.name;
+          break;
+        }
+      }
+    }
+
+    return { isMatch: false, districtLabel: teamDistrict };
+  };
+
+  // Helper xác định tọa độ sự cố
+  const getIncidentCoordinates = (inc: Incident | null) => {
+    let lat = inc?.latitude;
+    let lon = inc?.longitude;
+
+    if ((!lat || !lon) && inc?.address) {
+      const addr = inc.address.toLowerCase();
+      if (addr.includes('cầu giấy')) { lat = 21.0333; lon = 105.7939; }
+      else if (addr.includes('đống đa')) { lat = 21.0181; lon = 105.8272; }
+      else if (addr.includes('thanh xuân')) { lat = 20.9980; lon = 105.8083; }
+      else if (addr.includes('ba đình')) { lat = 21.0341; lon = 105.8239; }
+      else { lat = 21.0285; lon = 105.8048; }
+    }
+    return { lat: lat || 21.0285, lon: lon || 105.8048 };
+  };
+
+  // Helper xác định tọa độ trụ sở tổ đội
+  const getTeamCoordinates = (team: Team) => {
+    let baseLat = team.baseLatitude;
+    let baseLon = team.baseLongitude;
+    if (!baseLat || !baseLon) {
+      const zone = (team.zoneName || '').toLowerCase();
+      if (zone.includes('cầu giấy')) { baseLat = 21.0333; baseLon = 105.7939; }
+      else if (zone.includes('đống đa')) { baseLat = 21.0181; baseLon = 105.8272; }
+      else if (zone.includes('thanh xuân')) { baseLat = 20.9980; baseLon = 105.8083; }
+      else if (zone.includes('ba đình')) { baseLat = 21.0341; baseLon = 105.8239; }
+      else { baseLat = 21.0022; baseLon = 105.7895; }
+    }
+    return { lat: baseLat, lon: baseLon };
+  };
+
+  // Nạp định tuyến đường bộ thực tế qua OSRM API
+  const fetchDrivingRoutes = (candidateTeams: Team[], inc: Incident | null) => {
+    if (!inc) return;
+    const incPos = getIncidentCoordinates(inc);
+
+    candidateTeams.forEach((team) => {
+      const teamPos = getTeamCoordinates(team);
+      routingService.getRoute(teamPos.lat, teamPos.lon, incPos.lat, incPos.lon).then((route) => {
+        setRouteDetails((prev) => ({
+          ...prev,
+          [team.id]: route,
+        }));
+      }).catch(() => {});
+    });
+  };
+
+  // Helper tính khoảng cách GPS, thời gian ETA, đối soát khu vực và chấm điểm phù hợp
+  const getTeamDistanceAndEta = (team: Team, incident: Incident | null) => {
+    const incPos = getIncidentCoordinates(incident);
+    const teamPos = getTeamCoordinates(team);
+
+    const cachedRoute = routeDetails[team.id];
+    const distKm = cachedRoute
+      ? cachedRoute.distanceKm
+      : calculateDistanceKm(incPos.lat, incPos.lon, teamPos.lat, teamPos.lon);
+
+    const etaMinutes = cachedRoute
+      ? cachedRoute.durationMinutes
+      : getEstimatedTravelMinutes(distKm);
+
+    const isDrivingRoute = cachedRoute?.isDrivingRoute ?? false;
+    const polyline = cachedRoute?.polylineCoordinates;
+    const zoneResult = checkZoneMatch(incident?.address, team.zoneName, team.corridor);
+
+    // Thuật toán chấm điểm phù hợp chuẩn hóa (Thang 100 điểm, giới hạn nghiêm ngặt [10, 100]):
+    // - Điểm cơ sở: 80 điểm (bảo đảm điểm luôn dương và không bị vượt trần 100)
+    // - Cùng địa bàn phụ trách: +20 điểm (ưu tiên hành chính tương đương ~2.5 km cự ly)
+    // - Trạng thái rảnh việc (0 việc): +10 điểm (ưu tiên phân bổ đều việc)
+    // - Cự ly đường bộ OSRM: -8 điểm / km (yếu tố cơ động đô thị)
+    // - Số lượng việc dở dang: -10 điểm / việc
+    // - Phạt quá tải (>= 3 việc): -20 điểm
+    const tasks = team.activeTaskCount || 0;
+    const isMatch = zoneResult.isMatch ? 1 : 0;
+    const isAvailable = tasks === 0 ? 1 : 0;
+    const overloadPenalty = tasks >= 3 ? 20 : 0;
+
+    const baseScore = 80;
+    const rawScore = baseScore + (isMatch * 10) + (isAvailable * 10) - (distKm * 8) - (tasks * 10) - overloadPenalty;
+    const score = Math.min(100, Math.max(10, Math.round(rawScore)));
+
+    return { distKm, etaMinutes, zoneResult, isDrivingRoute, polyline, teamPos, incPos, score };
+  };
+
+  // Helper sắp xếp tổ đội thông minh theo điểm phù hợp (Từ cao xuống thấp)
   const getSortedTeamsForSelection = (candidateTeams: Team[], incident: Incident | null) => {
     return [...candidateTeams].sort((a, b) => {
-      const aMatch = incident && checkZoneMatch(incident.address, a.zoneName, a.corridor) ? 1 : 0;
-      const bMatch = incident && checkZoneMatch(incident.address, b.zoneName, b.corridor) ? 1 : 0;
-      
-      const aAvailable = (a.activeTaskCount || 0) === 0 ? 1 : 0;
-      const bAvailable = (b.activeTaskCount || 0) === 0 ? 1 : 0;
-
-      const aScore = aMatch * 10 + aAvailable * 5 - (a.activeTaskCount || 0);
-      const bScore = bMatch * 10 + bAvailable * 5 - (b.activeTaskCount || 0);
-
-      return bScore - aScore;
+      const infoA = getTeamDistanceAndEta(a, incident);
+      const infoB = getTeamDistanceAndEta(b, incident);
+      return infoB.score - infoA.score;
     });
   };
 
   const handleOpenAssignInspectionModal = (incident: Incident) => {
     setSelectedIncident(incident);
+    const defaultPriority: Priority = incident.severity === 'CRITICAL' ? 'CRITICAL' : incident.severity === 'HIGH' ? 'HIGH' : 'NORMAL';
+    setInspectionPriority(defaultPriority);
     const candidateTeams = teams.filter((t) => t.teamType === 'INSPECTION' || t.teamType === 'EMERGENCY');
     const sorted = getSortedTeamsForSelection(candidateTeams.length > 0 ? candidateTeams : teams, incident);
     if (sorted.length > 0) {
       setInspectionTeamId(sorted[0].id);
     }
+    fetchDrivingRoutes(candidateTeams.length > 0 ? candidateTeams : teams, incident);
     setIsAssignInspectionModalOpen(true);
   };
 
@@ -214,13 +351,19 @@ export const DispatchQueuePage: React.FC = () => {
 
   const handleOpenAssignConstructionModal = (incident: Incident) => {
     setSelectedIncident(incident);
-    const date = new Date(Date.now() + 48 * 3600 * 1000);
+    const slaHours = incident.severity === 'CRITICAL' ? 4 : incident.severity === 'HIGH' ? 24 : incident.severity === 'MEDIUM' ? 72 : 168;
+    const defaultPriority: Priority = incident.severity === 'CRITICAL' ? 'CRITICAL' : incident.severity === 'HIGH' ? 'HIGH' : 'NORMAL';
+    setConstructionPriority(defaultPriority);
+    const date = incident.plannedDeadline
+      ? new Date(incident.plannedDeadline)
+      : new Date(Date.now() + slaHours * 3600 * 1000);
     setPlannedDeadline(date.toISOString().slice(0, 16));
     const candidateTeams = teams.filter((t) => t.teamType === 'CONSTRUCTION' || t.teamType === 'EMERGENCY');
     const sorted = getSortedTeamsForSelection(candidateTeams.length > 0 ? candidateTeams : teams, incident);
     if (sorted.length > 0) {
       setConstructionTeamId(sorted[0].id);
     }
+    fetchDrivingRoutes(candidateTeams.length > 0 ? candidateTeams : teams, incident);
     setIsAssignConstructionModalOpen(true);
   };
 
@@ -527,8 +670,8 @@ export const DispatchQueuePage: React.FC = () => {
       </div>
 
       {/* Bảng Hàng Đợi Sự Cố */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-visible">
+        <div className="overflow-x-auto min-h-[340px]">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-600 uppercase text-[11px] font-semibold tracking-wide border-b border-slate-200">
               <tr>
@@ -670,23 +813,84 @@ export const DispatchQueuePage: React.FC = () => {
                             </Link>
                           ) : (
                             <>
-                              {/* Giai đoạn 3: AI_ANALYZED / SUBMITTED -> Giao khảo sát hoặc Từ chối */}
+                              {/* Giai đoạn 3: AI_ANALYZED / SUBMITTED -> Điều phối linh hoạt (Khảo sát hoặc Thi công trực tiếp), hoặc Từ chối */}
                               {['SUBMITTED', 'AI_ANALYZED', 'VERIFIED'].includes(incident.status) && (
                                 <>
-                                  <button
-                                    onClick={() => handleOpenAssignInspectionModal(incident)}
-                                    title="Giao tổ khảo sát xác minh hiện trường"
-                                    className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors text-xs flex items-center gap-1 shadow-xs"
-                                  >
-                                    <ClipboardList className="w-3.5 h-3.5" />
-                                    <span>Giao khảo sát</span>
-                                  </button>
+                                  <div className="relative inline-block text-left">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDispatchDropdownIncidentId(dispatchDropdownIncidentId === incident.id ? null : incident.id);
+                                      }}
+                                      className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+                                      title="Chọn phương án điều phối công việc"
+                                    >
+                                      <Send className="w-3.5 h-3.5" />
+                                      <span>Điều phối</span>
+                                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${dispatchDropdownIncidentId === incident.id ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {dispatchDropdownIncidentId === incident.id && (
+                                      <>
+                                        <div
+                                          className="fixed inset-0 z-30"
+                                          onClick={() => setDispatchDropdownIncidentId(null)}
+                                        />
+                                        <div className="absolute right-0 mt-1.5 w-64 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-40 text-left animate-in fade-in zoom-in-95 duration-100">
+                                          <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                                            Chọn luồng xử lý sự cố
+                                          </div>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setDispatchDropdownIncidentId(null);
+                                              handleOpenAssignInspectionModal(incident);
+                                            }}
+                                            className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-start gap-2.5 transition-colors cursor-pointer group"
+                                          >
+                                            <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                              <ClipboardList className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div>
+                                              <div className="text-xs font-semibold text-slate-800 group-hover:text-blue-700">1. Giao tổ khảo sát</div>
+                                              <div className="text-[11px] text-slate-500 leading-tight mt-0.5">Xác minh hiện trường & đo đạc kỹ thuật</div>
+                                            </div>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setDispatchDropdownIncidentId(null);
+                                              handleOpenAssignConstructionModal(incident);
+                                            }}
+                                            className="w-full px-3 py-2 text-left hover:bg-emerald-50 flex items-start gap-2.5 transition-colors cursor-pointer group border-t border-slate-100"
+                                          >
+                                            <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                              <HardHat className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div>
+                                              <div className="text-xs font-semibold text-slate-800 group-hover:text-emerald-700 flex items-center gap-1.5">
+                                                <span>2. Giao thi công trực tiếp</span>
+                                                {incident.severity === 'CRITICAL' && (
+                                                  <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1 py-0.2 rounded border border-amber-300">Khẩn</span>
+                                                )}
+                                              </div>
+                                              <div className="text-[11px] text-slate-500 leading-tight mt-0.5">Bỏ qua khảo sát, thi công ngay</div>
+                                            </div>
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+
                                   <button
                                     onClick={() => {
                                       setSelectedIncident(incident);
                                       setIsRejectModalOpen(true);
                                     }}
-                                    className="px-2 py-1 rounded-md border border-slate-200 text-rose-600 font-medium hover:bg-rose-50 transition-colors text-xs"
+                                    className="px-2 py-1 rounded-md border border-slate-200 text-rose-600 font-medium hover:bg-rose-50 transition-colors text-xs cursor-pointer"
                                   >
                                     Từ chối
                                   </button>
@@ -776,20 +980,20 @@ export const DispatchQueuePage: React.FC = () => {
       {/* Modal Giao Khảo Sát Hiện Trường (Giai đoạn 3) */}
       {isAssignInspectionModalOpen && selectedIncident && (
         <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-lg border border-slate-200 shadow-xl p-6 flex flex-col gap-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-3xl max-h-[92vh] overflow-hidden rounded-xl border border-slate-200 shadow-2xl p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
                   <ClipboardList className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Giao nhiệm vụ khảo sát</h3>
+                  <h3 className="text-base font-semibold text-slate-900">Giao nhiệm vụ khảo sát hiện trường</h3>
                   <span className="font-mono text-xs text-blue-700 font-medium">{selectedIncident.ticketCode}</span>
                 </div>
               </div>
               <button
                 onClick={() => setIsAssignInspectionModalOpen(false)}
-                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -803,96 +1007,125 @@ export const DispatchQueuePage: React.FC = () => {
                 selectedIncident
               );
               const currentTeam = teams.find((t) => t.id === inspectionTeamId) || candidateTeams[0];
-              const isZoneMatch = currentTeam ? checkZoneMatch(selectedIncident.address, currentTeam.zoneName, currentTeam.corridor) : false;
+              const isZoneMatch = currentTeam ? checkZoneMatch(selectedIncident.address, currentTeam.zoneName, currentTeam.corridor).isMatch : false;
               const isBusy = (currentTeam?.activeTaskCount || 0) > 0;
 
               return (
-                <form onSubmit={handleAssignInspectionSubmit} className="flex flex-col gap-3.5 text-xs">
-                  <div className="p-3 rounded-md bg-slate-50 border border-slate-200 flex flex-col gap-1 text-xs">
-                    <span className="font-semibold text-slate-800">{selectedIncident.title}</span>
-                    <span className="text-slate-500 line-clamp-1">📍 {selectedIncident.address || 'Không rõ địa chỉ'}</span>
+                <form onSubmit={handleAssignInspectionSubmit} className="flex flex-col gap-3.5 text-xs overflow-y-auto pr-1 -mr-1">
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col gap-1 text-xs">
+                    <span className="font-semibold text-slate-900 text-sm">{selectedIncident.title}</span>
+                    <span className="text-slate-600 line-clamp-1">📍 {selectedIncident.address || 'Không rõ địa chỉ'}</span>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block font-medium text-slate-700">Chọn Tổ Khảo Sát tiếp nhận *</label>
-                      <span className="text-[11px] text-slate-500">{candidateTeams.length} tổ đội khảo sát</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block font-semibold text-slate-800 text-xs">Chọn Tổ Khảo Sát tiếp nhận *</label>
+                      <span className="text-xs text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">{candidateTeams.length} tổ đội ứng viên</span>
                     </div>
 
-                    <div className="max-h-48 overflow-y-auto space-y-2 pr-1 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
+                    <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1 border border-slate-200 rounded-xl p-2.5 bg-slate-50/60">
                       {candidateTeams.map((team, idx) => {
                         const isSelected = inspectionTeamId === team.id;
-                        const match = checkZoneMatch(selectedIncident.address, team.zoneName, team.corridor);
+                        const { distKm, etaMinutes, zoneResult, isDrivingRoute, score } = getTeamDistanceAndEta(team, selectedIncident);
                         const teamAvailable = (team.activeTaskCount || 0) === 0;
                         const teamOverloaded = (team.activeTaskCount || 0) >= 3;
-                        const isBest = idx === 0 && match && teamAvailable;
+                        const isBest = idx === 0;
+                        const isRunnerUp = idx === 1;
 
                         return (
                           <div
                             key={team.id}
                             onClick={() => setInspectionTeamId(team.id)}
-                            className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all ${
+                            className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                               isSelected
-                                ? 'border-blue-600 bg-blue-50/90 shadow-2xs ring-1 ring-blue-500'
-                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                                ? 'border-blue-600 bg-blue-50/90 shadow-sm ring-2 ring-blue-500'
+                                : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50 shadow-2xs'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="flex items-center justify-between gap-3 mb-1.5">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {isBest && (
-                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-full">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
                                     <Star className="w-3 h-3 text-amber-600 fill-amber-500" />
-                                    ĐỀ XUẤT TỐI ƯU
+                                    🏆 GỢI Ý SỐ 1
                                   </span>
                                 )}
-                                {match ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                {isRunnerUp && !isBest && (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded-full">
+                                    🥈 Gợi ý số 2
+                                  </span>
+                                )}
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full" title="Điểm phù hợp tổng hợp (Thang 100)">
+                                  🎯 {score} điểm
+                                </span>
+                                {zoneResult.isMatch ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                                     <MapPin className="w-3 h-3 text-emerald-600" />
-                                    Đúng địa bàn
+                                    Cùng địa bàn ({zoneResult.districtLabel})
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
                                     <Globe className="w-3 h-3 text-slate-500" />
-                                    Khác địa bàn
+                                    Lân cận ({zoneResult.districtLabel} - Điều động chéo)
                                   </span>
                                 )}
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                                  <Navigation className="w-3 h-3 text-blue-600" />
+                                  {isDrivingRoute ? '🚗 Đường bộ: ' : '📍 '}Cách {distKm} km (~{etaMinutes} phút)
+                                </span>
                               </div>
 
-                              <div>
+                              <div className="shrink-0">
                                 {teamAvailable ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                     Sẵn sàng
                                   </span>
                                 ) : teamOverloaded ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                                     Quá tải ({team.activeTaskCount} việc)
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
                                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                    Đang bận ({team.activeTaskCount} việc)
+                                    Đang làm ({team.activeTaskCount} việc)
                                   </span>
                                 )}
                               </div>
                             </div>
 
-                            <div className="font-semibold text-xs text-slate-900 leading-snug">
+                            <div className="font-bold text-sm text-slate-900 leading-snug">
                               {team.name}
                             </div>
 
-                            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                              <span className="truncate">{team.zoneName || team.corridor || 'Toàn mạng lưới'}</span>
+                            <div className="mt-1.5 flex items-center justify-between text-xs text-slate-500 gap-3">
+                              <span className="truncate flex-1" title={team.baseAddress || team.zoneName}>
+                                📍 Trụ sở: <span className="text-slate-700 font-medium">{team.baseAddress || team.zoneName || 'Hà Nội'}</span>
+                              </span>
                               <span className="shrink-0 text-slate-600 font-medium">
-                                👤 {team.leaderName || 'Chưa có tổ trưởng'} ({team.members?.length || 0} người)
+                                👤 {team.leaderName || 'Chưa có tổ trưởng'} ({team.members?.length || 0} thành viên)
                               </span>
                             </div>
 
                             {team.currentActiveIncidentTicket && (
-                              <div className="mt-1.5 text-[10px] text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                              <div className="mt-2 text-[11px] text-amber-900 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                 <span>Đang xử lý: <strong className="font-mono">{team.currentActiveIncidentTicket}</strong> ({team.currentActiveIncidentTitle || 'Nhiệm vụ trước'})</span>
+                              </div>
+                            )}
+
+                            {isSelected && (
+                              <div className="mt-2 pt-2 border-t border-blue-200/60 flex items-center justify-between text-[11px] text-blue-800">
+                                <span className="flex items-center gap-1 font-medium">
+                                  <Car className="w-3.5 h-3.5 text-blue-600" />
+                                  Lộ trình: <strong>{distKm} km</strong> qua mạng lưới giao thông Hà Nội
+                                </span>
+                                {isDrivingRoute && (
+                                  <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-full border border-blue-200">
+                                    OSRM Real-Route
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -903,11 +1136,11 @@ export const DispatchQueuePage: React.FC = () => {
 
                   {/* Cảnh báo trạng thái & địa bàn */}
                   {isBusy && currentTeam && (
-                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2 text-xs">
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5 text-xs">
                       <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <div>
                         <div className="font-semibold">Lưu ý: Tổ đội đang có {currentTeam.activeTaskCount} nhiệm vụ</div>
-                        <div className="text-[11px] text-amber-800 mt-0.5">
+                        <div className="text-slate-700 mt-0.5">
                           Hệ thống vẫn cho phép điều phối. Sự cố sẽ tự động xếp vào <strong>hàng đợi công việc (Job Queue)</strong> của đội để thực hiện kế tiếp.
                         </div>
                       </div>
@@ -915,51 +1148,55 @@ export const DispatchQueuePage: React.FC = () => {
                   )}
 
                   {!isZoneMatch && currentTeam && (
-                    <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-2 text-xs">
+                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-2.5 text-xs">
                       <Globe className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                       <div>
                         <div className="font-semibold">Điều động chi viện ngoại vùng</div>
-                        <div className="text-[11px] text-blue-800 mt-0.5">
+                        <div className="text-blue-800 mt-0.5">
                           Tổ đội phụ trách <strong>{currentTeam.zoneName || 'Khu vực khác'}</strong>, sự cố tại <strong>{selectedIncident.address}</strong>. Bạn đang điều động chéo địa bàn.
                         </div>
                       </div>
                     </div>
                   )}
 
-                  <div>
-                    <label className="block font-medium mb-1 text-slate-700">Mức độ ưu tiên phản ứng</label>
-                    <select
-                      value={inspectionPriority}
-                      onChange={(e) => setInspectionPriority(e.target.value as Priority)}
-                      className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
-                    >
-                      <option value="CRITICAL">Khẩn cấp</option>
-                      <option value="HIGH">Cao</option>
-                      <option value="NORMAL">Bình thường</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-1">
+                      <label className="block font-semibold mb-1 text-slate-700">Mức độ ưu tiên phản ứng</label>
+                      <select
+                        value={inspectionPriority}
+                        onChange={(e) => setInspectionPriority(e.target.value as Priority)}
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent cursor-pointer"
+                      >
+                        <option value="CRITICAL">Khẩn cấp</option>
+                        <option value="HIGH">Cao</option>
+                        <option value="NORMAL">Bình thường</option>
+                        <option value="LOW">Thấp</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block font-semibold mb-1 text-slate-700">Ghi chú & Chỉ đạo khảo sát</label>
+                      <textarea
+                        rows={2}
+                        value={inspectionNotes}
+                        onChange={(e) => setInspectionNotes(e.target.value)}
+                        placeholder="Yêu cầu khảo sát hiện trường, kiểm tra kích thước hư hỏng..."
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block font-medium mb-1 text-slate-700">Ghi chú & Chỉ đạo khảo sát</label>
-                    <textarea
-                      rows={2}
-                      value={inspectionNotes}
-                      onChange={(e) => setInspectionNotes(e.target.value)}
-                      className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                  <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200">
                     <button
                       type="button"
                       onClick={() => setIsAssignInspectionModalOpen(false)}
-                      className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                      className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors cursor-pointer"
                     >
                       Hủy
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors shadow-xs"
+                      className="px-5 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
                     >
                       Xác nhận giao khảo sát
                     </button>
@@ -974,20 +1211,20 @@ export const DispatchQueuePage: React.FC = () => {
       {/* Modal Giao Thi Công Chuyên Trách (Giai đoạn 5) */}
       {isAssignConstructionModalOpen && selectedIncident && (
         <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-lg border border-slate-200 shadow-xl p-6 flex flex-col gap-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-3xl max-h-[92vh] overflow-hidden rounded-xl border border-slate-200 shadow-2xl p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
                   <HardHat className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Giao nhiệm vụ thi công sửa chữa</h3>
+                  <h3 className="text-base font-semibold text-slate-900">Giao nhiệm vụ thi công sửa chữa</h3>
                   <span className="font-mono text-xs text-emerald-700 font-medium">{selectedIncident.ticketCode}</span>
                 </div>
               </div>
               <button
                 onClick={() => setIsAssignConstructionModalOpen(false)}
-                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1001,96 +1238,125 @@ export const DispatchQueuePage: React.FC = () => {
                 selectedIncident
               );
               const currentTeam = teams.find((t) => t.id === constructionTeamId) || candidateTeams[0];
-              const isZoneMatch = currentTeam ? checkZoneMatch(selectedIncident.address, currentTeam.zoneName, currentTeam.corridor) : false;
+              const isZoneMatch = currentTeam ? checkZoneMatch(selectedIncident.address, currentTeam.zoneName, currentTeam.corridor).isMatch : false;
               const isBusy = (currentTeam?.activeTaskCount || 0) > 0;
 
               return (
-                <form onSubmit={handleAssignConstructionSubmit} className="flex flex-col gap-3 text-xs">
-                  <div className="p-3 rounded-md bg-slate-50 border border-slate-200 flex flex-col gap-1 text-xs">
-                    <span className="font-semibold text-slate-800">{selectedIncident.title}</span>
-                    <span className="text-slate-500 line-clamp-1">📍 {selectedIncident.address || 'Không rõ địa chỉ'}</span>
+                <form onSubmit={handleAssignConstructionSubmit} className="flex flex-col gap-3 text-xs overflow-y-auto pr-1 -mr-1">
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col gap-1 text-xs">
+                    <span className="font-semibold text-slate-900 text-sm">{selectedIncident.title}</span>
+                    <span className="text-slate-600 line-clamp-1">📍 {selectedIncident.address || 'Không rõ địa chỉ'}</span>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block font-medium text-slate-700">Chọn Tổ Thi Công chuyên trách *</label>
-                      <span className="text-[11px] text-slate-500">{candidateTeams.length} tổ đội thi công</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block font-semibold text-slate-800 text-xs">Chọn Tổ Thi Công chuyên trách *</label>
+                      <span className="text-xs text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">{candidateTeams.length} tổ đội ứng viên</span>
                     </div>
 
-                    <div className="max-h-48 overflow-y-auto space-y-2 pr-1 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
+                    <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1 border border-slate-200 rounded-xl p-2.5 bg-slate-50/60">
                       {candidateTeams.map((team, idx) => {
                         const isSelected = constructionTeamId === team.id;
-                        const match = checkZoneMatch(selectedIncident.address, team.zoneName, team.corridor);
+                        const { distKm, etaMinutes, zoneResult, isDrivingRoute, score } = getTeamDistanceAndEta(team, selectedIncident);
                         const teamAvailable = (team.activeTaskCount || 0) === 0;
                         const teamOverloaded = (team.activeTaskCount || 0) >= 3;
-                        const isBest = idx === 0 && match && teamAvailable;
+                        const isBest = idx === 0;
+                        const isRunnerUp = idx === 1;
 
                         return (
                           <div
                             key={team.id}
                             onClick={() => setConstructionTeamId(team.id)}
-                            className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all ${
+                            className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                               isSelected
-                                ? 'border-emerald-600 bg-emerald-50/90 shadow-2xs ring-1 ring-emerald-500'
-                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                                ? 'border-emerald-600 bg-emerald-50/90 shadow-sm ring-2 ring-emerald-500'
+                                : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-slate-50 shadow-2xs'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="flex items-center justify-between gap-3 mb-1.5">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {isBest && (
-                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-full">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
                                     <Star className="w-3 h-3 text-amber-600 fill-amber-500" />
-                                    ĐỀ XUẤT TỐI ƯU
+                                    🏆 GỢI Ý SỐ 1
                                   </span>
                                 )}
-                                {match ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                {isRunnerUp && !isBest && (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded-full">
+                                    🥈 Gợi ý số 2
+                                  </span>
+                                )}
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full" title="Điểm phù hợp tổng hợp (Thang 100)">
+                                  🎯 {score} điểm
+                                </span>
+                                {zoneResult.isMatch ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                                     <MapPin className="w-3 h-3 text-emerald-600" />
-                                    Đúng địa bàn
+                                    Cùng địa bàn ({zoneResult.districtLabel})
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
                                     <Globe className="w-3 h-3 text-slate-500" />
-                                    Khác địa bàn
+                                    Lân cận ({zoneResult.districtLabel} - Điều động chéo)
                                   </span>
                                 )}
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                                  <Navigation className="w-3 h-3 text-emerald-600" />
+                                  {isDrivingRoute ? '🚗 Đường bộ: ' : '📍 '}Cách {distKm} km (~{etaMinutes} phút)
+                                </span>
                               </div>
 
-                              <div>
+                              <div className="shrink-0">
                                 {teamAvailable ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                     Sẵn sàng
                                   </span>
                                 ) : teamOverloaded ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                                     Quá tải ({team.activeTaskCount} việc)
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
                                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                    Đang thi công ({team.activeTaskCount} việc)
+                                    Đang làm ({team.activeTaskCount} việc)
                                   </span>
                                 )}
                               </div>
                             </div>
 
-                            <div className="font-semibold text-xs text-slate-900 leading-snug">
+                            <div className="font-bold text-sm text-slate-900 leading-snug">
                               {team.name}
                             </div>
 
-                            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                              <span className="truncate">{team.zoneName || team.corridor || 'Toàn mạng lưới'}</span>
+                            <div className="mt-1.5 flex items-center justify-between text-xs text-slate-500 gap-3">
+                              <span className="truncate flex-1" title={team.baseAddress || team.zoneName}>
+                                📍 Trụ sở: <span className="text-slate-700 font-medium">{team.baseAddress || team.zoneName || 'Hà Nội'}</span>
+                              </span>
                               <span className="shrink-0 text-slate-600 font-medium">
-                                👤 {team.leaderName || 'Chưa có tổ trưởng'} ({team.members?.length || 0} người)
+                                👤 {team.leaderName || 'Chưa có tổ trưởng'} ({team.members?.length || 0} thành viên)
                               </span>
                             </div>
 
                             {team.currentActiveIncidentTicket && (
-                              <div className="mt-1.5 text-[10px] text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                              <div className="mt-2 text-[11px] text-amber-900 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                 <span>Đang xử lý: <strong className="font-mono">{team.currentActiveIncidentTicket}</strong> ({team.currentActiveIncidentTitle || 'Nhiệm vụ trước'})</span>
+                              </div>
+                            )}
+
+                            {isSelected && (
+                              <div className="mt-2 pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800">
+                                <span className="flex items-center gap-1 font-medium">
+                                  <Car className="w-3.5 h-3.5 text-emerald-600" />
+                                  Lộ trình: <strong>{distKm} km</strong> qua mạng lưới giao thông Hà Nội
+                                </span>
+                                {isDrivingRoute && (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
+                                    OSRM Real-Route
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1101,11 +1367,11 @@ export const DispatchQueuePage: React.FC = () => {
 
                   {/* Cảnh báo trạng thái & địa bàn */}
                   {isBusy && currentTeam && (
-                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2 text-xs">
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5 text-xs">
                       <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <div>
                         <div className="font-semibold">Lưu ý: Tổ đội đang bận ({currentTeam.activeTaskCount} nhiệm vụ)</div>
-                        <div className="text-[11px] text-amber-800 mt-0.5">
+                        <div className="text-slate-700 mt-0.5">
                           Hệ thống vẫn cho phép điều phối. Sự cố sẽ tự động xếp vào <strong>hàng đợi công việc (Job Queue)</strong> của đội để thực hiện kế tiếp.
                         </div>
                       </div>
@@ -1113,11 +1379,11 @@ export const DispatchQueuePage: React.FC = () => {
                   )}
 
                   {!isZoneMatch && currentTeam && (
-                    <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-2 text-xs">
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-2.5 text-xs">
                       <Globe className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                       <div>
                         <div className="font-semibold">Điều động chi viện ngoại vùng</div>
-                        <div className="text-[11px] text-emerald-800 mt-0.5">
+                        <div className="text-emerald-800 mt-0.5">
                           Tổ đội phụ trách <strong>{currentTeam.zoneName || 'Khu vực khác'}</strong>, sự cố tại <strong>{selectedIncident.address}</strong>. Bạn đang điều động chéo địa bàn.
                         </div>
                       </div>
@@ -1125,33 +1391,33 @@ export const DispatchQueuePage: React.FC = () => {
                   )}
 
                   <div>
-                    <label className="block font-medium mb-1 text-slate-700">Phương án thi công đã phê duyệt *</label>
+                    <label className="block font-semibold mb-1 text-slate-700">Phương án thi công đã phê duyệt *</label>
                     <textarea
                       rows={2}
                       value={workPlan}
                       required
                       onChange={(e) => setWorkPlan(e.target.value)}
                       placeholder="Ví dụ: Cào bóc 4cm, tưới nhựa dính bám 0.5kg/m2, thảm BTN C12.5 dày 5cm..."
-                      className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-medium mb-1 text-slate-700">Hạn hoàn thành (Deadline)</label>
+                      <label className="block font-semibold mb-1 text-slate-700">Hạn hoàn thành (Deadline)</label>
                       <input
                         type="datetime-local"
                         value={plannedDeadline}
                         onChange={(e) => setPlannedDeadline(e.target.value)}
-                        className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent cursor-pointer"
                       />
                     </div>
                     <div>
-                      <label className="block font-medium mb-1 text-slate-700">Mức độ ưu tiên</label>
+                      <label className="block font-semibold mb-1 text-slate-700">Mức độ ưu tiên</label>
                       <select
                         value={constructionPriority}
                         onChange={(e) => setConstructionPriority(e.target.value as Priority)}
-                        className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent cursor-pointer"
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent cursor-pointer"
                       >
                         <option value="CRITICAL">Khẩn cấp</option>
                         <option value="HIGH">Cao</option>
@@ -1161,26 +1427,26 @@ export const DispatchQueuePage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block font-medium mb-1 text-slate-700">Lưu ý an toàn giao thông & vật tư</label>
+                    <label className="block font-semibold mb-1 text-slate-700">Lưu ý an toàn giao thông & vật tư</label>
                     <textarea
                       rows={2}
                       value={safetyNotes}
                       onChange={(e) => setSafetyNotes(e.target.value)}
-                      className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                     />
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                  <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200">
                     <button
                       type="button"
                       onClick={() => setIsAssignConstructionModalOpen(false)}
-                      className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                      className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors cursor-pointer"
                     >
                       Hủy
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-md bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors shadow-xs"
+                      className="px-5 py-2 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
                     >
                       Xác nhận giao thi công
                     </button>

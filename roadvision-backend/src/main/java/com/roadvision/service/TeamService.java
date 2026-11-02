@@ -35,7 +35,7 @@ public class TeamService {
 
     @Transactional(readOnly = true)
     public List<TeamResponse> getAllTeams() {
-        return teamRepository.findAll().stream()
+        return teamRepository.findByIsActiveTrue().stream()
                 .map(this::mapToTeamResponse)
                 .collect(Collectors.toList());
     }
@@ -61,6 +61,9 @@ public class TeamService {
                 .corridor(request.getCorridor())
                 .zoneName(request.getZoneName())
                 .description(request.getDescription())
+                .baseLatitude(request.getBaseLatitude())
+                .baseLongitude(request.getBaseLongitude())
+                .baseAddress(request.getBaseAddress())
                 .leader(leader)
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
@@ -88,6 +91,9 @@ public class TeamService {
         team.setCorridor(request.getCorridor());
         team.setZoneName(request.getZoneName());
         team.setDescription(request.getDescription());
+        team.setBaseLatitude(request.getBaseLatitude());
+        team.setBaseLongitude(request.getBaseLongitude());
+        team.setBaseAddress(request.getBaseAddress());
         if (request.getIsActive() != null) {
             team.setIsActive(request.getIsActive());
         }
@@ -321,6 +327,9 @@ public class TeamService {
                 .corridor(team.getCorridor())
                 .zoneName(team.getZoneName())
                 .description(team.getDescription())
+                .baseLatitude(team.getBaseLatitude())
+                .baseLongitude(team.getBaseLongitude())
+                .baseAddress(team.getBaseAddress())
                 .isActive(team.getIsActive())
                 .memberCount(members.size())
                 .leaderId(leaderId)

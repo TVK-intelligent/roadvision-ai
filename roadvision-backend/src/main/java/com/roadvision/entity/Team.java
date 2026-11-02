@@ -41,6 +41,15 @@ public class Team {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "base_latitude")
+    private Double baseLatitude;
+
+    @Column(name = "base_longitude")
+    private Double baseLongitude;
+
+    @Column(name = "base_address", length = 255)
+    private String baseAddress;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "leader_id")
     @JsonIgnoreProperties({"team", "password", "hibernateLazyInitializer"})

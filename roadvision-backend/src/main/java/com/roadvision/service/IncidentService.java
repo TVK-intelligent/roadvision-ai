@@ -222,6 +222,17 @@ public class IncidentService {
             log.warn("Không thể kiểm tra trùng lặp sự cố khi tạo mới: {}", e.getMessage());
         }
 
+        // Tự động thiết lập hạn cam kết xử lý SLA (Service Level Agreement) theo mức độ nghiêm trọng
+        LocalDateTime now = LocalDateTime.now();
+        if (incident.getPlannedDeadline() == null && incident.getSeverity() != null) {
+            switch (incident.getSeverity()) {
+                case CRITICAL -> incident.setPlannedDeadline(now.plusHours(4));
+                case HIGH -> incident.setPlannedDeadline(now.plusHours(24));
+                case MEDIUM -> incident.setPlannedDeadline(now.plusHours(72));
+                case LOW -> incident.setPlannedDeadline(now.plusDays(7));
+            }
+        }
+
         Incident savedIncident = incidentRepository.save(incident);
 
         // 8. Lưu kết quả suy luận AI vào bảng ai_detections (bao gồm toàn bộ hộp bao dạng JSON)
@@ -247,11 +258,20 @@ public class IncidentService {
         aiDetectionRepository.save(aiDetection);
         savedIncident.setAiDetection(aiDetection);
 
-        // Gửi thông báo Real-time đến Quản trị viên
+        // Gửi thông báo Real-time đến Quản trị viên (Tự động kích hoạt Báo Động Đỏ URGENT qua WebSocket nếu CRITICAL)
+        boolean isCritical = savedIncident.getSeverity() == Severity.CRITICAL;
+        String notiType = isCritical ? "URGENT" : "INFO";
+        String notiTitle = isCritical
+                ? "🚨 [BÁO ĐỘNG ĐỎ] Sự cố khẩn cấp: " + savedIncident.getTicketCode()
+                : "Phản ánh mới tiếp nhận: " + savedIncident.getTicketCode();
+        String notiMsg = isCritical
+                ? "Báo động đỏ (SLA phản ứng 4 giờ): [" + savedIncident.getTitle() + "] tại " + savedIncident.getAddress() + ". Yêu cầu Ban Chỉ Huy điều phối ngay!"
+                : "Sự cố [" + savedIncident.getTitle() + "] vừa được ghi nhận tại " + savedIncident.getAddress();
+
         notificationService.notifyAdmins(
-            "Phản ánh mới tiếp nhận: " + savedIncident.getTicketCode(),
-            "Sự cố [" + savedIncident.getTitle() + "] vừa được ghi nhận tại " + savedIncident.getAddress(),
-            "INFO",
+            notiTitle,
+            notiMsg,
+            notiType,
             savedIncident
         );
 
@@ -1701,14 +1721,22 @@ public class IncidentService {
         // >= 3 lượt upvote: Cao (HIGH)
         if (currentUpvotes >= 5) {
             incident.setSeverity(Severity.CRITICAL);
+            incident.setPlannedDeadline(LocalDateTime.now().plusHours(4));
             if (incident.getAssignment() != null) {
                 incident.getAssignment().setPriority(com.roadvision.enums.Priority.CRITICAL);
             }
             log.info("Sự cố #{} tự động leo thang lên mức CRITICAL do có {} lượt đồng tình",
                     incident.getTicketCode(), currentUpvotes);
+            notificationService.notifyAdmins(
+                "🚨 [LEO THANG BÁO ĐỘNG ĐỎ] Sự cố " + incident.getTicketCode(),
+                "Sự cố [" + incident.getTitle() + "] đạt " + currentUpvotes + " lượt upvote cộng đồng! Tự động leo thang CRITICAL (SLA 4h).",
+                "URGENT",
+                incident
+            );
         } else if (currentUpvotes >= 3) {
             if (incident.getSeverity() == Severity.LOW || incident.getSeverity() == Severity.MEDIUM) {
                 incident.setSeverity(Severity.HIGH);
+                incident.setPlannedDeadline(LocalDateTime.now().plusHours(24));
             }
             if (incident.getAssignment() != null && incident.getAssignment().getPriority() == com.roadvision.enums.Priority.NORMAL) {
                 incident.getAssignment().setPriority(com.roadvision.enums.Priority.HIGH);

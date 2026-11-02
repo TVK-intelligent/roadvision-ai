@@ -13,6 +13,8 @@ import {
   ShieldAlert,
   BarChart3,
   Users,
+  UserCheck,
+  ShieldCheck,
   ChevronLeft,
   ChevronRight,
   Trophy,
@@ -214,6 +216,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <Users className="w-4 h-4 shrink-0 text-sky-400" />
                   {!isCollapsed && <span>Tổ đội & Nhân sự</span>}
+                </Link>
+
+                <Link
+                  to="/admin/users"
+                  onClick={closeMobile}
+                  className={navItemClass('/admin/users')}
+                  title="Quản lý toàn bộ người dùng và phân quyền RBAC"
+                >
+                  <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+                  {!isCollapsed && <span>Người dùng & Phân quyền</span>}
                 </Link>
               </nav>
             </div>

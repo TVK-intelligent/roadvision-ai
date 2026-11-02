@@ -22,6 +22,9 @@ public class TeamRequest {
     private String corridor;
     private String zoneName;
     private String description;
+    private Double baseLatitude;
+    private Double baseLongitude;
+    private String baseAddress;
     private Long leaderId;
     @Builder.Default
     private Boolean isActive = true;

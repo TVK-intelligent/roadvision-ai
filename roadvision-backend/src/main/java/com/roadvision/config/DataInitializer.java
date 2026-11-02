@@ -1,9 +1,13 @@
 package com.roadvision.config;
 
+import com.roadvision.entity.Incident;
+import com.roadvision.entity.IncidentInspection;
 import com.roadvision.entity.Team;
 import com.roadvision.entity.User;
 import com.roadvision.enums.Role;
 import com.roadvision.enums.TeamType;
+import com.roadvision.repository.IncidentInspectionRepository;
+import com.roadvision.repository.IncidentRepository;
 import com.roadvision.repository.TeamRepository;
 import com.roadvision.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +15,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -19,11 +24,21 @@ public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
+    private final IncidentRepository incidentRepository;
+    private final IncidentInspectionRepository incidentInspectionRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public DataInitializer(UserRepository userRepository, TeamRepository teamRepository, PasswordEncoder passwordEncoder) {
+    public DataInitializer(
+            UserRepository userRepository,
+            TeamRepository teamRepository,
+            IncidentRepository incidentRepository,
+            IncidentInspectionRepository incidentInspectionRepository,
+            PasswordEncoder passwordEncoder
+    ) {
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
+        this.incidentRepository = incidentRepository;
+        this.incidentInspectionRepository = incidentInspectionRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -185,6 +200,66 @@ public class DataInitializer implements CommandLineRunner {
                 false
         );
 
+        User staffMember10 = createOrUpdateUser(
+                "staff.member10@roadcare.gov.vn",
+                "Nguyễn Hữu Trí (Đội Trưởng Khảo Sát Ba Đình)",
+                "0909000020",
+                Role.ROLE_STAFF,
+                "Trắc địa đô thị & Đo vẽ bình đồ sự cố",
+                null,
+                true
+        );
+
+        User staffMember11 = createOrUpdateUser(
+                "staff.member11@roadcare.gov.vn",
+                "Lê Tuấn Anh (Kỹ thuật viên Khảo sát Ba Đình)",
+                "0909000021",
+                Role.ROLE_STAFF,
+                "Đo kích thước hình học hố sụt & nứt mặt đường",
+                null,
+                false
+        );
+
+        User staffMember12 = createOrUpdateUser(
+                "staff.member12@roadcare.gov.vn",
+                "Trần Quang Đăng (Đội Trưởng Thi Công Thanh Xuân)",
+                "0909000022",
+                Role.ROLE_STAFF,
+                "Chỉ huy cơ giới hóa thảm nhựa & lu lèn",
+                null,
+                true
+        );
+
+        User staffMember13 = createOrUpdateUser(
+                "staff.member13@roadcare.gov.vn",
+                "Vũ Đình Cường (Kỹ thuật viên Thi công Thanh Xuân)",
+                "0909000023",
+                Role.ROLE_STAFF,
+                "Vận hành xe tưới nhựa dính bám & đầm cóc",
+                null,
+                false
+        );
+
+        User staffMember14 = createOrUpdateUser(
+                "staff.member14@roadcare.gov.vn",
+                "Hoàng Trọng Nghĩa (Đội Trưởng Thi Công Ba Đình)",
+                "0909000024",
+                Role.ROLE_STAFF,
+                "Chỉ huy duy tu vá víu & bảo trì hoàn thiện",
+                null,
+                true
+        );
+
+        User staffMember15 = createOrUpdateUser(
+                "staff.member15@roadcare.gov.vn",
+                "Phạm Duy Khánh (Kỹ thuật viên Thi công Ba Đình)",
+                "0909000025",
+                Role.ROLE_STAFF,
+                "Cân chỉnh nắp hố ga & đan rãnh thoát nước",
+                null,
+                false
+        );
+
         // 3. Tài khoản Công dân (Citizen)
         createOrUpdateUser(
                 "citizen.an@gmail.com",
@@ -196,94 +271,189 @@ public class DataInitializer implements CommandLineRunner {
                 false
         );
 
-        // 4. Khởi tạo / Cập nhật Tổ đội chuyên trách (Teams) và gắn đầy đủ nhân viên kèm theo
+        // 4. Khởi tạo / Cập nhật 9 Tổ đội chuyên trách Hà Nội (4 Khảo sát, 4 Thi công, 1 Khẩn cấp)
         initTeamsAndMembers(
                 staffKhu1, staffKhu2, staffKhu3, staffKhu4,
                 staffMember1, staffMember2, staffMember3, staffMember4,
-                staffMember5, staffMember6, staffMember7, staffMember8, staffMember9
+                staffMember5, staffMember6, staffMember7, staffMember8, staffMember9,
+                staffMember10, staffMember11, staffMember12, staffMember13, staffMember14, staffMember15
         );
 
-        log.info("Khởi tạo tài khoản hệ thống & tổ đội mẫu hoàn tất! Mật khẩu cho mọi tài khoản mẫu là: 12345678");
+        log.info("Khởi tạo tài khoản hệ thống & 9 tổ đội chuyên trách Hà Nội hoàn tất! Mật khẩu mẫu: 12345678");
     }
 
     private void initTeamsAndMembers(
             User leader1, User leader2, User leader3, User leader4,
-            User m1, User m2, User m3, User m4, User m5, User m6, User m7, User m8, User m9
+            User m1, User m2, User m3, User m4, User m5, User m6, User m7, User m8, User m9,
+            User m10, User m11, User m12, User m13, User m14, User m15
     ) {
-        log.info("Khởi tạo & Cập nhật danh sách tổ đội chuyên trách và nhân viên kèm theo...");
+        log.info("Dọn dẹp các tổ đội di sản và khởi tạo danh sách 9 tổ đội chuyên trách Hà Nội...");
 
-        // Team 1: Khảo sát Miền Bắc (Khu QLĐB I)
-        Team team1 = teamRepository.findAll().stream()
-                .filter(t -> t.getTeamType() == TeamType.INSPECTION && t.getName().contains("Miền Bắc"))
+        // 0. Vô hiệu hóa triệt để các tổ đội di sản vùng miền cũ (Miền Bắc, Miền Trung, Đà Nẵng, Tây Nguyên, Phía Nam)
+        List<Team> allTeams = teamRepository.findAll();
+        for (Team legacy : allTeams) {
+            String n = legacy.getName();
+            if (n.contains("Miền Bắc") || n.contains("Miền Trung") || n.contains("Tây Nguyên")
+                    || n.contains("Đà Nẵng") || n.contains("Phía Nam") || n.contains("Khu QLĐB") || n.contains("Khu Quản Lý")) {
+                legacy.setIsActive(false);
+                teamRepository.save(legacy);
+                log.info("Đã vô hiệu hóa hoàn toàn tổ đội di sản cũ: {}", n);
+            }
+        }
+
+        // 1. TỔ KHẢO SÁT 1 - CẦU GIẤY
+        Team t1 = createOrUpdateTeam(
+                "Tổ Khảo Sát 1 - Cầu Giấy",
+                TeamType.INSPECTION,
+                "Quận Cầu Giấy (Trục Cầu Giấy - Xuân Thủy - Duy Tân)",
+                "Cầu Giấy, Hà Nội",
+                "Tiếp cận hiện trường trong 15-20 phút, đo đạc kích thước hố sụt, trắc địa nứt lún và bay flycam.",
+                21.0333, 105.7939,
+                "Số 68 Cầu Giấy, Quận Cầu Giấy, Hà Nội",
+                leader1
+        );
+        assignUserToTeam(m2, t1, false);
+
+        // 2. TỔ KHẢO SÁT 2 - ĐỐNG ĐA
+        Team t2 = createOrUpdateTeam(
+                "Tổ Khảo Sát 2 - Đống Đa",
+                TeamType.INSPECTION,
+                "Quận Đống Đa (Trục Xã Đàn - Tôn Đức Thắng - Thái Hà)",
+                "Đống Đa, Hà Nội",
+                "Kiểm định kết cấu nứt vỡ mặt đường, đo độ sâu hố ga và lập biên bản kỹ thuật số.",
+                21.0181, 105.8272,
+                "Số 226 Xã Đàn, Quận Đống Đa, Hà Nội",
+                leader3
+        );
+        assignUserToTeam(m3, t2, false);
+
+        // 3. TỔ KHẢO SÁT 3 - THANH XUÂN
+        Team t3 = createOrUpdateTeam(
+                "Tổ Khảo Sát 3 - Thanh Xuân",
+                TeamType.INSPECTION,
+                "Quận Thanh Xuân (Trục Nguyễn Trãi - Khuất Duy Tiến - Lê Văn Lương)",
+                "Thanh Xuân, Hà Nội",
+                "Khảo sát hiện trạng trồi lún vệt bánh xe, nứt mai rùa trục giao thông huyết mạch Tây Nam.",
+                20.9980, 105.8083,
+                "Số 312 Nguyễn Trãi, Quận Thanh Xuân, Hà Nội",
+                m6
+        );
+        assignUserToTeam(m7, t3, false);
+
+        // 4. TỔ KHẢO SÁT 4 - BA ĐÌNH
+        Team t4 = createOrUpdateTeam(
+                "Tổ Khảo Sát 4 - Ba Đình",
+                TeamType.INSPECTION,
+                "Quận Ba Đình (Trục Kim Mã - Liễu Giai - Giảng Võ)",
+                "Ba Đình, Hà Nội",
+                "Khảo sát địa bàn trung tâm hành chính, bảo đảm an toàn giao thông và mỹ quan đô thị.",
+                21.0341, 105.8239,
+                "Số 12 Kim Mã, Quận Ba Đình, Hà Nội",
+                m10
+        );
+        assignUserToTeam(m11, t4, false);
+
+        // 5. TỔ THI CÔNG 1 - CẦU GIẤY
+        Team t5 = createOrUpdateTeam(
+                "Tổ Thi Công 1 - Cầu Giấy",
+                TeamType.CONSTRUCTION,
+                "Quận Cầu Giấy (Trục Phạm Hùng - Duy Tân - Trần Thái Tông)",
+                "Cầu Giấy, Hà Nội",
+                "Trang bị máy cào bóc 1m, xe rải thảm bê tông nhựa nóng polymer và lu rung 10 tấn.",
+                21.0315, 105.7836,
+                "Ngõ 19 Duy Tân, Quận Cầu Giấy, Hà Nội",
+                leader4
+        );
+        assignUserToTeam(m1, t5, false);
+
+        // 6. TỔ THI CÔNG 2 - ĐỐNG ĐA
+        Team t6 = createOrUpdateTeam(
+                "Tổ Thi Công 2 - Đống Đa",
+                TeamType.CONSTRUCTION,
+                "Quận Đống Đa (Trục Đường Láng - Láng Hạ - Tây Sơn)",
+                "Đống Đa, Hà Nội",
+                "Đội cơ động vá nhanh ổ gà, sửa chữa vết nứt kết cấu và cân chỉnh nắp hố ga phẳng êm thuận.",
+                21.0156, 105.8142,
+                "Số 89 Láng Hạ, Quận Đống Đa, Hà Nội",
+                m8
+        );
+        assignUserToTeam(m9, t6, false);
+
+        // 7. TỔ THI CÔNG 3 - THANH XUÂN
+        Team t7 = createOrUpdateTeam(
+                "Tổ Thi Công 3 - Thanh Xuân",
+                TeamType.CONSTRUCTION,
+                "Quận Thanh Xuân (Trục Vành Đai 3 dưới thấp - Trường Chinh)",
+                "Thanh Xuân, Hà Nội",
+                "Thi công cào bóc hoàn trả mặt đường cao tốc và đường đô thị quá tải trọng.",
+                20.9912, 105.8175,
+                "Số 18 Vũ Tông Phan, Quận Thanh Xuân, Hà Nội",
+                m12
+        );
+        assignUserToTeam(m13, t7, false);
+
+        // 8. TỔ THI CÔNG 4 - BA ĐÌNH
+        Team t8 = createOrUpdateTeam(
+                "Tổ Thi Công 4 - Ba Đình",
+                TeamType.CONSTRUCTION,
+                "Quận Ba Đình (Trục Đội Cấn - Hoàng Hoa Thám - Nguyễn Thái Học)",
+                "Ba Đình, Hà Nội",
+                "Thi công hoàn thiện bê tông nhựa chặt, xử lý mép nối và bảo đảm chất lượng nghiêm ngặt.",
+                21.0368, 105.8295,
+                "Số 45 Đội Cấn, Quận Ba Đình, Hà Nội",
+                m14
+        );
+        assignUserToTeam(m15, t8, false);
+
+        // 9. ĐỘI CỨU HỘ KHẨN CẤP HÀ NỘI
+        Team t9 = createOrUpdateTeam(
+                "Đội Cứu Hộ Khẩn Cấp Hà Nội",
+                TeamType.EMERGENCY,
+                "Toàn thành phố Hà Nội (Cơ động Nút giao Vành Đai 3 - Đại Lộ Thăng Long)",
+                "Hà Nội (Khẩn cấp 24/7)",
+                "Đội trực chiến 24/7, chuyên xử lý sự cố CRITICAL trong 4 giờ: cây đổ, ngập hầm chui, hố sụt lớn.",
+                21.0022, 105.7895,
+                "Nút giao Đại Lộ Thăng Long & Vành Đai 3, Hà Nội",
+                leader2
+        );
+        assignUserToTeam(m4, t9, false);
+        assignUserToTeam(m5, t9, false);
+    }
+
+    private Team createOrUpdateTeam(
+            String name, TeamType teamType, String corridor, String zoneName,
+            String description, Double lat, Double lng, String baseAddress, User leader
+    ) {
+        Team team = teamRepository.findAll().stream()
+                .filter(t -> t.getName().equalsIgnoreCase(name)
+                        || (t.getZoneName() != null && t.getZoneName().equalsIgnoreCase(zoneName) && t.getTeamType() == teamType)
+                        || (t.getName().contains("Cầu Giấy") && name.contains("Cầu Giấy") && t.getTeamType() == teamType)
+                        || (t.getName().contains("Đống Đa") && name.contains("Đống Đa") && t.getTeamType() == teamType)
+                        || (t.getName().contains("Thanh Xuân") && name.contains("Thanh Xuân") && t.getTeamType() == teamType)
+                        || (t.getName().contains("Ba Đình") && name.contains("Ba Đình") && t.getTeamType() == teamType)
+                        || (t.getName().toLowerCase().contains("khẩn cấp") && name.toLowerCase().contains("khẩn cấp")))
                 .findFirst()
-                .orElseGet(() -> teamRepository.save(Team.builder()
-                        .name("Tổ Khảo Sát Hiện Trường Miền Bắc (Khu QLĐB I)")
-                        .teamType(TeamType.INSPECTION)
-                        .corridor("QL1A & Cao tốc HN - Hải Phòng")
-                        .zoneName("Khu QLĐB I (Miền Bắc)")
-                        .description("Chuyên trách tiếp cận hiện trường trong 60 phút, định vị GPS, đo đạc kích thước hư hỏng và lập báo cáo khảo sát kỹ thuật.")
-                        .leader(leader1)
-                        .isActive(true)
-                        .build()));
+                .orElseGet(() -> Team.builder().name(name).build());
 
-        assignUserToTeam(leader1, team1, true);
-        assignUserToTeam(m2, team1, false);
-        assignUserToTeam(m3, team1, false);
-
-        // Team 2: Phản ứng nhanh Khẩn cấp Trung Bộ (Khu QLĐB II)
-        Team team2 = teamRepository.findAll().stream()
-                .filter(t -> t.getTeamType() == TeamType.EMERGENCY)
-                .findFirst()
-                .orElseGet(() -> teamRepository.save(Team.builder()
-                        .name("Đội Phản Ứng Khẩn Cấp Miền Trung (Khu QLĐB II)")
-                        .teamType(TeamType.EMERGENCY)
-                        .corridor("QL1A & Đèo Hải Vân")
-                        .zoneName("Khu QLĐB II & III (Miền Trung)")
-                        .description("Đội cơ động trực chiến 24/7, chuyên xử lý vật cản lòng đường, cây đổ sạt trượt và ngập úng trong mùa mưa bão miền Trung.")
-                        .leader(leader2)
-                        .isActive(true)
-                        .build()));
-
-        assignUserToTeam(leader2, team2, true);
-        assignUserToTeam(m4, team2, false);
-        assignUserToTeam(m5, team2, false);
-
-        // Team 3: Khảo sát Tây Nguyên (Khu QLĐB III)
-        Team team3 = teamRepository.findAll().stream()
-                .filter(t -> t.getTeamType() == TeamType.INSPECTION && (t.getName().contains("Tây Nguyên") || t.getName().contains("QL14")))
-                .findFirst()
-                .orElseGet(() -> teamRepository.save(Team.builder()
-                        .name("Tổ Khảo Sát & Trắc Địa Đà Nẵng - Tây Nguyên (Khu QLĐB III)")
-                        .teamType(TeamType.INSPECTION)
-                        .corridor("QL14 Hồ Chí Minh & QL19")
-                        .zoneName("Khu QLĐB III (Tây Nguyên)")
-                        .description("Khảo sát hiện trạng hư hỏng, lún nứt, rãnh xói thoát nước vùng cao nguyên đèo dốc.")
-                        .leader(leader3)
-                        .isActive(true)
-                        .build()));
-
-        assignUserToTeam(leader3, team3, true);
-        assignUserToTeam(m6, team3, false);
-        assignUserToTeam(m7, team3, false);
-
-        // Team 4: Thi công sửa chữa Phía Nam (Khu QLĐB IV)
-        Team team4 = teamRepository.findAll().stream()
-                .filter(t -> t.getTeamType() == TeamType.CONSTRUCTION)
-                .findFirst()
-                .orElseGet(() -> teamRepository.save(Team.builder()
-                        .name("Tổ Thi Công Sửa Chữa Mặt Đường Phía Nam (Khu QLĐB IV)")
-                        .teamType(TeamType.CONSTRUCTION)
-                        .corridor("Cao tốc TP.HCM - Long Thành & QL51")
-                        .zoneName("Khu QLĐB IV (Phía Nam)")
-                        .description("Đội thi công trang bị cơ giới cào bóc thảm nhựa nóng polymer, vá triệt để hố sụt, bảo đảm êm thuận cho các tuyến huyết mạch phía Nam.")
-                        .leader(leader4)
-                        .isActive(true)
-                        .build()));
-
-        assignUserToTeam(leader4, team4, true);
-        assignUserToTeam(m1, team4, false);
-        assignUserToTeam(m8, team4, false);
-        assignUserToTeam(m9, team4, false);
+        team.setName(name);
+        team.setTeamType(teamType);
+        team.setCorridor(corridor);
+        team.setZoneName(zoneName);
+        team.setDescription(description);
+        team.setBaseLatitude(lat);
+        team.setBaseLongitude(lng);
+        team.setBaseAddress(baseAddress);
+        team.setIsActive(true);
+        if (leader != null) {
+            team.setLeader(leader);
+        }
+        Team saved = teamRepository.save(team);
+        if (leader != null) {
+            leader.setTeam(saved);
+            leader.setIsTeamLeader(true);
+            userRepository.save(leader);
+        }
+        return saved;
     }
 
     private void assignUserToTeam(User user, Team team, boolean isTeamLeader) {

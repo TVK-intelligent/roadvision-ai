@@ -41,6 +41,9 @@ const AdminAnalyticsPage = lazy(() =>
 const AdminTeamsPage = lazy(() =>
   import('./pages/AdminTeamsPage').then((m) => ({ default: m.AdminTeamsPage }))
 );
+const AdminUsersPage = lazy(() =>
+  import('./pages/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage }))
+);
 const LeaderboardPage = lazy(() =>
   import('./pages/LeaderboardPage').then((m) => ({ default: m.LeaderboardPage }))
 );
@@ -150,6 +153,16 @@ export function App() {
                     element={
                       <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
                         <AdminTeamsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Tuyến Quản Trị Viên: Quản lý Toàn Bộ Người Dùng & Phân Quyền (RBAC) */}
+                  <Route
+                    path="/admin/users"
+                    element={
+                      <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
+                        <AdminUsersPage />
                       </ProtectedRoute>
                     }
                   />

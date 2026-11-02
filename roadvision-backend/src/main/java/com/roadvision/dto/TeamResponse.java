@@ -20,6 +20,10 @@ public class TeamResponse {
     private String corridor;
     private String zoneName;
     private String description;
+    private Double baseLatitude;
+    private Double baseLongitude;
+    private String baseAddress;
+    private Double distanceKm; // Khoảng cách tính toán đường chim bay (km) đến sự cố
     private Boolean isActive;
     private Integer memberCount;
     private Long leaderId;
