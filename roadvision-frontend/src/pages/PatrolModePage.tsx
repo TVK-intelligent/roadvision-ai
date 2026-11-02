@@ -1994,22 +1994,24 @@ export const PatrolModePage: React.FC = () => {
       </div>
 
       {/* Tab Điều Hướng Nghiệp Vụ Quản Lý Tuần Tra */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 pb-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="flex items-center gap-2">
           {/* Tab 1: Lịch & Giao Ca Tuần Tra (Admin & Staff) */}
           <button
             type="button"
             onClick={() => setActiveTab('SCHEDULE')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'SCHEDULE'
-                ? 'bg-primary text-on-primary shadow-sm'
-                : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200'
             }`}
           >
-            <Calendar className="w-4 h-4 text-amber-400" />
+            <Calendar className={`w-4 h-4 ${activeTab === 'SCHEDULE' ? 'text-white' : 'text-blue-600'}`} />
             <span>{isAdmin ? 'Lịch & Giao Ca Tuần Tra' : 'Nhiệm Vụ Tuần Tra Của Tôi'}</span>
             {assignments.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                activeTab === 'SCHEDULE' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
                 {assignments.length}
               </span>
             )}
@@ -2020,13 +2022,13 @@ export const PatrolModePage: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('CAMERA')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'CAMERA'
-                  ? 'bg-primary text-on-primary shadow-sm'
-                  : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <Video className="w-4 h-4 text-blue-400" />
+              <Video className={`w-4 h-4 ${activeTab === 'CAMERA' ? 'text-white' : 'text-blue-600'}`} />
               <span>Thực Hiện Tuần Tra (AI Video)</span>
             </button>
           )}
@@ -2035,28 +2037,30 @@ export const PatrolModePage: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('HISTORY')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'HISTORY'
-                ? 'bg-primary text-on-primary shadow-sm'
-                : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200'
             }`}
           >
-            <History className="w-4 h-4 text-cyan-400" />
+            <History className={`w-4 h-4 ${activeTab === 'HISTORY' ? 'text-white' : 'text-cyan-600'}`} />
             <span>{isAdmin ? 'Nhật Ký & Báo Cáo PCI' : 'Lịch Sử Phiên Của Tôi'}</span>
             {patrolSessions.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                activeTab === 'HISTORY' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
                 {patrolSessions.length}
               </span>
             )}
           </button>
         </div>
 
-        {/* Nút Giao Ca Tuần Tra Mới (Dành cho Admin) */}
+        {/* Nút Giao Ca Tuần Tra Mới (Duy nhất cho Admin ở góc trên phải) */}
         {isAdmin && (
           <button
             type="button"
             onClick={() => setIsAssignModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Giao Ca Tuần Tra Mới</span>
@@ -2069,101 +2073,89 @@ export const PatrolModePage: React.FC = () => {
         <div className="flex flex-col gap-5">
           {/* 1. Thẻ KPI Tổng quan Ca tuần tra */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 flex flex-col">
-              <span className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-cyan-400" /> Tổ Tuần Tra Thường Trực
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <span className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-blue-600" /> Tổ Tuần Tra Thường Trực
               </span>
-              <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl font-extrabold text-on-surface font-mono">4</span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-800 font-mono">
+              <div className="flex items-baseline justify-between mt-2.5">
+                <span className="text-2xl font-bold text-slate-900 font-mono">4</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">
                   100% Sẵn sàng
                 </span>
               </div>
-              <span className="text-[10px] text-on-surface-variant/70 mt-1">
+              <span className="text-[10px] text-slate-400 mt-1">
                 Khu vực: Bắc • Nam • Đông • Tây
               </span>
             </div>
 
-            <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 flex flex-col">
-              <span className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-blue-400" /> Tổng Ca Tuần Hôm Nay
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <span className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-indigo-600" /> Tổng Ca Tuần Hôm Nay
               </span>
-              <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl font-extrabold text-on-surface font-mono">{assignments.length}</span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-950/60 text-blue-300 border border-blue-800 font-mono">
+              <div className="flex items-baseline justify-between mt-2.5">
+                <span className="text-2xl font-bold text-slate-900 font-mono">{assignments.length}</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">
                   Lệnh điều xe
                 </span>
               </div>
-              <span className="text-[10px] text-on-surface-variant/70 mt-1">
-                Hà Nội & Hà Nam
+              <span className="text-[10px] text-slate-400 mt-1">
+                Địa bàn: Hà Nội & Hà Nam
               </span>
             </div>
 
-            <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 flex flex-col">
-              <span className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
-                <Truck className="w-4 h-4 text-blue-400" /> Đang Chạy Ngoài Tuyến
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <span className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
+                <Truck className="w-4 h-4 text-sky-600" /> Đang Chạy Ngoài Tuyến
               </span>
-              <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl font-extrabold text-blue-400 font-mono">
+              <div className="flex items-baseline justify-between mt-2.5">
+                <span className="text-2xl font-bold text-sky-700 font-mono">
                   {assignments.filter((a) => a.status === 'IN_PROGRESS').length}
                 </span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-950/60 text-blue-300 border border-blue-800 font-mono animate-pulse">
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-medium inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-600 animate-pulse" />
                   Live GPS
                 </span>
               </div>
-              <span className="text-[10px] text-on-surface-variant/70 mt-1">
+              <span className="text-[10px] text-slate-400 mt-1">
                 Quét camera AI thời gian thực
               </span>
             </div>
 
-            <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 flex flex-col">
-              <span className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Hoàn Thành & PCI
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <span className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Hoàn Thành & PCI
               </span>
-              <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl font-extrabold text-emerald-400 font-mono">
+              <div className="flex items-baseline justify-between mt-2.5">
+                <span className="text-2xl font-bold text-emerald-700 font-mono">
                   {assignments.filter((a) => a.status === 'COMPLETED').length}
                 </span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800 font-mono">
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
                   Đã đồng bộ
                 </span>
               </div>
-              <span className="text-[10px] text-on-surface-variant/70 mt-1">
+              <span className="text-[10px] text-slate-400 mt-1">
                 Sổ nhật ký ca tuần
               </span>
             </div>
           </div>
 
-          {/* 2. Bảng Lệnh Điều Xe & Phân Công Ca Tuần */}
-          <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-outline-variant/20">
-              <div>
-                <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <span>Danh Sách Lệnh Điều Phối & Giao Ca Tuần Tra Tuyến Đường</span>
-                </h2>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Phân công tuyến đường và phương tiện chuyên dụng cho 4 Tổ Tuần Tra đường bộ.
-                </p>
-              </div>
-
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => setIsAssignModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Giao Ca Tuần Tra Mới</span>
-                </button>
-              )}
+          {/* 2. Bảng Lệnh Điều Xe & Phân Công Ca Tuần (Không còn nút Giao ca trùng lặp ở đây) */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col gap-4">
+            <div className="pb-3 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <span>Danh Sách Lệnh Điều Phối & Giao Ca Tuần Tra Tuyến Đường</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Phân công tuyến đường và phương tiện chuyên dụng cho 4 Tổ Tuần Tra đường bộ.
+              </p>
             </div>
 
             {/* Bảng dữ liệu */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-outline-variant/30 text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 text-[11px] font-semibold uppercase tracking-wider">
                     <th className="py-3 px-4">Mã Lệnh</th>
                     <th className="py-3 px-4">Tổ Tuần Tra Phụ Trách</th>
                     <th className="py-3 px-4">Tuyến Đường & Cự Ly</th>
@@ -2173,16 +2165,16 @@ export const PatrolModePage: React.FC = () => {
                     <th className="py-3 px-4 text-right">Thao Tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant/20">
+                <tbody className="divide-y divide-slate-100">
                   {assignments.map((asg) => {
                     const statusBadgeClass =
                       asg.status === 'COMPLETED'
-                        ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : asg.status === 'IN_PROGRESS'
-                        ? 'bg-blue-950/70 text-blue-300 border-blue-800 animate-pulse'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
                         : asg.status === 'CANCELLED'
-                        ? 'bg-slate-800 text-slate-400 border-slate-700'
-                        : 'bg-amber-950/70 text-amber-300 border-amber-800';
+                        ? 'bg-slate-100 text-slate-600 border-slate-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200';
 
                     const statusLabel =
                       asg.status === 'COMPLETED'
@@ -2194,46 +2186,50 @@ export const PatrolModePage: React.FC = () => {
                         : 'Chờ xuất phát';
 
                     return (
-                      <tr key={asg.id} className="hover:bg-surface-container/40 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-bold text-primary">
+                      <tr key={asg.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3.5 px-4 font-mono font-bold text-blue-700">
                           {asg.assignmentCode}
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="flex flex-col">
-                            <span className="font-bold text-on-surface">{asg.teamName}</span>
-                            <span className="text-[11px] text-on-surface-variant/80">
+                            <span className="font-semibold text-slate-900">{asg.teamName}</span>
+                            <span className="text-[11px] text-slate-500">
                               {asg.leaderName}
                             </span>
                           </div>
                         </td>
                         <td className="py-3.5 px-4 max-w-xs">
                           <div className="flex flex-col">
-                            <span className="font-semibold text-on-surface truncate" title={asg.routeName}>
+                            <span className="font-medium text-slate-800 truncate" title={asg.routeName}>
                               {asg.routeName}
                             </span>
-                            <span className="text-[11px] text-cyan-400 font-mono">
+                            <span className="text-[11px] text-blue-600 font-mono font-semibold">
                               Cự ly: ~{asg.routeDistanceKm} km
                             </span>
                           </div>
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="flex flex-col">
-                            <span className="font-medium text-on-surface">{asg.shiftLabel}</span>
-                            <span className="text-[10px] text-on-surface-variant font-mono">
+                            <span className="font-medium text-slate-800">{asg.shiftLabel}</span>
+                            <span className="text-[11px] text-slate-400 font-mono">
                               {asg.scheduledDate}
                             </span>
                           </div>
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="text-on-surface font-mono text-[11px] bg-surface-container px-2 py-0.5 rounded border border-outline-variant/30">
+                          <span className="text-slate-700 font-mono text-[11px] bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
                             {asg.vehicleNumber}
                           </span>
                         </td>
                         <td className="py-3.5 px-4">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusBadgeClass}`}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${statusBadgeClass}`}
                           >
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              asg.status === 'IN_PROGRESS' ? 'bg-blue-600 animate-pulse' :
+                              asg.status === 'COMPLETED' ? 'bg-emerald-600' :
+                              asg.status === 'CANCELLED' ? 'bg-slate-400' : 'bg-amber-500'
+                            }`} />
                             <span>{statusLabel}</span>
                           </span>
                         </td>
@@ -2245,7 +2241,7 @@ export const PatrolModePage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleStartAssignment(asg)}
-                                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                                     title="Kích hoạt tuyến đường và bật camera AI"
                                   >
                                     <Play className="w-3.5 h-3.5 fill-current" />
@@ -2255,7 +2251,7 @@ export const PatrolModePage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleCancelAssignment(asg.id)}
-                                    className="px-2.5 py-1.5 rounded-xl hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/30 flex items-center gap-1 transition-colors cursor-pointer"
+                                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 text-rose-600 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                                     title="Hủy lệnh tuần tra này"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -2271,14 +2267,15 @@ export const PatrolModePage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleStartAssignment(asg)}
-                                    className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                                   >
                                     <Video className="w-3.5 h-3.5" />
                                     <span>Mở Camera</span>
                                   </button>
                                 ) : (
-                                  <span className="text-[11px] text-cyan-400 font-mono font-medium">
-                                    Đang tuần tra
+                                  <span className="text-[11px] text-blue-700 font-medium inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
+                                    <span>Đang tuần tra</span>
                                   </span>
                                 )}
                               </>
@@ -2288,9 +2285,9 @@ export const PatrolModePage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => setActiveTab('HISTORY')}
-                                className="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs border border-outline-variant/30 flex items-center gap-1 transition-all cursor-pointer"
+                                className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs border border-slate-200 flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                               >
-                                <History className="w-3.5 h-3.5" />
+                                <History className="w-3.5 h-3.5 text-blue-600" />
                                 <span>Xem nhật ký PCI</span>
                               </button>
                             )}
