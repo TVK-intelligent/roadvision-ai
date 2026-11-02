@@ -259,10 +259,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   to="/patrol"
                   onClick={closeMobile}
                   className={navItemClass('/patrol')}
-                  title="Kế hoạch giao ca & Sổ nhật ký ca tuần đường toàn tuyến"
+                  title="Kế hoạch giao ca, giám sát hành trình GPS & phân tích AI tuyến đường"
                 >
                   <Video className="w-4 h-4 shrink-0 text-cyan-400" />
-                  {!isCollapsed && <span>Nhật ký tuần tra (AI)</span>}
+                  {!isCollapsed && <span>Quản lý tuần tra (AI)</span>}
                 </Link>
 
                 <Link

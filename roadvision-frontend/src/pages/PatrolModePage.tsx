@@ -1974,7 +1974,7 @@ export const PatrolModePage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs text-primary font-bold uppercase tracking-wider">
-                VIDEO DASHCAM PIPELINE • MÔ HÌNH NHẬN DIỆN THỜI GIAN THỰC
+                HỆ THỐNG QUẢN LÝ TUẦN TRA ĐƯỜNG BỘ BẰNG AI
               </span>
               {isPlaying && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-mono text-[10px] font-bold border border-emerald-500/20">
@@ -1983,17 +1983,20 @@ export const PatrolModePage: React.FC = () => {
                 </span>
               )}
             </div>
-            <h1 className="font-display text-xl font-black text-on-surface mt-0.5">
-              Giám Sát & Tuần Tra Mặt Đường Qua Video Hành Trình
+            <h1 className="font-display text-xl md:text-2xl font-bold text-on-surface mt-0.5">
+              Quản Lý Tuần Tra (AI)
             </h1>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Lập lịch & giao ca cho 4 tổ tuần tra, theo dõi lộ trình GPS thời gian thực, quét video phát hiện hư hỏng và tổng hợp chỉ số chất lượng đường PCI.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Tab Điều Hướng Nghiệp Vụ: Kế hoạch & Giao ca vs Sổ nhật ký ca tuần vs Thực hiện trực tiếp */}
+      {/* Tab Điều Hướng Nghiệp Vụ Quản Lý Tuần Tra */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 pb-2">
         <div className="flex items-center gap-2">
-          {/* Tab 1: Kế Hoạch & Giao Ca Tuần Tra (Admin & Staff) */}
+          {/* Tab 1: Lịch & Giao Ca Tuần Tra (Admin & Staff) */}
           <button
             type="button"
             onClick={() => setActiveTab('SCHEDULE')}
@@ -2004,7 +2007,7 @@ export const PatrolModePage: React.FC = () => {
             }`}
           >
             <Calendar className="w-4 h-4 text-amber-400" />
-            <span>{isAdmin ? 'Kế Hoạch & Giao Ca Tuần' : 'Ca Tuần Tra Của Tôi'}</span>
+            <span>{isAdmin ? 'Lịch & Giao Ca Tuần Tra' : 'Nhiệm Vụ Tuần Tra Của Tôi'}</span>
             {assignments.length > 0 && (
               <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
                 {assignments.length}
@@ -2012,26 +2015,7 @@ export const PatrolModePage: React.FC = () => {
             )}
           </button>
 
-          {/* Tab 2: Sổ Nhật Ký & Giám Sát Tuyến Đường (PCI) */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('HISTORY')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'HISTORY'
-                ? 'bg-primary text-on-primary shadow-sm'
-                : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-            }`}
-          >
-            <History className="w-4 h-4 text-cyan-400" />
-            <span>{isAdmin ? 'Nhật Ký & Giám Sát Ca Tuần (PCI)' : 'Lịch Sử Phiên Của Tôi'}</span>
-            {patrolSessions.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
-                {patrolSessions.length}
-              </span>
-            )}
-          </button>
-
-          {/* Tab 3: Thực Hiện Tuần Tra (AI Video) */}
+          {/* Tab 2: Theo Dõi & Quét Video AI */}
           <button
             type="button"
             onClick={() => setActiveTab('CAMERA')}
@@ -2042,7 +2026,26 @@ export const PatrolModePage: React.FC = () => {
             }`}
           >
             <Video className="w-4 h-4 text-blue-400" />
-            <span>{isAdmin ? 'Thử Nghiệm Quét AI Video' : 'Thực Hiện Tuần Tra (AI Video)'}</span>
+            <span>{isAdmin ? 'Theo Dõi & Quét Video AI' : 'Thực Hiện Tuần Tra (AI Video)'}</span>
+          </button>
+
+          {/* Tab 3: Sổ Nhật Ký & Giám Sát Tuyến Đường (PCI) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('HISTORY')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'HISTORY'
+                ? 'bg-primary text-on-primary shadow-sm'
+                : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+          >
+            <History className="w-4 h-4 text-cyan-400" />
+            <span>{isAdmin ? 'Nhật Ký & Báo Cáo PCI' : 'Lịch Sử Phiên Của Tôi'}</span>
+            {patrolSessions.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
+                {patrolSessions.length}
+              </span>
+            )}
           </button>
         </div>
 
