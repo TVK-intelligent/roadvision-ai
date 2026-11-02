@@ -1,6 +1,7 @@
 package com.roadvision.dto;
 
 import com.roadvision.enums.Role;
+import com.roadvision.enums.TeamType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,4 +20,8 @@ public class AuthResponse {
     private String fullName;
     private Role role;
     private Integer reputationScore;
+    private Long teamId;
+    private String teamName;
+    private TeamType teamType;
+    private Boolean isTeamLeader;
 }

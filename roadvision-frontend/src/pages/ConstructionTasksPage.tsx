@@ -144,8 +144,7 @@ export const ConstructionTasksPage: React.FC = () => {
         .then((res) => {
           if (res.data?.content) {
             const constructionOnly = res.data.content.filter((i) =>
-              ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED'].includes(i.status) ||
-              i.assignedTeamName
+              ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED'].includes(i.status)
             );
             setTasks(constructionOnly);
             setTotalPages(Math.ceil(constructionOnly.length / pageSize) || 1);
@@ -157,15 +156,20 @@ export const ConstructionTasksPage: React.FC = () => {
         })
         .finally(() => setLoading(false));
     } else {
-      // Staff: Chỉ lấy các nhiệm vụ được giao cho chính mình
+      // Staff: Chỉ lấy các nhiệm vụ thi công được giao cho chính mình hoặc tổ đội thi công của mình
       incidentApi
         .getAssignedToMe(0, 100)
         .then((res) => {
           if (res.data?.content) {
-            const constructionOnly = res.data.content.filter((i) =>
-              ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED'].includes(i.status) ||
-              i.assignedTeamName
-            );
+            const constructionOnly = res.data.content.filter((i) => {
+              const isConstructionStatus = ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED'].includes(i.status);
+              if (!isConstructionStatus) return false;
+              // Nếu là nhân viên khảo sát, không nhận việc thi công
+              if (user?.teamType === 'INSPECTION') return false;
+              // Nếu có teamId, kiểm tra xem có đúng tổ thi công được giao không
+              if (user?.teamId && i.assignedTeamId && i.assignedTeamId !== user.teamId) return false;
+              return true;
+            });
             setTasks(constructionOnly);
             setTotalPages(Math.ceil(constructionOnly.length / pageSize) || 1);
             setTotalElements(constructionOnly.length);

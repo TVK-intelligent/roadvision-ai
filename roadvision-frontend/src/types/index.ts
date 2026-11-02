@@ -48,6 +48,7 @@ export interface User {
   suspendReason?: string;
   teamId?: number;
   teamName?: string;
+  teamType?: TeamType;
   isTeamLeader?: boolean;
   specialization?: string;
   createdAt?: string;
@@ -58,6 +59,7 @@ export interface AdminUser extends User {
   isActive: boolean;
   teamId?: number;
   teamName?: string;
+  teamType?: TeamType;
   isTeamLeader?: boolean;
   specialization?: string;
   createdAt?: string;
@@ -303,6 +305,10 @@ export interface AuthResponse {
   fullName: string;
   role: Role;
   reputationScore?: number;
+  teamId?: number;
+  teamName?: string;
+  teamType?: TeamType;
+  isTeamLeader?: boolean;
 }
 
 export interface StreamPoint {

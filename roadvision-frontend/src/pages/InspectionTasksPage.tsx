@@ -105,8 +105,9 @@ export const InspectionTasksPage: React.FC = () => {
         })
         .then((res) => {
           if (res.data?.content) {
+            // Chỉ lấy các sự cố ĐANG trong chu trình khảo sát (không lấy các sự cố đã chuyển hẳn sang thi công)
             const inspectionOnly = res.data.content.filter((i) =>
-              ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(i.status) || i.inspectionTeamName
+              ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(i.status)
             );
             setTasks(inspectionOnly);
             setTotalPages(Math.ceil(inspectionOnly.length / pageSize) || 1);
@@ -118,14 +119,18 @@ export const InspectionTasksPage: React.FC = () => {
         })
         .finally(() => setLoading(false));
     } else {
-      // Staff: Chỉ lấy nhiệm vụ được phân công cho mình
+      // Staff: Chỉ lấy nhiệm vụ khảo sát được phân công cho mình hoặc tổ đội khảo sát của mình
       incidentApi
         .getAssignedToMe(0, 100)
         .then((res) => {
           if (res.data?.content) {
-            const inspectionOnly = res.data.content.filter((i) =>
-              ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(i.status) || i.inspectionTeamName
-            );
+            // Chỉ lấy các sự cố ĐANG trong chu trình khảo sát và thuộc tổ khảo sát của mình
+            const inspectionOnly = res.data.content.filter((i) => {
+              const isInspectionStatus = ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(i.status);
+              if (!isInspectionStatus) return false;
+              if (user?.teamId && i.inspectionTeamId && i.inspectionTeamId !== user.teamId) return false;
+              return true;
+            });
             setTasks(inspectionOnly);
             setTotalPages(Math.ceil(inspectionOnly.length / pageSize) || 1);
             setTotalElements(inspectionOnly.length);
@@ -384,9 +389,7 @@ export const InspectionTasksPage: React.FC = () => {
   };
 
   const isInspectionDone = (t: Incident) =>
-    t.status === 'INSPECTED' ||
-    Boolean(t.inspection) ||
-    ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'RESOLVED', 'CLOSED'].includes(t.status);
+    t.status === 'INSPECTED' || Boolean(t.inspection);
 
   const filteredTasks = tasks.filter((t) => {
     if (filter === 'INSPECTION_ASSIGNED') return t.status === 'INSPECTION_ASSIGNED';
@@ -741,11 +744,6 @@ export const InspectionTasksPage: React.FC = () => {
                             <Clock className="w-3 h-3" /> Chờ tổ tiếp cận
                           </span>
                         )}
-                        {['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'RESOLVED', 'CLOSED'].includes(task.status) && (
-                          <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-300 flex items-center gap-1">
-                            <Check className="w-3 h-3 text-emerald-600" /> Đã duyệt & Chuyển thi công
-                          </span>
-                        )}
                       </>
                     ) : (
                       /* Hành động dành cho Kỹ thuật viên hiện trường (STAFF) */
@@ -777,12 +775,6 @@ export const InspectionTasksPage: React.FC = () => {
                         {task.status === 'INSPECTED' && (
                           <span className="text-[11px] font-medium text-teal-700 bg-teal-50 px-2.5 py-1 rounded border border-teal-200">
                             Đã nộp biên bản • Chờ duyệt
-                          </span>
-                        )}
-
-                        {['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'RESOLVED', 'CLOSED'].includes(task.status) && (
-                          <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-300 flex items-center gap-1">
-                            <Check className="w-3 h-3 text-emerald-600" /> Khảo sát hoàn tất • Đã chuyển thi công
                           </span>
                         )}
                       </>

@@ -34,6 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       fullName: authData.fullName,
       role: authData.role,
       reputationScore: authData.reputationScore ?? 50,
+      teamId: authData.teamId,
+      teamName: authData.teamName,
+      teamType: authData.teamType,
+      isTeamLeader: authData.isTeamLeader,
     };
     setUser(userData);
     localStorage.setItem('token', authData.token);
@@ -61,6 +65,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             reputationScore: res.data.reputationScore ?? 50,
             avatarUrl: prev?.avatarUrl,
             phone: prev?.phone,
+            teamId: res.data.teamId ?? prev?.teamId,
+            teamName: res.data.teamName ?? prev?.teamName,
+            teamType: res.data.teamType ?? prev?.teamType,
+            isTeamLeader: res.data.isTeamLeader ?? prev?.isTeamLeader,
           };
           localStorage.setItem('user', JSON.stringify(updated));
           return updated;
@@ -94,12 +102,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Giữ phiên đăng nhập từ localStorage nếu hợp lệ, không ép buộc tự động làm Admin
+  // Giữ phiên đăng nhập từ localStorage và tự động đồng bộ hồ sơ mới nhất từ backend
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    if (!savedToken || !savedUser) {
-      // Người dùng ở trạng thái khách (Guest) cho đến khi chủ động đăng nhập
+    if (savedToken && savedUser) {
+      refreshUserProfile();
     }
   }, []);
 

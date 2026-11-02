@@ -154,25 +154,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Video className="w-4 h-4 shrink-0 text-cyan-400" />
                   {!isCollapsed && <span>Tuần tra Tuyến đường (AI)</span>}
                 </Link>
-                <Link
-                  to="/inspection-tasks"
-                  onClick={closeMobile}
-                  className={navItemClass('/inspection-tasks')}
-                  title="Khảo sát đo đạc hiện trường"
-                >
-                  <Compass className="w-4 h-4 shrink-0 text-teal-400" />
-                  {!isCollapsed && <span>Khảo sát hiện trường</span>}
-                </Link>
+                {/* 1. Khảo sát hiện trường: Dành riêng cho Admin, hoặc Nhân viên thuộc Đội Khảo sát (INSPECTION) / Khẩn cấp */}
+                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'INSPECTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && !user?.email?.includes('khu4'))) && (
+                  <Link
+                    to="/inspection-tasks"
+                    onClick={closeMobile}
+                    className={navItemClass('/inspection-tasks')}
+                    title="Khảo sát đo đạc hiện trường"
+                  >
+                    <Compass className="w-4 h-4 shrink-0 text-teal-400" />
+                    {!isCollapsed && <span>Khảo sát hiện trường</span>}
+                  </Link>
+                )}
 
-                <Link
-                  to="/construction-tasks"
-                  onClick={closeMobile}
-                  className={navItemClass('/construction-tasks')}
-                  title="Thi công sửa chữa & Nghiệm thu"
-                >
-                  <HardHat className="w-4 h-4 shrink-0 text-amber-400" />
-                  {!isCollapsed && <span>Thi công sửa chữa</span>}
-                </Link>
+                {/* 2. Thi công sửa chữa: Dành riêng cho Admin, hoặc Nhân viên thuộc Đội Thi công (CONSTRUCTION) / Khẩn cấp */}
+                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'CONSTRUCTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && user?.email?.includes('khu4'))) && (
+                  <Link
+                    to="/construction-tasks"
+                    onClick={closeMobile}
+                    className={navItemClass('/construction-tasks')}
+                    title="Thi công sửa chữa & Nghiệm thu"
+                  >
+                    <HardHat className="w-4 h-4 shrink-0 text-amber-400" />
+                    {!isCollapsed && <span>Thi công sửa chữa</span>}
+                  </Link>
+                )}
               </nav>
             </div>
           )}

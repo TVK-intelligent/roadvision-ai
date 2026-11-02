@@ -64,6 +64,7 @@ public class UserService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
@@ -82,9 +83,14 @@ public class UserService {
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .reputationScore(user.getReputationScore() != null ? user.getReputationScore() : 50)
+                .teamId(user.getTeam() != null ? user.getTeam().getId() : null)
+                .teamName(user.getTeam() != null ? user.getTeam().getName() : null)
+                .teamType(user.getTeam() != null ? user.getTeam().getTeamType() : null)
+                .isTeamLeader(user.getIsTeamLeader() != null ? user.getIsTeamLeader() : false)
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public AuthResponse getUserProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
@@ -94,6 +100,10 @@ public class UserService {
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .reputationScore(user.getReputationScore() != null ? user.getReputationScore() : 50)
+                .teamId(user.getTeam() != null ? user.getTeam().getId() : null)
+                .teamName(user.getTeam() != null ? user.getTeam().getName() : null)
+                .teamType(user.getTeam() != null ? user.getTeam().getTeamType() : null)
+                .isTeamLeader(user.getIsTeamLeader() != null ? user.getIsTeamLeader() : false)
                 .build();
     }
 
