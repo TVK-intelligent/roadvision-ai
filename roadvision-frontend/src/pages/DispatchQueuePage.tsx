@@ -75,6 +75,16 @@ export const DispatchQueuePage: React.FC = () => {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [rejectionReason, setRejectionReason] = useState<string>('Ảnh chụp không rõ ràng hoặc nằm ngoài quyền hạn quản lý');
 
+  // Modal Yêu cầu khảo sát lại (Giai đoạn 5)
+  const [isRejectInspectionModalOpen, setIsRejectInspectionModalOpen] = useState<boolean>(false);
+  const [inspectionRevisionReason, setInspectionRevisionReason] = useState<string>('');
+  const [isSubmittingInspectionRevision, setIsSubmittingInspectionRevision] = useState<boolean>(false);
+
+  // Modal Yêu cầu thi công lại (Giai đoạn 7)
+  const [isReworkModalOpen, setIsReworkModalOpen] = useState<boolean>(false);
+  const [reworkInstructions, setReworkInstructions] = useState<string>('');
+  const [isSubmittingRework, setIsSubmittingRework] = useState<boolean>(false);
+
   // Lộ trình OSRM thời gian thực
   const [routeDetails, setRouteDetails] = useState<Record<number, RouteResult>>({});
 
@@ -436,6 +446,65 @@ export const DispatchQueuePage: React.FC = () => {
       )
     );
     setIsRejectModalOpen(false);
+  };
+
+  const handleRejectInspectionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedIncident) return;
+    if (!inspectionRevisionReason || inspectionRevisionReason.trim().length < 5) {
+      toast.warning('Vui lòng ghi rõ lý do yêu cầu khảo sát lại (tối thiểu 5 ký tự)!', 'Thiếu lý do');
+      return;
+    }
+    setIsSubmittingInspectionRevision(true);
+    try {
+      await incidentApi.rejectInspectionReport(selectedIncident.id, { reason: inspectionRevisionReason.trim() });
+      toast.info(`Đã gửi lệnh yêu cầu Tổ khảo sát đo đạc lại cho ${selectedIncident.ticketCode}`, 'Yêu cầu khảo sát lại');
+      setIsRejectInspectionModalOpen(false);
+      setInspectionRevisionReason('');
+      fetchIncidents(page, pageSize);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể gửi yêu cầu khảo sát lại', 'Lỗi');
+    } finally {
+      setIsSubmittingInspectionRevision(false);
+    }
+  };
+
+  const handleReworkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedIncident) return;
+    if (!reworkInstructions || reworkInstructions.trim().length < 5) {
+      toast.warning('Vui lòng chỉ đạo rõ nội dung cần thi công lại (tối thiểu 5 ký tự)!', 'Thiếu nội dung');
+      return;
+    }
+    setIsSubmittingRework(true);
+    try {
+      await incidentApi.reviewAcceptance(selectedIncident.id, {
+        approved: false,
+        reworkReason: reworkInstructions.trim(),
+        notes: 'Yêu cầu thi công lại từ Bàn cờ Điều phối',
+      });
+      toast.info(`Đã ban hành lệnh yêu cầu Tổ thi công làm lại cho ${selectedIncident.ticketCode}`, 'Yêu cầu thi công lại');
+      setIsReworkModalOpen(false);
+      setReworkInstructions('');
+      fetchIncidents(page, pageSize);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể gửi lệnh thi công lại', 'Lỗi');
+    } finally {
+      setIsSubmittingRework(false);
+    }
+  };
+
+  const handleQuickApproveAcceptance = async (incidentId: number) => {
+    try {
+      await incidentApi.reviewAcceptance(incidentId, {
+        approved: true,
+        notes: 'Phê duyệt nghiệm thu đạt chuẩn từ Bàn cờ Điều phối',
+      });
+      toast.success('Đã phê duyệt nghiệm thu công trình đạt chuẩn (RESOLVED)!', 'Nghiệm thu thành công');
+      fetchIncidents(page, pageSize);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể phê duyệt nghiệm thu', 'Lỗi');
+    }
   };
 
   const aiIncidents = incidents.filter(
@@ -904,16 +973,30 @@ export const DispatchQueuePage: React.FC = () => {
                                 </span>
                               )}
 
-                              {/* Giai đoạn 5: Đã khảo sát -> Giao thi công */}
+                              {/* Giai đoạn 5: Đã khảo sát -> Giao thi công hoặc Yêu cầu khảo sát lại */}
                               {incident.status === 'INSPECTED' && (
-                                <button
-                                  onClick={() => handleOpenAssignConstructionModal(incident)}
-                                  title="Duyệt kết quả khảo sát và giao tổ thi công"
-                                  className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors text-xs flex items-center gap-1 shadow-xs"
-                                >
-                                  <HardHat className="w-3.5 h-3.5" />
-                                  <span>Giao thi công</span>
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleOpenAssignConstructionModal(incident)}
+                                    title="Duyệt kết quả khảo sát và giao tổ thi công"
+                                    className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                                  >
+                                    <HardHat className="w-3.5 h-3.5" />
+                                    <span>Giao thi công</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedIncident(incident);
+                                      setInspectionRevisionReason('');
+                                      setIsRejectInspectionModalOpen(true);
+                                    }}
+                                    title="Yêu cầu tổ khảo sát đo đạc lại hoặc bổ sung số liệu"
+                                    className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium transition-colors text-xs flex items-center gap-1 shadow-2xs cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>Khảo sát lại</span>
+                                  </button>
+                                </div>
                               )}
 
                               {/* Giai đoạn 6: Đang thi công */}
@@ -923,15 +1006,30 @@ export const DispatchQueuePage: React.FC = () => {
                                 </span>
                               )}
 
-                              {/* Giai đoạn 7: Chờ nghiệm thu */}
+                              {/* Giai đoạn 7: Chờ nghiệm thu -> Phê duyệt nghiệm thu hoặc Yêu cầu thi công lại */}
                               {['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(incident.status) && (
-                                <Link
-                                  to={`/incidents/${incident.id}`}
-                                  className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs flex items-center gap-1 transition-colors shadow-xs"
-                                >
-                                  <ShieldCheck className="w-3.5 h-3.5" />
-                                  <span>Nghiệm thu</span>
-                                </Link>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleQuickApproveAcceptance(incident.id)}
+                                    title="Phê duyệt nghiệm thu đạt chuẩn kỹ thuật (RESOLVED)"
+                                    className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
+                                  >
+                                    <ShieldCheck className="w-3.5 h-3.5" />
+                                    <span>Duyệt nghiệm thu</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedIncident(incident);
+                                      setReworkInstructions('');
+                                      setIsReworkModalOpen(true);
+                                    }}
+                                    title="Từ chối nghiệm thu, bắt tổ thi công xử lý lại hiện trường"
+                                    className="px-2 py-1 rounded-md border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 font-medium transition-colors text-xs flex items-center gap-1 shadow-2xs cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                                    <span>Thi công lại</span>
+                                  </button>
+                                </div>
                               )}
 
                               {/* Giai đoạn 7: Đã hoàn tất & Đóng */}
@@ -1469,7 +1567,7 @@ export const DispatchQueuePage: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsRejectModalOpen(false)}
-                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1492,15 +1590,137 @@ export const DispatchQueuePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsRejectModalOpen(false)}
-                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-md bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors shadow-xs"
+                  className="px-4 py-1.5 rounded-md bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors shadow-xs cursor-pointer"
                 >
                   Xác nhận từ chối
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Yêu Cầu Khảo Sát Lại (Giai đoạn 5) */}
+      {isRejectInspectionModalOpen && selectedIncident && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-lg border border-slate-200 shadow-xl p-6 flex flex-col gap-4 animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-800">Yêu cầu Khảo sát lại</h3>
+                  <span className="font-mono text-xs text-slate-500">{selectedIncident.ticketCode}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRejectInspectionModalOpen(false)}
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectInspectionSubmit} className="flex flex-col gap-3 text-xs">
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-slate-700">
+                <p className="font-medium text-amber-900 mb-0.5">Lệnh yêu cầu đo đạc lại hoặc bổ sung số liệu</p>
+                <p className="text-[11px] text-slate-600">Sự cố sẽ được chuyển về trạng thái <strong>INSPECTING</strong> và thông báo khẩn tới Tổ khảo sát.</p>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Nội dung chỉ đạo / lý do yêu cầu khảo sát lại *</label>
+                <textarea
+                  rows={3}
+                  value={inspectionRevisionReason}
+                  onChange={(e) => setInspectionRevisionReason(e.target.value)}
+                  required
+                  placeholder="Ví dụ: Kích thước độ sâu chưa chuẩn xác, yêu cầu kiểm tra lại bề rộng rãnh nứt..."
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:border-transparent text-slate-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsRejectInspectionModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingInspectionRevision}
+                  className="px-4 py-1.5 rounded-md bg-amber-600 text-white font-medium hover:bg-amber-700 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingInspectionRevision ? 'Đang gửi...' : 'Gửi yêu cầu đo lại'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Yêu Cầu Thi Công Lại (Giai đoạn 7) */}
+      {isReworkModalOpen && selectedIncident && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-lg border border-slate-200 shadow-xl p-6 flex flex-col gap-4 animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-rose-800">Yêu cầu Thi công lại</h3>
+                  <span className="font-mono text-xs text-slate-500">{selectedIncident.ticketCode}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsReworkModalOpen(false)}
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReworkSubmit} className="flex flex-col gap-3 text-xs">
+              <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-slate-700">
+                <p className="font-medium text-rose-900 mb-0.5">Từ chối nghiệm thu chất lượng mặt đường</p>
+                <p className="text-[11px] text-slate-600">Sự cố sẽ chuyển về trạng thái <strong>REWORK_REQUIRED</strong> yêu cầu Tổ thi công ra xử lý lại dứt điểm.</p>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-slate-700">Chỉ đạo thi công khắc phục cho Tổ thi công *</label>
+                <textarea
+                  rows={3}
+                  value={reworkInstructions}
+                  onChange={(e) => setReworkInstructions(e.target.value)}
+                  required
+                  placeholder="Ví dụ: Mặt đường vá nhựa chưa êm thuận, vẫn còn lún võng nguy hiểm. Bù thêm nhựa và đầm lèn lại..."
+                  className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-600 focus:border-transparent text-slate-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsReworkModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingRework}
+                  className="px-4 py-1.5 rounded-md bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingRework ? 'Đang gửi...' : 'Ban hành lệnh làm lại'}
                 </button>
               </div>
             </form>
