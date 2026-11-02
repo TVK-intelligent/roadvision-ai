@@ -254,12 +254,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* GROUP 4: DỊCH VỤ CÔNG DÂN (CITIZEN & ADMIN) */}
-          {(user?.role === 'ROLE_CITIZEN' || user?.role === 'ROLE_ADMIN') && (
+          {/* GROUP 4: DỊCH VỤ DÀNH RIÊNG CHO CÔNG DÂN (ROLE_CITIZEN) */}
+          {user?.role === 'ROLE_CITIZEN' && (
             <div>
               {!isCollapsed ? (
                 <div className="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  {user?.role === 'ROLE_ADMIN' ? 'Hồ sơ sự cố' : 'Dịch vụ công dân'}
+                  Dịch vụ công dân
                 </div>
               ) : (
                 <div className="border-t border-[#243048] my-2" />
@@ -272,35 +272,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   title="Lịch sử phản ánh của tôi"
                 >
                   <FileText className="w-4 h-4 shrink-0 text-emerald-400" />
-                  {!isCollapsed && (
-                    <span>{user?.role === 'ROLE_ADMIN' ? 'Hồ sơ phản ánh' : 'Lịch sử phản ánh'}</span>
-                  )}
+                  {!isCollapsed && <span>Lịch sử phản ánh</span>}
                 </Link>
 
-                {/* Các tiện ích trang dành riêng cho Công dân */}
-                {user?.role === 'ROLE_CITIZEN' && (
-                  <>
-                    <Link
-                      to="/leaderboard"
-                      onClick={closeMobile}
-                      className={navItemClass('/leaderboard')}
-                      title="Bảng vinh danh công dân đóng góp tích cực cho thành phố"
-                    >
-                      <Trophy className="w-4 h-4 shrink-0 text-amber-400" />
-                      {!isCollapsed && <span>Bảng vinh danh</span>}
-                    </Link>
+                <Link
+                  to="/leaderboard"
+                  onClick={closeMobile}
+                  className={navItemClass('/leaderboard')}
+                  title="Bảng vinh danh công dân đóng góp tích cực cho thành phố"
+                >
+                  <Trophy className="w-4 h-4 shrink-0 text-amber-400" />
+                  {!isCollapsed && <span>Bảng vinh danh</span>}
+                </Link>
 
-                    <Link
-                      to="/photo-guide"
-                      onClick={closeMobile}
-                      className={navItemClass('/photo-guide')}
-                      title="Cẩm nang chụp ảnh hiện trường chuẩn AI"
-                    >
-                      <BookOpen className="w-4 h-4 shrink-0 text-sky-400" />
-                      {!isCollapsed && <span>Cẩm nang chụp ảnh</span>}
-                    </Link>
-                  </>
-                )}
+                <Link
+                  to="/photo-guide"
+                  onClick={closeMobile}
+                  className={navItemClass('/photo-guide')}
+                  title="Cẩm nang chụp ảnh hiện trường chuẩn AI"
+                >
+                  <BookOpen className="w-4 h-4 shrink-0 text-sky-400" />
+                  {!isCollapsed && <span>Cẩm nang chụp ảnh</span>}
+                </Link>
               </nav>
             </div>
           )}
