@@ -644,14 +644,16 @@ export const PatrolModePage: React.FC = () => {
     if (!isAuthenticated) return;
     setIsLoadingSessions(true);
     try {
-      const data = await patrolApi.getMySessions({ size: 30 });
+      const data = isAdmin
+        ? await patrolApi.getAllSessions({ size: 30 })
+        : await patrolApi.getMySessions({ size: 30 });
       setPatrolSessions(data.content || []);
     } catch (err: any) {
       console.error('Lỗi nạp lịch sử phiên tuần tra:', err);
     } finally {
       setIsLoadingSessions(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isAdmin]);
 
   useEffect(() => {
     if (activeTab === 'HISTORY' || isAuthenticated) {
@@ -3068,14 +3070,14 @@ export const PatrolModePage: React.FC = () => {
       </div>
       ) : (
         /* GIAO DIỆN TAB LỊCH SỬ PHIÊN TUẦN TRA ĐƯỜNG BỘ */
-        <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/30 shadow-xs flex flex-col gap-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-outline-variant/20">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
-              <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
-                <History className="w-5 h-5 text-primary" />
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <History className="w-4 h-4 text-blue-600" />
                 <span>Nhật Ký & Hồ Sơ Các Phiên Tuần Tra Đường Bộ</span>
               </h2>
-              <p className="text-xs text-on-surface-variant mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Danh sách các chuyến tuần tra xe AI đã thực hiện và lưu vào cơ sở dữ liệu quốc gia
               </p>
             </div>
@@ -3084,7 +3086,7 @@ export const PatrolModePage: React.FC = () => {
               type="button"
               onClick={loadHistory}
               disabled={isLoadingSessions}
-              className="px-3.5 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-all border border-outline-variant/30 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-xs font-medium text-slate-700 flex items-center gap-1.5 transition-colors border border-slate-200 cursor-pointer"
             >
               <RotateCcw className={`w-3.5 h-3.5 ${isLoadingSessions ? 'animate-spin' : ''}`} />
               <span>Làm mới danh sách</span>
@@ -3092,34 +3094,31 @@ export const PatrolModePage: React.FC = () => {
           </div>
 
           {isLoadingSessions ? (
-            <div className="py-16 flex flex-col items-center justify-center gap-3 text-on-surface-variant">
-              <span className="w-8 h-8 border-3 border-primary/30 border-t-primary rounded-full animate-spin"></span>
-              <span className="text-xs font-semibold">Đang tải lịch sử phiên tuần tra...</span>
+            <div className="py-16 flex flex-col items-center justify-center gap-3 text-slate-500">
+              <span className="w-7 h-7 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></span>
+              <span className="text-xs font-medium">Đang tải lịch sử phiên tuần tra...</span>
             </div>
           ) : patrolSessions.length === 0 ? (
-            <div className="py-16 flex flex-col items-center justify-center gap-3 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-surface-container-low flex items-center justify-center text-outline">
-                <FileText className="w-7 h-7" />
+            <div className="py-16 flex flex-col items-center justify-center gap-2 text-center">
+              <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 mb-1">
+                <FileText className="w-6 h-6 text-slate-400" />
               </div>
-              <div className="max-w-sm">
-                <h3 className="font-bold text-sm text-on-surface">Chưa có phiên tuần tra nào</h3>
-                <p className="text-xs text-on-surface-variant mt-1">
-                  Hãy thực hiện một chuyến tuần tra video bằng AI và nhấn nút &quot;Gửi Báo Cáo Tuần Tra Tuyến Đường&quot; để lưu hồ sơ.
+              <div className="max-w-md">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {isAdmin ? 'Chưa có nhật ký tuần tra nào được đồng bộ' : 'Chưa có phiên tuần tra nào được lưu'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  {isAdmin
+                    ? 'Các Tổ Tuần Tra sẽ tự động đồng bộ video quét AI, tọa độ GPS hành trình và chỉ số chất lượng PCI sau khi hoàn thành ca tuần.'
+                    : 'Sau khi hoàn thành hành trình tuần tra video bằng camera AI, hãy nhấn "Gửi Báo Cáo Tuần Tra Tuyến Đường" để lưu hồ sơ lên hệ thống.'}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab('CAMERA')}
-                className="mt-2 px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs cursor-pointer hover:bg-primary/90 transition-all"
-              >
-                Quay lại Màn hình Tuần tra
-              </button>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-outline-variant/30 text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 text-[11px] font-semibold uppercase tracking-wider">
                     <th className="py-3 px-4">Mã Phiên</th>
                     <th className="py-3 px-4">Tuyến Đường & Địa Chỉ</th>
                     <th className="py-3 px-4">Thời Gian</th>
