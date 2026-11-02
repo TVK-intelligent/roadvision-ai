@@ -34,6 +34,7 @@ import {
   Car,
   ChevronDown,
   Send,
+  Compass,
 } from 'lucide-react';
 import { routingService, RouteResult } from '../services/routingService';
 
@@ -749,7 +750,7 @@ export const DispatchQueuePage: React.FC = () => {
                 <th className="py-3 px-4">Loại sự cố</th>
                 <th className="py-3 px-4">Độ tin cậy</th>
                 <th className="py-3 px-4">Trạng thái</th>
-                <th className="py-3 px-4 text-right">Thao tác</th>
+                <th className="py-3.5 px-4 text-right min-w-[210px] whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -870,118 +871,125 @@ export const DispatchQueuePage: React.FC = () => {
                       </td>
 
                       {/* Thao tác */}
-                      <td className="py-3 px-4 align-top text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                           {isDisputed ? (
                             <Link
                               to={`/incidents/${incident.id}`}
-                              className="px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs flex items-center gap-1 transition-colors"
+                              className="h-7.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
                             >
                               <AlertTriangle className="w-3.5 h-3.5" />
                               <span>Xử lý khiếu nại</span>
                             </Link>
                           ) : (
                             <>
-                              {/* Giai đoạn 3: AI_ANALYZED / SUBMITTED -> Điều phối linh hoạt (Khảo sát hoặc Thi công trực tiếp), hoặc Từ chối */}
+                              {/* Giai đoạn 3: Phản ánh mới -> 1 nút Điều phối thông minh (chứa cả Giao khảo sát, Giao thi công & Từ chối) */}
                               {['SUBMITTED', 'AI_ANALYZED', 'VERIFIED'].includes(incident.status) && (
-                                <>
-                                  <div className="relative inline-block text-left">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDispatchDropdownIncidentId(dispatchDropdownIncidentId === incident.id ? null : incident.id);
-                                      }}
-                                      className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
-                                      title="Chọn phương án điều phối công việc"
-                                    >
-                                      <Send className="w-3.5 h-3.5" />
-                                      <span>Điều phối</span>
-                                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${dispatchDropdownIncidentId === incident.id ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {dispatchDropdownIncidentId === incident.id && (
-                                      <>
-                                        <div
-                                          className="fixed inset-0 z-30"
-                                          onClick={() => setDispatchDropdownIncidentId(null)}
-                                        />
-                                        <div className="absolute right-0 mt-1.5 w-64 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-40 text-left animate-in fade-in zoom-in-95 duration-100">
-                                          <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                                            Chọn luồng xử lý sự cố
-                                          </div>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setDispatchDropdownIncidentId(null);
-                                              handleOpenAssignInspectionModal(incident);
-                                            }}
-                                            className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-start gap-2.5 transition-colors cursor-pointer group"
-                                          >
-                                            <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                              <ClipboardList className="w-3.5 h-3.5" />
-                                            </div>
-                                            <div>
-                                              <div className="text-xs font-semibold text-slate-800 group-hover:text-blue-700">1. Giao tổ khảo sát</div>
-                                              <div className="text-[11px] text-slate-500 leading-tight mt-0.5">Xác minh hiện trường & đo đạc kỹ thuật</div>
-                                            </div>
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setDispatchDropdownIncidentId(null);
-                                              handleOpenAssignConstructionModal(incident);
-                                            }}
-                                            className="w-full px-3 py-2 text-left hover:bg-emerald-50 flex items-start gap-2.5 transition-colors cursor-pointer group border-t border-slate-100"
-                                          >
-                                            <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                              <HardHat className="w-3.5 h-3.5" />
-                                            </div>
-                                            <div>
-                                              <div className="text-xs font-semibold text-slate-800 group-hover:text-emerald-700 flex items-center gap-1.5">
-                                                <span>2. Giao thi công trực tiếp</span>
-                                                {incident.severity === 'CRITICAL' && (
-                                                  <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1 py-0.2 rounded border border-amber-300">Khẩn</span>
-                                                )}
-                                              </div>
-                                              <div className="text-[11px] text-slate-500 leading-tight mt-0.5">Bỏ qua khảo sát, thi công ngay</div>
-                                            </div>
-                                          </button>
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-
+                                <div className="relative inline-block text-left">
                                   <button
-                                    onClick={() => {
-                                      setSelectedIncident(incident);
-                                      setIsRejectModalOpen(true);
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDispatchDropdownIncidentId(dispatchDropdownIncidentId === incident.id ? null : incident.id);
                                     }}
-                                    className="px-2 py-1 rounded-md border border-slate-200 text-rose-600 font-medium hover:bg-rose-50 transition-colors text-xs cursor-pointer"
+                                    className="h-7.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
+                                    title="Chọn phương án điều phối công việc"
                                   >
-                                    Từ chối
+                                    <Send className="w-3.5 h-3.5" />
+                                    <span>Điều phối</span>
+                                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${dispatchDropdownIncidentId === incident.id ? 'rotate-180' : ''}`} />
                                   </button>
-                                </>
+
+                                  {dispatchDropdownIncidentId === incident.id && (
+                                    <>
+                                      <div
+                                        className="fixed inset-0 z-30"
+                                        onClick={() => setDispatchDropdownIncidentId(null)}
+                                      />
+                                      <div className="absolute right-0 mt-1.5 w-64 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-40 text-left animate-in fade-in zoom-in-95 duration-100">
+                                        <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                                          Chọn luồng xử lý sự cố
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setDispatchDropdownIncidentId(null);
+                                            handleOpenAssignInspectionModal(incident);
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-start gap-2.5 transition-colors cursor-pointer group"
+                                        >
+                                          <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                            <ClipboardList className="w-3.5 h-3.5" />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs font-semibold text-slate-800 group-hover:text-blue-700">1. Giao tổ khảo sát</div>
+                                            <div className="text-[11px] text-slate-500 leading-tight mt-0.5">Xác minh hiện trường & đo đạc kỹ thuật</div>
+                                          </div>
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setDispatchDropdownIncidentId(null);
+                                            handleOpenAssignConstructionModal(incident);
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-emerald-50 flex items-start gap-2.5 transition-colors cursor-pointer group border-t border-slate-100"
+                                        >
+                                          <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                            <HardHat className="w-3.5 h-3.5" />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs font-semibold text-slate-800 group-hover:text-emerald-700 flex items-center gap-1.5">
+                                              <span>2. Giao thi công trực tiếp</span>
+                                              {incident.severity === 'CRITICAL' && (
+                                                <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1 py-0.2 rounded border border-amber-300">Khẩn</span>
+                                              )}
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 leading-tight mt-0.5">Bỏ qua khảo sát, thi công ngay</div>
+                                          </div>
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setDispatchDropdownIncidentId(null);
+                                            setSelectedIncident(incident);
+                                            setIsRejectModalOpen(true);
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-rose-50 flex items-start gap-2.5 transition-colors cursor-pointer group border-t border-slate-100"
+                                        >
+                                          <div className="w-6 h-6 rounded-md bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                                            <X className="w-3.5 h-3.5" />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs font-semibold text-slate-800 group-hover:text-rose-700">3. Từ chối tiếp nhận</div>
+                                            <div className="text-[11px] text-slate-500 leading-tight mt-0.5">Không thuộc thẩm quyền hoặc thông tin sai</div>
+                                          </div>
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
                               )}
 
-                              {/* Giai đoạn 4: Đang trong quá trình khảo sát */}
+                              {/* Giai đoạn 4: Đang khảo sát -> Pill bo tròn nhẹ nhàng */}
                               {['INSPECTION_ASSIGNED', 'INSPECTING'].includes(incident.status) && (
-                                <span className="text-[11px] font-medium text-sky-700 bg-sky-50 px-2 py-1 rounded border border-sky-200 line-clamp-1 max-w-[140px]" title={incident.inspectionTeamName || 'Tổ Khảo Sát'}>
-                                  {incident.inspectionTeamName || 'Tổ Khảo Sát'}
+                                <span className="h-7.5 px-2.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap" title={incident.inspectionTeamName || 'Tổ Khảo Sát'}>
+                                  <Compass className="w-3 h-3 text-sky-600 shrink-0" />
+                                  <span className="truncate max-w-[120px]">{incident.inspectionTeamName || 'Đang khảo sát'}</span>
                                 </span>
                               )}
 
-                              {/* Giai đoạn 5: Đã khảo sát -> Giao thi công hoặc Yêu cầu khảo sát lại */}
+                              {/* Giai đoạn 5: Đã khảo sát -> Giao thi công (Chính) & Khảo sát lại (Phụ) gọn gàng 1 dòng */}
                               {incident.status === 'INSPECTED' && (
-                                <div className="flex items-center gap-1.5">
+                                <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
                                   <button
                                     onClick={() => handleOpenAssignConstructionModal(incident)}
                                     title="Duyệt kết quả khảo sát và giao tổ thi công"
-                                    className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                                    className="h-7.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors text-xs inline-flex items-center gap-1.5 shadow-2xs cursor-pointer whitespace-nowrap"
                                   >
-                                    <HardHat className="w-3.5 h-3.5" />
+                                    <HardHat className="w-3.5 h-3.5 shrink-0" />
                                     <span>Giao thi công</span>
                                   </button>
                                   <button
@@ -991,30 +999,39 @@ export const DispatchQueuePage: React.FC = () => {
                                       setIsRejectInspectionModalOpen(true);
                                     }}
                                     title="Yêu cầu tổ khảo sát đo đạc lại hoặc bổ sung số liệu"
-                                    className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium transition-colors text-xs flex items-center gap-1 shadow-2xs cursor-pointer"
+                                    className="h-7.5 px-2.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium transition-colors text-xs inline-flex items-center gap-1 shadow-2xs cursor-pointer whitespace-nowrap"
                                   >
-                                    <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                                    <RotateCcw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                     <span>Khảo sát lại</span>
                                   </button>
                                 </div>
                               )}
 
-                              {/* Giai đoạn 6: Đang thi công */}
+                              {/* Giai đoạn 6: Đang thi công -> Pill bo tròn nhẹ nhàng */}
                               {['ASSIGNED', 'IN_PROGRESS'].includes(incident.status) && (
-                                <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 line-clamp-1 max-w-[140px]" title={incident.assignedTeamName || 'Tổ Thi Công'}>
-                                  {incident.assignedTeamName || 'Tổ Thi Công'}
+                                <span className="h-7.5 px-2.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap" title={incident.assignedTeamName || 'Tổ Thi Công'}>
+                                  <HardHat className="w-3 h-3 text-amber-600 shrink-0" />
+                                  <span className="truncate max-w-[120px]">{incident.assignedTeamName || 'Đang thi công'}</span>
                                 </span>
                               )}
 
-                              {/* Giai đoạn 7: Chờ nghiệm thu -> Phê duyệt nghiệm thu hoặc Yêu cầu thi công lại */}
+                              {/* Bị yêu cầu thi công lại */}
+                              {incident.status === 'REWORK_REQUIRED' && (
+                                <span className="h-7.5 px-2.5 rounded-full bg-rose-50 text-rose-800 border border-rose-200 text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap" title={incident.assignedTeamName || 'Tổ Thi Công'}>
+                                  <RotateCcw className="w-3 h-3 text-rose-600 shrink-0" />
+                                  <span className="truncate max-w-[120px]">Thi công lại #{incident.reworkCount || 1}</span>
+                                </span>
+                              )}
+
+                              {/* Giai đoạn 7: Chờ nghiệm thu -> Duyệt nghiệm thu (Chính) & Thi công lại (Phụ) */}
                               {['PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(incident.status) && (
-                                <div className="flex items-center gap-1.5">
+                                <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
                                   <button
                                     onClick={() => handleQuickApproveAcceptance(incident.id)}
                                     title="Phê duyệt nghiệm thu đạt chuẩn kỹ thuật (RESOLVED)"
-                                    className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
+                                    className="h-7.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
                                   >
-                                    <ShieldCheck className="w-3.5 h-3.5" />
+                                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                                     <span>Duyệt nghiệm thu</span>
                                   </button>
                                   <button
@@ -1024,9 +1041,9 @@ export const DispatchQueuePage: React.FC = () => {
                                       setIsReworkModalOpen(true);
                                     }}
                                     title="Từ chối nghiệm thu, bắt tổ thi công xử lý lại hiện trường"
-                                    className="px-2 py-1 rounded-md border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 font-medium transition-colors text-xs flex items-center gap-1 shadow-2xs cursor-pointer"
+                                    className="h-7.5 px-2.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 font-medium transition-colors text-xs inline-flex items-center gap-1 shadow-2xs cursor-pointer whitespace-nowrap"
                                   >
-                                    <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                                    <RotateCcw className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                                     <span>Thi công lại</span>
                                   </button>
                                 </div>
@@ -1034,16 +1051,17 @@ export const DispatchQueuePage: React.FC = () => {
 
                               {/* Giai đoạn 7: Đã hoàn tất & Đóng */}
                               {['RESOLVED', 'CLOSED'].includes(incident.status) && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span className="h-7.5 px-2.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                   <span>{incident.status === 'CLOSED' ? 'Đã đóng' : 'Đã nghiệm thu'}</span>
                                 </span>
                               )}
 
+                              {/* Link Xem chi tiết thanh thoát (Ghost Icon Button) */}
                               <Link
                                 to={`/incidents/${incident.id}`}
-                                title="Xem hồ sơ chi tiết"
-                                className="p-1 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                                title="Xem hồ sơ chi tiết sự cố"
+                                className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
                               >
                                 <ArrowUpRight className="w-4 h-4" />
                               </Link>
