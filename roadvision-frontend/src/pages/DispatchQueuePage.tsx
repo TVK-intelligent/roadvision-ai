@@ -35,6 +35,7 @@ import {
   ChevronDown,
   Send,
   Compass,
+  Eye,
 } from 'lucide-react';
 import { routingService, RouteResult } from '../services/routingService';
 
@@ -781,11 +782,16 @@ export const DispatchQueuePage: React.FC = () => {
                       }`}
                     >
                       {/* Mã Ticket */}
-                      <td className="py-3 px-4 align-top">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-mono font-semibold text-blue-700">{incident.ticketCode}</span>
+                      <td className="py-3 px-4 align-middle whitespace-nowrap">
+                        <div className="flex flex-col gap-1 items-start whitespace-nowrap">
+                          <Link
+                            to={`/incidents/${incident.id}`}
+                            className="font-mono font-bold text-blue-700 hover:text-blue-800 hover:underline"
+                          >
+                            #{incident.ticketCode}
+                          </Link>
                           {isDisputed && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-medium w-fit">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-semibold whitespace-nowrap">
                               <AlertTriangle className="w-2.5 h-2.5" /> Bị khiếu nại
                             </span>
                           )}
@@ -793,7 +799,7 @@ export const DispatchQueuePage: React.FC = () => {
                       </td>
 
                       {/* Thumbnail & Địa chỉ */}
-                      <td className="py-3 px-4 align-top">
+                      <td className="py-3 px-4 align-middle">
                         <div className="flex items-center gap-3">
                           <img
                             src={incident.imageUrl}
@@ -838,32 +844,34 @@ export const DispatchQueuePage: React.FC = () => {
                       </td>
 
                       {/* Phân loại */}
-                      <td className="py-3 px-4 align-top font-medium text-slate-800">
-                        {incident.category === 'POTHOLE' && 'Ổ gà'}
-                        {incident.category === 'ROAD_CRACK' && 'Vết nứt mặt đường'}
-                        {incident.category === 'ROAD_FLOODING' && 'Điểm ngập úng'}
-                        {incident.category === 'ROAD_OBSTACLE' && 'Chướng ngại vật'}
-                        {incident.category === 'COMPLEX_DAMAGE' && 'Đa sự cố'}
-                        {!['POTHOLE', 'ROAD_CRACK', 'ROAD_FLOODING', 'ROAD_OBSTACLE', 'COMPLEX_DAMAGE'].includes(incident.category) && incident.category}
+                      <td className="py-3 px-4 align-middle whitespace-nowrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200/60">
+                          {incident.category === 'POTHOLE' && 'Ổ gà'}
+                          {incident.category === 'ROAD_CRACK' && 'Vết nứt mặt đường'}
+                          {incident.category === 'ROAD_FLOODING' && 'Điểm ngập úng'}
+                          {incident.category === 'ROAD_OBSTACLE' && 'Chướng ngại vật'}
+                          {incident.category === 'COMPLEX_DAMAGE' && 'Đa sự cố'}
+                          {!['POTHOLE', 'ROAD_CRACK', 'ROAD_FLOODING', 'ROAD_OBSTACLE', 'COMPLEX_DAMAGE'].includes(incident.category) && incident.category}
+                        </span>
                       </td>
 
                       {/* AI Confidence */}
-                      <td className="py-3 px-4 align-top">
+                      <td className="py-3 px-4 align-middle whitespace-nowrap">
                         {incident.aiDetection?.confidence ? (
-                          <div className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[11px] font-medium">
+                          <div className="inline-flex items-center px-2 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-700 font-mono text-[11px] font-medium">
                             {(incident.aiDetection.confidence * 100).toFixed(1)}%
                           </div>
                         ) : (
-                          <span className="text-slate-400 font-mono text-[11px]">—</span>
+                          <span className="text-slate-400 font-mono text-[11px] px-2">—</span>
                         )}
                       </td>
 
                       {/* Status Badge */}
-                      <td className="py-3 px-4 align-top">
-                        <div className="flex flex-col gap-1">
+                      <td className="py-3 px-4 align-middle whitespace-nowrap min-w-[130px]">
+                        <div className="inline-flex flex-col gap-1 items-start whitespace-nowrap">
                           <StatusBadge status={incident.status} />
                           {isDisputed && (
-                            <span className="text-[10px] font-medium text-rose-600">
+                            <span className="text-[10px] font-semibold text-rose-600 whitespace-nowrap">
                               Chờ điều phối lại
                             </span>
                           )}
@@ -874,16 +882,25 @@ export const DispatchQueuePage: React.FC = () => {
                       <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                           {isDisputed ? (
-                            <Link
-                              to={`/incidents/${incident.id}`}
-                              className="h-7.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
-                            >
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                              <span>Xử lý khiếu nại</span>
-                            </Link>
+                            <>
+                              <Link
+                                to={`/incidents/${incident.id}`}
+                                className="h-7.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>Xử lý khiếu nại</span>
+                              </Link>
+                              <Link
+                                to={`/incidents/${incident.id}`}
+                                title="Xem hồ sơ chi tiết sự cố"
+                                className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
+                              >
+                                <ArrowUpRight className="w-4 h-4" />
+                              </Link>
+                            </>
                           ) : (
                             <>
-                              {/* Giai đoạn 3: Phản ánh mới -> 1 nút Điều phối thông minh (chứa cả Giao khảo sát, Giao thi công & Từ chối) */}
+                              {/* Giai đoạn 3: Phản ánh mới -> Nút Điều phối thông minh */}
                               {['SUBMITTED', 'AI_ANALYZED', 'VERIFIED'].includes(incident.status) && (
                                 <div className="relative inline-block text-left">
                                   <button
@@ -973,15 +990,7 @@ export const DispatchQueuePage: React.FC = () => {
                                 </div>
                               )}
 
-                              {/* Giai đoạn 4: Đang khảo sát -> Pill bo tròn nhẹ nhàng */}
-                              {['INSPECTION_ASSIGNED', 'INSPECTING'].includes(incident.status) && (
-                                <span className="h-7.5 px-2.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap" title={incident.inspectionTeamName || 'Tổ Khảo Sát'}>
-                                  <Compass className="w-3 h-3 text-sky-600 shrink-0" />
-                                  <span className="truncate max-w-[120px]">{incident.inspectionTeamName || 'Đang khảo sát'}</span>
-                                </span>
-                              )}
-
-                              {/* Giai đoạn 5: Đã khảo sát -> Giao thi công (Chính) & Khảo sát lại (Phụ) gọn gàng 1 dòng */}
+                              {/* Giai đoạn 5: Đã khảo sát -> Giao thi công (Chính) & Khảo sát lại (Phụ) */}
                               {incident.status === 'INSPECTED' && (
                                 <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
                                   <button
@@ -1005,22 +1014,6 @@ export const DispatchQueuePage: React.FC = () => {
                                     <span>Khảo sát lại</span>
                                   </button>
                                 </div>
-                              )}
-
-                              {/* Giai đoạn 6: Đang thi công -> Pill bo tròn nhẹ nhàng */}
-                              {['ASSIGNED', 'IN_PROGRESS'].includes(incident.status) && (
-                                <span className="h-7.5 px-2.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap" title={incident.assignedTeamName || 'Tổ Thi Công'}>
-                                  <HardHat className="w-3 h-3 text-amber-600 shrink-0" />
-                                  <span className="truncate max-w-[120px]">{incident.assignedTeamName || 'Đang thi công'}</span>
-                                </span>
-                              )}
-
-                              {/* Bị yêu cầu thi công lại */}
-                              {incident.status === 'REWORK_REQUIRED' && (
-                                <span className="h-7.5 px-2.5 rounded-full bg-rose-50 text-rose-800 border border-rose-200 text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap" title={incident.assignedTeamName || 'Tổ Thi Công'}>
-                                  <RotateCcw className="w-3 h-3 text-rose-600 shrink-0" />
-                                  <span className="truncate max-w-[120px]">Thi công lại #{incident.reworkCount || 1}</span>
-                                </span>
                               )}
 
                               {/* Giai đoạn 7: Chờ nghiệm thu -> Duyệt nghiệm thu (Chính) & Thi công lại (Phụ) */}
@@ -1049,22 +1042,37 @@ export const DispatchQueuePage: React.FC = () => {
                                 </div>
                               )}
 
-                              {/* Giai đoạn 7: Đã hoàn tất & Đóng */}
-                              {['RESOLVED', 'CLOSED'].includes(incident.status) && (
-                                <span className="h-7.5 px-2.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                  <span>{incident.status === 'CLOSED' ? 'Đã đóng' : 'Đã nghiệm thu'}</span>
-                                </span>
+                              {/* Các trạng thái đang xử lý hoặc đã hoàn tất: Nút Xem chi tiết chuẩn mực */}
+                              {[
+                                'INSPECTION_ASSIGNED',
+                                'INSPECTING',
+                                'ASSIGNED',
+                                'IN_PROGRESS',
+                                'REWORK_REQUIRED',
+                                'RESOLVED',
+                                'CLOSED',
+                                'REJECTED',
+                              ].includes(incident.status) && (
+                                <Link
+                                  to={`/incidents/${incident.id}`}
+                                  className="h-7.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
+                                  title="Xem toàn bộ tiến độ và hồ sơ sự cố"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span>Xem chi tiết</span>
+                                </Link>
                               )}
 
-                              {/* Link Xem chi tiết thanh thoát (Ghost Icon Button) */}
-                              <Link
-                                to={`/incidents/${incident.id}`}
-                                title="Xem hồ sơ chi tiết sự cố"
-                                className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
-                              >
-                                <ArrowUpRight className="w-4 h-4" />
-                              </Link>
+                              {/* Ghost Icon Button xem nhanh dành cho các dòng có nút hành động chính */}
+                              {['SUBMITTED', 'AI_ANALYZED', 'VERIFIED', 'INSPECTED', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(incident.status) && (
+                                <Link
+                                  to={`/incidents/${incident.id}`}
+                                  title="Xem hồ sơ chi tiết sự cố"
+                                  className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
+                                >
+                                  <ArrowUpRight className="w-4 h-4" />
+                                </Link>
+                              )}
                             </>
                           )}
                         </div>
