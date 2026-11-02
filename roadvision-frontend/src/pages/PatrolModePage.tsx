@@ -318,8 +318,8 @@ export const PatrolModePage: React.FC = () => {
   const [lastCreatedSession, setLastCreatedSession] = useState<PatrolSession | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
 
-  // Tab & Lịch sử phiên tuần tra
-  const [activeTab, setActiveTab] = useState<'CAMERA' | 'HISTORY'>('CAMERA');
+  // Tab & Lịch sử phiên tuần tra (Admin mặc định vào tab Giám sát / Nhật ký)
+  const [activeTab, setActiveTab] = useState<'CAMERA' | 'HISTORY'>(user?.role === 'ROLE_ADMIN' ? 'HISTORY' : 'CAMERA');
   const [patrolSessions, setPatrolSessions] = useState<PatrolSession[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(false);
   const [selectedSessionForReport, setSelectedSessionForReport] = useState<PatrolSession | null>(null);
@@ -1787,7 +1787,7 @@ export const PatrolModePage: React.FC = () => {
           }`}
         >
           <History className="w-4 h-4" />
-          <span>Lịch Sử Phiên Tuần Tra Của Tôi</span>
+          <span>{user?.role === 'ROLE_ADMIN' ? 'Nhật Ký & Giám Sát Ca Tuần Tra' : 'Lịch Sử Phiên Tuần Tra Của Tôi'}</span>
           {patrolSessions.length > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-[10px] font-mono font-bold text-on-surface">
               {patrolSessions.length}

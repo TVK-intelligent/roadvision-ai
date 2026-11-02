@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Trophy,
   BookOpen,
+  History,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -127,26 +128,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {!isCollapsed && <span>Bản đồ số GIS</span>}
               </Link>
 
-              <Link to="/report" onClick={closeMobile} className={navItemClass('/report')} title="Báo sự cố hư hỏng đường">
-                <PlusCircle className="w-4 h-4 shrink-0" />
-                {!isCollapsed && <span>Báo sự cố</span>}
-              </Link>
+              {user?.role !== 'ROLE_ADMIN' && (
+                <Link to="/report" onClick={closeMobile} className={navItemClass('/report')} title="Báo sự cố hư hỏng đường">
+                  <PlusCircle className="w-4 h-4 shrink-0" />
+                  {!isCollapsed && <span>Báo sự cố</span>}
+                </Link>
+              )}
             </nav>
           </div>
 
-          {/* GROUP 2: TÁC NGHIỆP HIỆN TRƯỜNG & TUẦN TRA (STAFF / ADMIN) */}
-          {(user?.role === 'ROLE_STAFF' || user?.role === 'ROLE_ADMIN') && (
+          {/* GROUP 2: TÁC NGHIỆP HIỆN TRƯỜNG (DÀNH RIÊNG CHO STAFF CHUYÊN TRÁCH) */}
+          {user?.role === 'ROLE_STAFF' && (
             <div>
               {!isCollapsed ? (
                 <div className="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Hiện trường & Tuần tra
+                  Tác nghiệp hiện trường
                 </div>
               ) : (
                 <div className="border-t border-[#243048] my-2" />
               )}
               <nav className="space-y-1">
-                {/* 1. Tuần tra Tuyến đường: Dành riêng cho Admin, hoặc Nhân viên thuộc Tổ Tuần tra (PATROL) / Khẩn cấp */}
-                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'PATROL' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && user?.email?.includes('patrol'))) && (
+                {/* 1. Tuần tra Tuyến đường: Nhân viên thuộc Tổ Tuần tra (PATROL) / Khẩn cấp */}
+                {(user?.teamType === 'PATROL' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.email?.includes('patrol'))) && (
                   <Link
                     to="/patrol"
                     onClick={closeMobile}
@@ -158,8 +161,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </Link>
                 )}
 
-                {/* 2. Khảo sát hiện trường: Dành riêng cho Admin, hoặc Nhân viên thuộc Tổ Khảo sát (INSPECTION) / Khẩn cấp */}
-                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'INSPECTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && !user?.email?.includes('khu4') && !user?.email?.includes('patrol'))) && (
+                {/* 2. Khảo sát hiện trường: Nhân viên thuộc Tổ Khảo sát (INSPECTION) / Khẩn cấp */}
+                {(user?.teamType === 'INSPECTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && !user?.email?.includes('khu4') && !user?.email?.includes('patrol'))) && (
                   <Link
                     to="/inspection-tasks"
                     onClick={closeMobile}
@@ -171,8 +174,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </Link>
                 )}
 
-                {/* 3. Thi công sửa chữa: Dành riêng cho Admin, hoặc Nhân viên thuộc Tổ Thi công (CONSTRUCTION) / Khẩn cấp */}
-                {(user?.role === 'ROLE_ADMIN' || user?.teamType === 'CONSTRUCTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && user?.role === 'ROLE_STAFF' && (user?.email?.includes('khu4') || user?.email?.includes('construct')))) && (
+                {/* 3. Thi công sửa chữa: Nhân viên thuộc Tổ Thi công (CONSTRUCTION) / Khẩn cấp */}
+                {(user?.teamType === 'CONSTRUCTION' || user?.teamType === 'EMERGENCY' || (!user?.teamType && (user?.email?.includes('khu4') || user?.email?.includes('construct')))) && (
                   <Link
                     to="/construction-tasks"
                     onClick={closeMobile}
@@ -209,20 +212,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </Link>
 
                 <Link
-                  to="/analytics"
+                  to="/patrol"
                   onClick={closeMobile}
-                  className={navItemClass('/analytics')}
-                  title="Báo cáo phân tích KPI & Hiệu suất"
+                  className={navItemClass('/patrol')}
+                  title="Giám sát & Sổ nhật ký ca tuần đường toàn tuyến"
                 >
-                  <BarChart3 className="w-4 h-4 shrink-0 text-indigo-400" />
-                  {!isCollapsed && <span>Báo cáo KPI & Phân tích</span>}
+                  <History className="w-4 h-4 shrink-0 text-cyan-400" />
+                  {!isCollapsed && <span>Nhật ký Tuần tra (AI)</span>}
                 </Link>
 
                 <Link
                   to="/admin/teams"
                   onClick={closeMobile}
                   className={navItemClass('/admin/teams')}
-                  title="Quản lý tổ đội và lực lượng nhân sự"
+                  title="Quản lý 12 tổ đội chuyên trách & nhân lực"
                 >
                   <Users className="w-4 h-4 shrink-0 text-sky-400" />
                   {!isCollapsed && <span>Tổ đội & Nhân sự</span>}
@@ -236,6 +239,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
                   {!isCollapsed && <span>Người dùng & Phân quyền</span>}
+                </Link>
+
+                <Link
+                  to="/analytics"
+                  onClick={closeMobile}
+                  className={navItemClass('/analytics')}
+                  title="Báo cáo phân tích KPI & Hiệu suất"
+                >
+                  <BarChart3 className="w-4 h-4 shrink-0 text-indigo-400" />
+                  {!isCollapsed && <span>Báo cáo KPI & Phân tích</span>}
                 </Link>
               </nav>
             </div>
