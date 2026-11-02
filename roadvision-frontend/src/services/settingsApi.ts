@@ -17,6 +17,7 @@ export interface SystemSettings {
   allowDirectConstruction: boolean;
   maxReworkAttempts: number;
   requireInspectionReportAttachment: boolean;
+  autoEscalateUnassignedHours?: number;
 
   // Notification & Alert
   enableRealtimeWebsocket: boolean;
@@ -24,15 +25,34 @@ export interface SystemSettings {
   emergencyWeatherAlerts: boolean;
   supportHotline: string;
   notificationEmailSender: string;
+  notifyLeaderOnCritical?: boolean;
 
-  // System & General
+  // Security & Authentication
+  maintenanceMode: boolean;
+  sessionTimeoutMinutes?: number;
+  maxLoginAttempts?: number;
+  enableRateLimitReport?: boolean;
+  requireCitizenPhoneVerification?: boolean;
+
+  // System & Logs
   organizationName: string;
   systemEnvironment: string;
-  maintenanceMode: boolean;
   autoBackupSchedule: string;
   enableAuditLog: boolean;
+  logRetentionDays?: number;
   mapDefaultCenter: string;
   mapDefaultZoom: number;
+
+  // Incident Categories Config
+  incidentCategoriesConfig?: {
+    code: string;
+    name: string;
+    enabled: boolean;
+    defaultSeverity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    color: string;
+    estimatedHours: number;
+    description: string;
+  }[];
 
   // Metadata
   lastUpdatedAt?: string;
