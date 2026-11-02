@@ -401,7 +401,9 @@ export const InspectionTasksPage: React.FC = () => {
 
   // 3. Đã lập biên bản kỹ thuật - Chờ Admin thẩm định:
   const isInspectionWaitingApproval = (t: Incident) =>
-    t.status === 'INSPECTED';
+    t.status === 'INSPECTED' ||
+    (!['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'RESOLVED', 'CLOSED'].includes(t.status) &&
+      Boolean(t.inspection && t.inspection.confirmedCategory != null));
 
   // 4. Đã thẩm định & Bàn giao sang Tổ thi công:
   const isTransferredToConstruction = (t: Incident) =>
