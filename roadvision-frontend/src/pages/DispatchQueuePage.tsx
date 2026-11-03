@@ -10,7 +10,6 @@ import {
   Filter,
   ShieldAlert,
   UserCheck,
-  ArrowUpRight,
   RotateCcw,
   AlertCircle,
   Clock,
@@ -895,7 +894,7 @@ export const DispatchQueuePage: React.FC = () => {
                                 title="Xem hồ sơ chi tiết sự cố"
                                 className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
                               >
-                                <ArrowUpRight className="w-4 h-4" />
+                                <Eye className="w-4 h-4" />
                               </Link>
                             </>
                           ) : (
@@ -1063,14 +1062,14 @@ export const DispatchQueuePage: React.FC = () => {
                                 </Link>
                               )}
 
-                              {/* Ghost Icon Button xem nhanh dành cho các dòng có nút hành động chính */}
+                              {/* Nút icon xem nhanh dành cho các dòng có nút hành động chính */}
                               {['SUBMITTED', 'AI_ANALYZED', 'VERIFIED', 'INSPECTED', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(incident.status) && (
                                 <Link
                                   to={`/incidents/${incident.id}`}
                                   title="Xem hồ sơ chi tiết sự cố"
                                   className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
                                 >
-                                  <ArrowUpRight className="w-4 h-4" />
+                                  <Eye className="w-4 h-4" />
                                 </Link>
                               )}
                             </>

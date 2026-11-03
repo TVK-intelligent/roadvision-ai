@@ -47,7 +47,7 @@ import {
   ChevronUp,
   Printer,
   History,
-  ExternalLink,
+  Eye,
   ShieldCheck,
   AlertTriangle,
   Navigation,
@@ -2995,7 +2995,7 @@ export const PatrolModePage: React.FC = () => {
                             to={`/incidents/${lastCreatedSession.incidentId}`}
                             className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-center"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5" />
                             <span>Hồ Sơ Điều Phối</span>
                           </Link>
                         ) : (
@@ -3212,10 +3212,10 @@ export const PatrolModePage: React.FC = () => {
                           {session.incidentId && (
                             <Link
                               to={`/incidents/${session.incidentId}`}
-                              className="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface transition-all"
-                              title="Xem hồ sơ điều phối sự cố"
+                              className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
+                              title="Xem chi tiết hồ sơ sự cố"
                             >
-                              <ExternalLink className="w-3.5 h-3.5" />
+                              <Eye className="w-4 h-4" />
                             </Link>
                           )}
                         </div>

@@ -8,7 +8,7 @@ import {
   Loader2,
   ChevronDown,
   RotateCcw,
-  ExternalLink,
+  Eye,
   MapPin,
   CheckCircle2,
   AlertTriangle,
@@ -251,8 +251,8 @@ export const AiChatWidget: React.FC = () => {
                             onClick={() => setIsOpen(false)}
                             className="inline-flex items-center gap-1 text-primary hover:underline text-[10px] font-medium mt-0.5"
                           >
+                            <Eye className="w-3 h-3" />
                             <span>Xem chi tiết hồ sơ</span>
-                            <ExternalLink className="w-2.5 h-2.5" />
                           </Link>
                         </div>
                       ))}

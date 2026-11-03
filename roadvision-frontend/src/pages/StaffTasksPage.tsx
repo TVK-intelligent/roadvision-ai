@@ -10,7 +10,7 @@ import {
   Hammer,
   CheckCircle2,
   Clock,
-  ArrowUpRight,
+  Eye,
   Upload,
   AlertCircle,
   FileCheck,
@@ -718,10 +718,10 @@ export const StaffTasksPage: React.FC = () => {
 
                     <Link
                       to={`/incidents/${task.id}`}
-                      className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                      className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
                       title="Xem chi tiết hồ sơ"
                     >
-                      <ArrowUpRight className="w-4 h-4" />
+                      <Eye className="w-4 h-4" />
                     </Link>
                   </div>
                 </div>

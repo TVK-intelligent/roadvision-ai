@@ -9,7 +9,7 @@ import {
   PlusCircle,
   Clock,
   MapPin,
-  ArrowRight,
+  Eye,
   FileText,
   AlertCircle,
   Star,
@@ -255,12 +255,12 @@ export const MyReportsPage: React.FC = () => {
                     </div>
                     <Link
                       to={`/incidents/${item.id}`}
-                      className={`inline-flex items-center gap-1 font-medium transition-colors ${
+                      className={`inline-flex items-center gap-1.5 font-medium transition-colors text-xs ${
                         isDone ? 'text-emerald-700 hover:text-emerald-800' : 'text-blue-600 hover:text-blue-700'
                       }`}
                     >
-                      <span>Chi tiết hồ sơ</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Xem chi tiết</span>
                     </Link>
                   </div>
                 </div>

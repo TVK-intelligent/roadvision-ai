@@ -16,7 +16,7 @@ import {
   Sparkles,
   Loader2,
   X,
-  ArrowUpRight,
+  Eye,
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
@@ -317,7 +317,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                             </p>
                           )}
                         </div>
-                        <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 shrink-0 mt-1" />
+                        <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 shrink-0 mt-1" />
                       </div>
                     ))
                   ) : !isSearching && searchQuery.trim().length >= 2 ? (

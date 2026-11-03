@@ -8,7 +8,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import {
   MapPin,
   Search,
-  ArrowUpRight,
+  Eye,
 } from 'lucide-react';
 
 // Sửa cấu hình default icon cho Leaflet
@@ -364,8 +364,8 @@ export const SpatialMapPage: React.FC = () => {
                         to={`/incidents/${inc.id}`}
                         className="mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 !text-white font-semibold text-xs hover:bg-blue-700 transition-colors shadow-xs"
                       >
+                        <Eye className="w-3.5 h-3.5 !text-white" />
                         <span className="!text-white">Xem chi tiết hồ sơ</span>
-                        <ArrowUpRight className="w-3.5 h-3.5 !text-white" />
                       </Link>
                     </div>
                   </Popup>

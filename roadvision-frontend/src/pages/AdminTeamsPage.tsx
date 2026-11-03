@@ -36,7 +36,7 @@ import {
   Video,
   Unlock,
   UserPlus,
-  ArrowUpRight,
+  Eye,
   Clock,
 } from 'lucide-react';
 
@@ -958,7 +958,6 @@ export const AdminTeamsPage: React.FC = () => {
                                   >
                                     <Briefcase className="w-3.5 h-3.5 text-blue-600" />
                                     <span>Xem chi tiết {team.activeTaskCount} nhiệm vụ đang gánh</span>
-                                    <ArrowUpRight className="w-3.5 h-3.5" />
                                   </button>
                                 )}
                               </div>
@@ -1536,7 +1535,7 @@ export const AdminTeamsPage: React.FC = () => {
                           className="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
                         >
                           <span>{task.ticketCode}</span>
-                          <ArrowUpRight className="w-3.5 h-3.5" />
+                          <Eye className="w-3.5 h-3.5" />
                         </Link>
                         <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
                           {task.category === 'POTHOLE' ? 'Ổ gà / Hố sụt' : task.category === 'ROAD_CRACK' ? 'Nứt mặt đường' : task.category === 'ROAD_FLOODING' ? 'Ngập úng' : 'Chướng ngại vật'}

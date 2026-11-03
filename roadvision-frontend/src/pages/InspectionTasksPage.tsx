@@ -10,7 +10,6 @@ import {
   Compass,
   CheckCircle2,
   Clock,
-  ArrowUpRight,
   FileCheck,
   MapPin,
   X,
@@ -24,7 +23,6 @@ import {
   AlertTriangle,
   FileText,
   Check,
-  ExternalLink,
   RotateCcw,
 } from 'lucide-react';
 
@@ -761,9 +759,10 @@ export const InspectionTasksPage: React.FC = () => {
                         ) : (
                           <Link
                             to={`/incidents/${task.id}`}
-                            className="px-3 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors border border-slate-200 shadow-2xs"
+                            className="h-7.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-blue-600 font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
+                            title="Xem chi tiết hồ sơ"
                           >
-                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                             <span>Xem chi tiết</span>
                           </Link>
                         )}
@@ -813,13 +812,16 @@ export const InspectionTasksPage: React.FC = () => {
                       </>
                     )}
 
-                    <Link
-                      to={`/incidents/${task.id}`}
-                      className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
-                      title="Xem chi tiết toàn văn hồ sơ"
-                    >
-                      <ArrowUpRight className="w-4 h-4" />
-                    </Link>
+                    {/* Nút icon xem chi tiết hồ sơ dành cho Staff hoặc khi Admin đã có nút Xem biên bản */}
+                    {(isInspectedDone || isTransferredToConstruction(task) || Boolean(task.inspection?.confirmedCategory) || !isAdmin) && (
+                      <Link
+                        to={`/incidents/${task.id}`}
+                        className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
+                        title="Xem chi tiết hồ sơ"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1283,7 +1285,7 @@ export const InspectionTasksPage: React.FC = () => {
                   to={`/incidents/${reviewTask.id}`}
                   className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-xs"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <Eye className="w-3.5 h-3.5" />
                   <span>Xem hồ sơ chi tiết đầy đủ</span>
                 </Link>
 

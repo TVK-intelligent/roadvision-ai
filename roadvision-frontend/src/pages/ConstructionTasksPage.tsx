@@ -11,7 +11,6 @@ import {
   HardHat,
   CheckCircle2,
   Clock,
-  ArrowUpRight,
   Upload,
   AlertCircle,
   MapPin,
@@ -25,7 +24,6 @@ import {
   AlertTriangle,
   RotateCcw,
   Check,
-  ExternalLink,
   Layers,
   FileCheck,
   RefreshCw,
@@ -538,21 +536,20 @@ export const ConstructionTasksPage: React.FC = () => {
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     {/* Hành động dành riêng cho ADMIN - CHỈ XEM (ACTION VIEW) */}
                     {isAdmin ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => setGalleryTask(task)}
-                          className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-                          title="Xem toàn bộ ảnh Trước, Trong và Sau thi công của công trình"
+                          className="p-1.5 rounded-md border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors cursor-pointer"
+                          title="Xem nhanh ảnh bằng chứng hiện trường (Gallery)"
                         >
-                          <Camera className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Xem bằng chứng & Tiến độ</span>
+                          <Camera className="w-4 h-4 text-amber-600" />
                         </button>
                         <Link
                           to={`/incidents/${task.id}`}
-                          className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-blue-700 font-medium text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
-                          title="Xem hồ sơ chi tiết sự cố"
+                          className="h-7.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-blue-600 font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
+                          title="Xem toàn văn hồ sơ & chi tiết tiến độ"
                         >
-                          <Eye className="w-3.5 h-3.5 text-blue-600" />
+                          <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                           <span>Xem chi tiết</span>
                         </Link>
                       </div>
@@ -607,16 +604,16 @@ export const ConstructionTasksPage: React.FC = () => {
                             <span>Đã đóng phiếu</span>
                           </span>
                         )}
+
+                        <Link
+                          to={`/incidents/${task.id}`}
+                          className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
+                          title="Xem chi tiết hồ sơ"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
                       </>
                     )}
-
-                    <Link
-                      to={`/incidents/${task.id}`}
-                      className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
-                      title="Xem chi tiết toàn văn hồ sơ"
-                    >
-                      <ArrowUpRight className="w-4 h-4" />
-                    </Link>
                   </div>
                 </div>
               </div>
@@ -1029,7 +1026,7 @@ export const ConstructionTasksPage: React.FC = () => {
                   to={`/incidents/${reviewAcceptanceTask.id}`}
                   className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium text-xs"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <Eye className="w-3.5 h-3.5" />
                   <span>Xem chi tiết hồ sơ gốc</span>
                 </Link>
 
@@ -1129,7 +1126,7 @@ export const ConstructionTasksPage: React.FC = () => {
                   to={`/incidents/${galleryTask.id}`}
                   className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-xs"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <Eye className="w-3.5 h-3.5" />
                   <span>Xem hồ sơ chi tiết đầy đủ</span>
                 </Link>
                 <button

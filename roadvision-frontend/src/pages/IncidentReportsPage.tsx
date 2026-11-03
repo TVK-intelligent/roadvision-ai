@@ -491,12 +491,13 @@ export const IncidentReportsPage: React.FC = () => {
                       </td>
 
                       {/* Cột 8: Hành động */}
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <Link
                           to={`/incidents/${inc.id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 transition-all font-semibold text-xs shadow-xs"
+                          className="h-7.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-blue-600 font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
+                          title="Xem chi tiết hồ sơ"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                           <span>Xem chi tiết</span>
                         </Link>
                       </td>
