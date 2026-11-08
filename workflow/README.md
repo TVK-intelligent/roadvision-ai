@@ -32,6 +32,8 @@ Thư mục `workflow/` này đóng vai trò là **Bản thiết kế kỹ thuậ
 | **`07_stitch_ui_mapping.md`** | Bản đồ khớp nối Stitch UI | Bảng đối chiếu chính xác giữa 9 màn hình thiết kế Stitch UI với các pha nghiệp vụ và các API tương ứng. |
 | **`08_tasks_and_business_logic.md`** | Việc cần làm & Logic hệ thống cốt lõi | Danh mục toàn bộ các logic kiểm tra (validation), rào cản địa lý (geo-fencing), giải thuật NMS/Tensor, bảo đảm toàn vẹn và Checklist phân rã công việc chi tiết cho BE & FE. |
 | **`09_github_references_and_ai_training_guide.md`** | Phân tích 6 Repo tham khảo & Hướng dẫn train AI | Phân tích chuyên sâu 6 repo tham khảo (`Greviances_Management`, `SamaIsmail91`, `jaygala24`, `CivicAI`...), chiến lược huấn luyện YOLOv8 trên Colab cho máy 16GB RAM và xuất sang ONNX. |
+| **`10_vietnam_road_maintenance_and_crew_optimization.md`** | Tối ưu hóa phân vùng tổ đội bảo trì | Đặc tả phân bổ tổ đội chuyên trách tuyến đường và định mức xử lý hư hỏng theo tiêu chuẩn bảo trì đường bộ Việt Nam. |
+| **`11_ai_evaluation_and_root_cause_diagnostic.md`** | Đánh giá khoa học AI & Nguyên nhân gốc rễ | Phân tích định lượng chỉ số YOLO11m trên tập Test độc lập, chẩn đoán nguyên nhân trượt cây đổ / nứt đường / FPR ma trận nhầm lẫn và giải pháp tối ưu. |
 | **`ai_training/`** | Thư mục mã nguồn huấn luyện AI | Chứa `data.yaml`, script `train_yolo.py` và hướng dẫn chạy miễn phí trên Google Colab với GPU T4. |
 
 ---

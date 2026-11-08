@@ -38,6 +38,11 @@ roadvision:
     model-path: classpath:models/yolov8_multiclass_roadcare.onnx
     confidence-threshold: 0.20
     iou-threshold: 0.45
+    thresholds:
+      pothole: 0.42
+      crack: 0.22
+      flooding: 0.38
+      obstacle: 0.32
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: gemini-2.5-flash

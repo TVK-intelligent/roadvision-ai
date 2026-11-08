@@ -54,3 +54,8 @@ Thumbs.db
 *.tar
 *.gz
 *.7z
+
+# Scratch test files
+scratch/
+scratch_test_suite_results.json
+*.ps1

@@ -3,6 +3,7 @@ import { adminUserApi } from '../services/adminUserApi';
 import { incidentApi } from '../services/incidentApi';
 import { AdminUser, UserStats, Role, Team, AdminCreateUserData } from '../types';
 import { useToast } from '../components/Toast';
+import { Pagination } from '../components/Pagination';
 import {
   Users,
   Shield,
@@ -46,6 +47,10 @@ export const AdminUsersPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  // Pagination state
+  const [page, setPage] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // Modals state
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -124,6 +129,17 @@ export const AdminUsersPage: React.FC = () => {
       return true;
     });
   }, [users, roleFilter, statusFilter, searchQuery]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setPage(0);
+  }, [roleFilter, statusFilter, searchQuery]);
+
+  const totalPages = Math.ceil(filteredUsers.length / pageSize) || 1;
+  const paginatedUsers = useMemo(() => {
+    const start = page * pageSize;
+    return filteredUsers.slice(start, start + pageSize);
+  }, [filteredUsers, page, pageSize]);
 
   // Handle Role Change
   const handleOpenRoleModal = (u: AdminUser) => {
@@ -486,7 +502,8 @@ export const AdminUsersPage: React.FC = () => {
               <p className="text-xs text-slate-400 mt-1">Hãy thử thay đổi từ khóa hoặc bộ lọc vai trò / trạng thái</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -498,7 +515,7 @@ export const AdminUsersPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredUsers.map((u) => {
+                  {paginatedUsers.map((u) => {
                     const initials = u.fullName
                       ? u.fullName
                           .split(' ')
@@ -578,7 +595,7 @@ export const AdminUsersPage: React.FC = () => {
                           <div className="inline-flex flex-col items-center">
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs">
                               <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                              <span>{u.reputationScore ?? 50} / 100</span>
+                              <span>{u.reputationScore ?? 50} / 1.000</span>
                             </span>
                             {(u.spamStrikes ?? 0) > 0 && (
                               <span className="text-[10px] text-rose-600 font-semibold mt-0.5">
@@ -674,7 +691,23 @@ export const AdminUsersPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
-          )}
+
+            {/* Phân trang */}
+            <div className="p-4 border-t border-slate-100 bg-white">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalElements={filteredUsers.length}
+                pageSize={pageSize}
+                onPageChange={(newPage) => setPage(newPage)}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setPage(0);
+                }}
+              />
+            </div>
+          </>
+        )}
         </div>
       </div>
 
@@ -994,15 +1027,16 @@ export const AdminUsersPage: React.FC = () => {
             <div className="space-y-4 mb-6">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-700">Điểm uy tín (0 - 100):</span>
+                  <span className="text-xs font-semibold text-slate-700">Điểm uy tín tích lũy (0 - 1.000):</span>
                   <span className="text-sm font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                    {newReputation} / 100
+                    {newReputation} / 1.000
                   </span>
                 </div>
                 <input
                   type="range"
                   min="0"
-                  max="100"
+                  max="1000"
+                  step="10"
                   value={newReputation}
                   onChange={(e) => setNewReputation(Number(e.target.value))}
                   className="w-full accent-amber-600 cursor-pointer"
@@ -1012,14 +1046,14 @@ export const AdminUsersPage: React.FC = () => {
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1">
                 <p className="font-semibold text-slate-800 flex items-center gap-1">
                   <Info className="w-3.5 h-3.5 text-blue-500" />
-                  Ý nghĩa mức điểm uy tín trong RoadVision:
+                  Ý nghĩa thang điểm uy tín RoadVision (0 - 1.000):
                 </p>
                 <p className="text-[11px] leading-relaxed">
-                  • <strong>≥ 80 điểm</strong>: Báo cáo được AI ưu tiên duyệt thẳng vào hàng đợi điều phối khẩn cấp.
+                  • <strong>≥ 800 điểm</strong>: Hạng Vàng / Kim Cương — Ưu tiên gắn cờ TRUSTED_REPORT, Fast-Track.
                   <br />
-                  • <strong>50 - 79 điểm</strong>: Báo cáo trải qua kiểm duyệt đối chiếu không gian tiêu chuẩn.
+                  • <strong>400 - 799 điểm</strong>: Hạng Bạc / Đồng — Hoạt động tích cực, duyệt kiểm định tiêu chuẩn.
                   <br />
-                  • <strong>&lt; 30 điểm</strong>: Người dùng có nguy cơ bị hệ thống tự động gắn cờ cảnh báo spam.
+                  • <strong>&lt; 100 điểm</strong>: Cần lưu ý — Bị đưa vào diện kiểm duyệt thủ công nghiêm ngặt.
                 </p>
               </div>
 

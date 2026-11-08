@@ -11,6 +11,8 @@ import com.roadvision.exception.ResourceNotFoundException;
 import com.roadvision.repository.*;
 import com.roadvision.util.GeoUtil;
 import com.roadvision.util.ImageTensorUtil;
+import com.roadvision.enums.ReputationTransactionType;
+import com.roadvision.enums.ViolationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -45,6 +47,8 @@ public class IncidentService {
     private final FileStorageService fileStorageService;
     private final AiInferenceService aiInferenceService;
     private final NotificationService notificationService;
+    private final UserReputationTransactionRepository reputationTransactionRepository;
+    private final UserViolationRepository violationRepository;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     /**
@@ -191,6 +195,7 @@ public class IncidentService {
 
         if (isConfident) {
             incident.setStatus(IncidentStatus.AI_ANALYZED);
+            incident.setAiStatus("AI_ANALYZED");
             if (isUserMulti || isAiMulti) {
                 incident.setCategory(Category.COMPLEX_DAMAGE);
                 if (incident.getFlag() == null) incident.setFlag("MULTI_DEFECT");
@@ -203,6 +208,11 @@ public class IncidentService {
             }
         } else {
             incident.setStatus(IncidentStatus.SUBMITTED);
+            if (!detectionBoxes.isEmpty()) {
+                incident.setAiStatus("AI_LOW_CONFIDENCE");
+            } else {
+                incident.setAiStatus("MANUAL_FALLBACK");
+            }
             if (incident.getFlag() == null) incident.setFlag("NEEDS_MANUAL_REVIEW");
             if (isUserMulti) {
                 incident.setCategory(Category.COMPLEX_DAMAGE);
@@ -348,13 +358,28 @@ public class IncidentService {
         incident.setStatus(IncidentStatus.VERIFIED);
         incident.setFlag(null);
 
-        // Cộng điểm uy tín cho người dân (+5 điểm, tối đa 100)
+        // Cộng điểm uy tín cho người dân (+50 điểm, tối đa 1000) vào Sổ cái (Ledger)
         User citizen = incident.getCitizen();
         if (citizen != null) {
-            int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
-            citizen.setReputationScore(Math.min(100, currentScore + 5));
-            userRepository.save(citizen);
-            log.info("Cộng +5 điểm uy tín cho người dùng ID {}. Điểm mới: {}", citizen.getId(), citizen.getReputationScore());
+            boolean alreadyAwarded = reputationTransactionRepository.existsByUserIdAndIncidentIdAndTransactionType(
+                    citizen.getId(), incident.getId(), ReputationTransactionType.VERIFIED_BONUS);
+            if (!alreadyAwarded) {
+                int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
+                int newScore = Math.min(1000, currentScore + 50);
+                citizen.setReputationScore(newScore);
+                userRepository.save(citizen);
+
+                UserReputationTransaction tx = UserReputationTransaction.builder()
+                        .user(citizen)
+                        .incident(incident)
+                        .points(50)
+                        .balanceAfter(newScore)
+                        .transactionType(ReputationTransactionType.VERIFIED_BONUS)
+                        .reason("Thưởng thẩm định phản ánh hợp lệ #" + incident.getTicketCode())
+                        .build();
+                reputationTransactionRepository.save(tx);
+                log.info("Ghi nhận Sổ cái: +50 điểm VERIFIED_BONUS cho người dùng ID {}. Điểm mới: {}", citizen.getId(), newScore);
+            }
         }
 
         log.info("Quản trị viên ID {} đã thẩm định xác nhận sự cố #{}", adminId, incident.getTicketCode());
@@ -362,7 +387,7 @@ public class IncidentService {
             notificationService.notifyUser(
                 citizen.getId(),
                 "Phản ánh hợp lệ: " + incident.getTicketCode(),
-                "Phản ánh của bạn đã được Quản trị viên thẩm định hợp lệ và đưa vào kế hoạch bảo trì.",
+                "Phản ánh của bạn đã được Quản trị viên thẩm định hợp lệ và đưa vào kế hoạch bảo trì (+50 điểm uy tín).",
                 "SUCCESS",
                 incident
             );
@@ -385,35 +410,74 @@ public class IncidentService {
         incident.setStatus(IncidentStatus.REJECTED);
         incident.setRejectionReason(request.getRejectionReason());
 
-        // Xử lý trừ điểm uy tín & phạt vi phạm nếu bị từ chối do vi phạm rõ ràng
+        String rawReason = request.getRejectionReason() != null ? request.getRejectionReason().toLowerCase() : "";
+        boolean isDuplicate = rawReason.contains("trùng") || rawReason.contains("duplicate") || "DUPLICATE".equalsIgnoreCase(incident.getFlag());
+        boolean isInvalidLocation = rawReason.contains("vị trí") || rawReason.contains("tọa độ") || rawReason.contains("location") || "INVALID_LOCATION".equalsIgnoreCase(incident.getFlag());
+
+        if (isDuplicate) {
+            incident.setFlag("DUPLICATE");
+        } else if (isInvalidLocation) {
+            incident.setFlag("INVALID_LOCATION");
+        }
+
         User citizen = incident.getCitizen();
         if (citizen != null) {
-            int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
-            citizen.setReputationScore(Math.max(0, currentScore - 10));
+            if (isDuplicate || isInvalidLocation) {
+                log.info("Từ chối sự cố #{} do {} khách quan. Giữ nguyên điểm uy tín cho user ID {}",
+                        incident.getTicketCode(), isDuplicate ? "trùng lặp" : "vị trí không hợp lệ", citizen.getId());
+            } else {
+                // Vi phạm cố ý (tin giả, phá hoại, ảnh mạng, spam) -> Trừ 100 điểm uy tín & Ghi nhận vi phạm
+                int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
+                int newScore = Math.max(0, currentScore - 100);
+                citizen.setReputationScore(newScore);
 
-            // Chỉ tính strike nếu lý do vi phạm không phải do lỗi trùng lặp khách quan
-            String reason = request.getRejectionReason() != null ? request.getRejectionReason().toLowerCase() : "";
-            boolean isObjectiveDuplicate = reason.contains("trùng") || reason.contains("duplicate");
-            
-            if (!isObjectiveDuplicate) {
-                int strikes = (citizen.getSpamStrikes() != null ? citizen.getSpamStrikes() : 0) + 1;
-                citizen.setSpamStrikes(strikes);
+                long currentStrikes = violationRepository.countByUserIdAndIsRevokedFalse(citizen.getId()) + 1;
+                citizen.setSpamStrikes((int) currentStrikes);
 
-                // Khóa tài khoản tạm thời 7 ngày nếu tái phạm >= 5 lần
-                if (strikes >= 5) {
+                String actionTaken = "WARNING";
+                if (currentStrikes >= 5) {
+                    actionTaken = "SUSPENDED_7_DAYS";
                     citizen.setSuspendedUntil(LocalDateTime.now().plusDays(7));
-                    citizen.setSuspendReason("Tài khoản đã có từ 5 báo cáo bị từ chối do vi phạm quy định gửi tin.");
-                    log.warn("Tài khoản ID {} đã bị tạm khóa 7 ngày do đạt 5 vi phạm spam!", citizen.getId());
+                    citizen.setSuspendReason("Tài khoản đã có từ 5 vi phạm quy định gửi tin báo. Bị tạm khóa 7 ngày.");
+                    log.warn("Tài khoản ID {} đã bị tạm khóa 7 ngày do đạt 5 vi phạm spam/tin giả!", citizen.getId());
+                } else if (currentStrikes >= 3) {
+                    actionTaken = "RESTRICTED";
+                    log.warn("Tài khoản ID {} bị đưa vào diện hạn chế kiểm duyệt (strike {})", citizen.getId(), currentStrikes);
                 }
+
+                userRepository.save(citizen);
+
+                // Ghi nhận transaction PENALTY trong Ledger
+                UserReputationTransaction tx = UserReputationTransaction.builder()
+                        .user(citizen)
+                        .incident(incident)
+                        .points(-100)
+                        .balanceAfter(newScore)
+                        .transactionType(ReputationTransactionType.PENALTY)
+                        .reason("Phạt vi phạm gửi tin báo không hợp lệ: " + request.getRejectionReason())
+                        .build();
+                reputationTransactionRepository.save(tx);
+
+                // Ghi nhận UserViolation
+                UserViolation violation = UserViolation.builder()
+                        .user(citizen)
+                        .incident(incident)
+                        .violationType(ViolationType.FAKE_REPORT)
+                        .strikeCount((int) currentStrikes)
+                        .actionTaken(actionTaken)
+                        .description(request.getRejectionReason())
+                        .build();
+                violationRepository.save(violation);
+
+                log.info("Trừ -100 điểm uy tín cho người dùng ID {}. Điểm mới: {}, Cảnh cáo vi phạm lần: {}",
+                        citizen.getId(), newScore, currentStrikes);
             }
-            userRepository.save(citizen);
-            log.info("Trừ -10 điểm uy tín cho người dùng ID {}. Điểm mới: {}, Số strike vi phạm: {}", 
-                    citizen.getId(), citizen.getReputationScore(), citizen.getSpamStrikes());
+
             notificationService.notifyUser(
                 citizen.getId(),
                 "Phản ánh bị từ chối: " + incident.getTicketCode(),
                 "Phản ánh sự cố của bạn đã bị từ chối tiếp nhận. Lý do: " + request.getRejectionReason(),
-                "WARNING",
+                "ERROR",
                 incident
             );
         }
@@ -584,24 +648,46 @@ public class IncidentService {
             incident.setFeedback(feedback);
         }
 
-        // 🌟 Thưởng điểm uy tín (+10 điểm) cho người dân khi sự cố hoàn thành nghiệm thu đóng hồ sơ
-        if (citizen != null) {
-            int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
-            int newScore = Math.min(100, currentScore + 10);
-            citizen.setReputationScore(newScore);
-            userRepository.save(citizen);
-            log.info("Thưởng +10 điểm uy tín cho người dân ID {}. Điểm mới: {}", citizen.getId(), newScore);
-            notificationService.notifyUser(
-                citizen.getId(),
-                "Thưởng điểm uy tín: +10 điểm ⭐",
-                "Phản ánh " + incident.getTicketCode() + " đã hoàn thành nghiệm thu đóng hồ sơ! Bạn được cộng +10 điểm uy tín (Tổng điểm: " + newScore + ").",
-                "SUCCESS",
-                incident
-            );
-        }
+        // 🌟 Thưởng điểm uy tín (+100 điểm, tối đa 1000) vào Sổ cái (Ledger) khi đóng hồ sơ
+        awardClosedReputationBonus(incident);
 
         log.info("Sự cố #{} đã được đóng hồ sơ (CLOSED) thành công bởi user ID {}", incident.getTicketCode(), userId);
         return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * Thưởng +100 điểm uy tín vào Sổ cái khi nghiệm thu & đóng hồ sơ thành công (Idempotent)
+     */
+    private void awardClosedReputationBonus(Incident incident) {
+        User citizen = incident.getCitizen();
+        if (citizen != null) {
+            boolean alreadyAwarded = reputationTransactionRepository.existsByUserIdAndIncidentIdAndTransactionType(
+                    citizen.getId(), incident.getId(), ReputationTransactionType.CLOSED_BONUS);
+            if (!alreadyAwarded) {
+                int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
+                int newScore = Math.min(1000, currentScore + 100);
+                citizen.setReputationScore(newScore);
+                userRepository.save(citizen);
+
+                UserReputationTransaction tx = UserReputationTransaction.builder()
+                        .user(citizen)
+                        .incident(incident)
+                        .points(100)
+                        .balanceAfter(newScore)
+                        .transactionType(ReputationTransactionType.CLOSED_BONUS)
+                        .reason("Thưởng nghiệm thu & đóng hồ sơ thành công sự cố #" + incident.getTicketCode())
+                        .build();
+                reputationTransactionRepository.save(tx);
+                log.info("Ghi nhận Sổ cái: +100 điểm CLOSED_BONUS cho người dân ID {}. Điểm mới: {}", citizen.getId(), newScore);
+                notificationService.notifyUser(
+                    citizen.getId(),
+                    "Thưởng điểm uy tín: +100 điểm ⭐",
+                    "Phản ánh " + incident.getTicketCode() + " đã hoàn thành nghiệm thu đóng hồ sơ! Bạn được cộng +100 điểm uy tín (Tổng điểm: " + newScore + ").",
+                    "SUCCESS",
+                    incident
+                );
+            }
+        }
     }
 
     /**
@@ -813,6 +899,10 @@ public class IncidentService {
                 .status(i.getStatus())
                 .severity(i.getSeverity())
                 .flag(i.getFlag())
+                .aiStatus(i.getAiStatus())
+                .fastTrackReason(i.getFastTrackReason())
+                .fastTrackApprovedById(i.getFastTrackApprovedBy() != null ? i.getFastTrackApprovedBy().getId() : null)
+                .fastTrackApprovedByName(i.getFastTrackApprovedBy() != null ? i.getFastTrackApprovedBy().getFullName() : null)
                 .rejectionReason(i.getRejectionReason())
                 .reworkReason(i.getReworkReason())
                 .reworkCount(i.getReworkCount())
@@ -1254,6 +1344,17 @@ public class IncidentService {
         incident.setSafetyNotes(req.getSafetyNotes());
         incident.setStatus(IncidentStatus.ASSIGNED);
 
+        // Xử lý nhánh Fast-Track bỏ qua khảo sát đối với sự cố khẩn cấp
+        if (Boolean.TRUE.equals(req.getIsFastTrack()) || incident.getInspection() == null) {
+            if (req.getFastTrackReason() == null || req.getFastTrackReason().trim().length() < 10) {
+                throw new BadRequestException("Bỏ qua khảo sát hiện trường (Fast-Track) bắt buộc phải có giải trình lý do khẩn cấp tối thiểu 10 ký tự");
+            }
+            incident.setFlag("FAST_TRACK");
+            incident.setFastTrackReason(req.getFastTrackReason().trim());
+            incident.setFastTrackApprovedBy(admin);
+            log.info("Phê duyệt Fast-Track sự cố #{}: {}", incident.getTicketCode(), req.getFastTrackReason());
+        }
+
         // Đánh dấu biên bản khảo sát đã được Admin phê duyệt phương án thi công
         if (incident.getInspection() != null) {
             IncidentInspection insp = incident.getInspection();
@@ -1602,6 +1703,7 @@ public class IncidentService {
 
         Incident savedIncident = incidentRepository.save(incident);
         if (req.getApproved() != null && req.getApproved()) {
+            awardClosedReputationBonus(savedIncident);
             if (savedIncident.getCitizen() != null) {
                 notificationService.notifyUser(
                     savedIncident.getCitizen().getId(),
@@ -2005,5 +2107,181 @@ public class IncidentService {
         stats.put("aiConfidenceMedian", aiConfStr);
         stats.put("activeVisionModel", aiInferenceService.isModelLoaded() ? "YOLOv8-RoadCare v2.4 Active" : "YOLOv8-RoadCare Standby");
         return stats;
+    }
+
+    /**
+     * THU HỒI ĐIỂM THƯỞNG VÀ XỬ PHẠT GIAN LẬN SAU KHI ĐÃ DUYỆT HOẶC ĐÓNG HỒ SƠ (ADMIN)
+     */
+    @Transactional
+    public IncidentResponse reverseFraudIncident(Long incidentId, FraudReversalRequest req, Long adminId) {
+        Incident incident = getIncidentEntity(incidentId);
+        User citizen = incident.getCitizen();
+        if (citizen == null) {
+            throw new BadRequestException("Sự cố này không có thông tin người dân nộp báo cáo");
+        }
+
+        // 1. Kiểm tra các khoản điểm thưởng đã cấp
+        boolean hadVerifiedBonus = reputationTransactionRepository.existsByUserIdAndIncidentIdAndTransactionType(
+                citizen.getId(), incident.getId(), ReputationTransactionType.VERIFIED_BONUS);
+        boolean hadClosedBonus = reputationTransactionRepository.existsByUserIdAndIncidentIdAndTransactionType(
+                citizen.getId(), incident.getId(), ReputationTransactionType.CLOSED_BONUS);
+
+        int bonusToReverse = 0;
+        if (hadVerifiedBonus) bonusToReverse += 50;
+        if (hadClosedBonus) bonusToReverse += 100;
+
+        int currentScore = citizen.getReputationScore() != null ? citizen.getReputationScore() : 50;
+
+        // 2. Thu hồi điểm thưởng đã cấp (REVERSAL)
+        if (bonusToReverse > 0) {
+            int scoreAfterReversal = Math.max(0, currentScore - bonusToReverse);
+            citizen.setReputationScore(scoreAfterReversal);
+            currentScore = scoreAfterReversal;
+
+            UserReputationTransaction revTx = UserReputationTransaction.builder()
+                    .user(citizen)
+                    .incident(incident)
+                    .points(-bonusToReverse)
+                    .balanceAfter(scoreAfterReversal)
+                    .transactionType(ReputationTransactionType.REVERSAL)
+                    .reason("Thu hồi " + bonusToReverse + " điểm thưởng do phát hiện gian lận sau khi duyệt: " + req.getReason())
+                    .build();
+            reputationTransactionRepository.save(revTx);
+            log.info("Thu hồi {} điểm thưởng của user ID {}", bonusToReverse, citizen.getId());
+        }
+
+        // 3. Phạt hành vi gian lận cố ý (PENALTY -100 điểm)
+        int finalScore = Math.max(0, currentScore - 100);
+        citizen.setReputationScore(finalScore);
+
+        long currentStrikes = violationRepository.countByUserIdAndIsRevokedFalse(citizen.getId()) + 1;
+        citizen.setSpamStrikes((int) currentStrikes);
+
+        String actionTaken = "WARNING";
+        if (currentStrikes >= 5) {
+            actionTaken = "SUSPENDED_7_DAYS";
+            citizen.setSuspendedUntil(LocalDateTime.now().plusDays(7));
+            citizen.setSuspendReason("Tài khoản đạt 5 vi phạm. Phát hiện gian lận nghiêm trọng: " + req.getReason());
+        } else if (currentStrikes >= 3) {
+            actionTaken = "RESTRICTED";
+        }
+        userRepository.save(citizen);
+
+        UserReputationTransaction penTx = UserReputationTransaction.builder()
+                .user(citizen)
+                .incident(incident)
+                .points(-100)
+                .balanceAfter(finalScore)
+                .transactionType(ReputationTransactionType.PENALTY)
+                .reason("Phạt vi phạm cố tình gian lận phản ánh sự cố: " + req.getReason())
+                .build();
+        reputationTransactionRepository.save(penTx);
+
+        UserViolation violation = UserViolation.builder()
+                .user(citizen)
+                .incident(incident)
+                .violationType(ViolationType.FAKE_REPORT)
+                .strikeCount((int) currentStrikes)
+                .actionTaken(actionTaken)
+                .description(req.getReason())
+                .build();
+        violationRepository.save(violation);
+
+        // 4. Cập nhật hồ sơ sự cố
+        incident.setStatus(IncidentStatus.REJECTED);
+        incident.setFlag("FRAUD_REVOKED");
+        incident.setRejectionReason("Phát hiện gian lận: " + req.getReason());
+
+        log.warn("Admin ID {} đã thu hồi toàn bộ điểm và phạt -100đ đối với user ID {} qua sự cố #{}",
+                adminId, citizen.getId(), incident.getTicketCode());
+
+        notificationService.notifyUser(
+            citizen.getId(),
+            "Thu hồi điểm & Phạt vi phạm: " + incident.getTicketCode(),
+            "Hồ sơ " + incident.getTicketCode() + " đã bị hủy do phát hiện gian lận. Hệ thống đã thu hồi điểm thưởng và áp dụng chế tài vi phạm.",
+            "ERROR",
+            incident
+        );
+
+        return mapToResponse(incidentRepository.save(incident));
+    }
+
+    /**
+     * BẢNG XẾP HẠNG THI ĐUA CÔNG DÂN THEO THÁNG & ĐIỂM UY TÍN TÍCH LŨY DÀI HẠN
+     */
+    @Transactional(readOnly = true)
+    public List<CitizenLeaderboardResponse> getCitizenLeaderboard(String period) {
+        LocalDateTime startOfMonth = java.time.LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        List<User> citizens = userRepository.findAll().stream()
+                .filter(u -> u.getRole() == Role.ROLE_CITIZEN)
+                .collect(java.util.stream.Collectors.toList());
+
+        List<CitizenLeaderboardResponse> list = new java.util.ArrayList<>();
+        for (User u : citizens) {
+            int monthlyPts = reputationTransactionRepository.calculateMonthlyPoints(u.getId(), startOfMonth);
+            int lifetimeReputation = u.getReputationScore() != null ? u.getReputationScore() : 50;
+            long reportsSent = incidentRepository.countReportsByCitizen(u.getId());
+            long resolvedReports = incidentRepository.countResolvedReportsByCitizen(u.getId());
+
+            String tier = "TIÊU CHUẨN";
+            String badgeTitle = "Công Dân Gương Mẫu";
+            if (lifetimeReputation >= 800) {
+                tier = "HẠNG VÀNG";
+                badgeTitle = "Hiệp Sĩ Giao Thông";
+            } else if (lifetimeReputation >= 600) {
+                tier = "HẠNG BẠC";
+                badgeTitle = "Đôi Mắt Đô Thị";
+            } else if (lifetimeReputation >= 400) {
+                tier = "HẠNG ĐỒNG";
+                badgeTitle = "Công Dân Tích Cực";
+            } else if (lifetimeReputation < 100) {
+                tier = "CẦN LƯU Ý";
+                badgeTitle = "Điểm Uy Tín Hạn Chế";
+            }
+
+            list.add(CitizenLeaderboardResponse.builder()
+                    .userId(u.getId())
+                    .fullName(u.getFullName())
+                    .avatarUrl(u.getAvatarUrl())
+                    .monthlyPoints(monthlyPts)
+                    .reputationScore(lifetimeReputation)
+                    .reportsSent(reportsSent)
+                    .resolvedReports(resolvedReports)
+                    .tier(tier)
+                    .badgeTitle(badgeTitle)
+                    .lastEarnedAt(u.getUpdatedAt() != null ? u.getUpdatedAt() : u.getCreatedAt())
+                    .build());
+        }
+
+        // Sắp xếp: Nếu 'month' -> ưu tiên monthlyPoints DESC, sau đó reputationScore DESC, updatedAt ASC
+        if ("all".equalsIgnoreCase(period)) {
+            list.sort((a, b) -> {
+                int cmp = Integer.compare(b.getReputationScore(), a.getReputationScore());
+                if (cmp != 0) return cmp;
+                return a.getLastEarnedAt().compareTo(b.getLastEarnedAt());
+            });
+        } else {
+            list.sort((a, b) -> {
+                int cmp = Integer.compare(b.getMonthlyPoints(), a.getMonthlyPoints());
+                if (cmp != 0) return cmp;
+                int cmpRep = Integer.compare(b.getReputationScore(), a.getReputationScore());
+                if (cmpRep != 0) return cmpRep;
+                return a.getLastEarnedAt().compareTo(b.getLastEarnedAt());
+            });
+        }
+
+        for (int i = 0; i < list.size(); i++) {
+            list.get(i).setRank(i + 1);
+        }
+
+        return list;
+    }
+
+    /**
+     * LẤY LỊCH SỬ BIẾN ĐỘNG ĐIỂM UY TÍN (LEDGER) CỦA MỘT USER
+     */
+    @Transactional(readOnly = true)
+    public List<UserReputationTransaction> getUserReputationTransactions(Long userId) {
+        return reputationTransactionRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 }

@@ -63,6 +63,24 @@ public class AdminTeamController {
         return ResponseEntity.ok(Map.of("message", "Đã xóa hoặc giải thể tổ đội thành công"));
     }
 
+    @PostMapping("/teams/{teamId}/members/{staffId}")
+    @Operation(summary = "Thêm một nhân viên vào tổ đội")
+    public ResponseEntity<TeamResponse> addMemberToTeam(@PathVariable Long teamId, @PathVariable Long staffId) {
+        return ResponseEntity.ok(teamService.addMemberToTeam(teamId, staffId));
+    }
+
+    @DeleteMapping("/teams/{teamId}/members/{staffId}")
+    @Operation(summary = "Đưa một nhân viên ra khỏi tổ đội (trở về nhân viên tự do)")
+    public ResponseEntity<TeamResponse> removeMemberFromTeam(@PathVariable Long teamId, @PathVariable Long staffId) {
+        return ResponseEntity.ok(teamService.removeMemberFromTeam(teamId, staffId));
+    }
+
+    @PutMapping("/teams/{teamId}/leader/{staffId}")
+    @Operation(summary = "Chỉ định một nhân viên làm tổ trưởng")
+    public ResponseEntity<TeamResponse> setTeamLeader(@PathVariable Long teamId, @PathVariable Long staffId) {
+        return ResponseEntity.ok(teamService.setTeamLeader(teamId, staffId));
+    }
+
     // ==========================================
     // QUẢN LÝ NHÂN VIÊN & PHÂN CÔNG (STAFF)
     // ==========================================

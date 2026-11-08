@@ -12,6 +12,9 @@ import com.roadvision.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import com.roadvision.entity.UserReputationTransaction;
+import com.roadvision.enums.ReputationTransactionType;
+import com.roadvision.repository.UserReputationTransactionRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +30,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
+    private final UserReputationTransactionRepository reputationTransactionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
@@ -185,11 +189,27 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
 
+        int oldScore = user.getReputationScore() != null ? user.getReputationScore() : 50;
         if (request.getReputationScore() != null) {
-            user.setReputationScore(Math.max(0, Math.min(100, request.getReputationScore())));
+            int newScore = Math.max(0, Math.min(1000, request.getReputationScore()));
+            user.setReputationScore(newScore);
+
+            int diff = newScore - oldScore;
+            if (diff != 0) {
+                UserReputationTransaction tx = UserReputationTransaction.builder()
+                        .user(user)
+                        .points(diff)
+                        .balanceAfter(newScore)
+                        .transactionType(ReputationTransactionType.ADMIN_ADJUST)
+                        .reason("Quản trị viên điều chỉnh điểm uy tín trực tiếp")
+                        .build();
+                reputationTransactionRepository.save(tx);
+            }
         }
         if (Boolean.TRUE.equals(request.getResetStrikes())) {
             user.setSpamStrikes(0);
+            user.setSuspendedUntil(null);
+            user.setSuspendReason(null);
         }
         User updated = userRepository.save(user);
         return AdminUserResponse.fromEntity(updated);

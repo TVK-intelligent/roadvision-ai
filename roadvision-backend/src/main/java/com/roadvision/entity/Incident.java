@@ -110,6 +110,17 @@ public class Incident {
     @Column(length = 50)
     private String flag;
 
+    @Column(name = "ai_status", length = 50)
+    @Builder.Default
+    private String aiStatus = "AI_ANALYZED";
+
+    @Column(name = "fast_track_reason", length = 500)
+    private String fastTrackReason;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fast_track_approved_by")
+    private User fastTrackApprovedBy;
+
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
 

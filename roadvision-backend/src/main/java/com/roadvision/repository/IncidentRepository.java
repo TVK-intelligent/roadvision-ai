@@ -36,6 +36,12 @@ public interface IncidentRepository extends JpaRepository<Incident, Long> {
     @Query("SELECT COUNT(i) FROM Incident i WHERE i.citizen.id = :citizenId AND i.status IN ('VERIFIED', 'RESOLVED', 'CLOSED')")
     long countVerifiedReportsByCitizen(@Param("citizenId") Long citizenId);
 
+    @Query("SELECT COUNT(i) FROM Incident i WHERE i.citizen.id = :citizenId")
+    long countReportsByCitizen(@Param("citizenId") Long citizenId);
+
+    @Query("SELECT COUNT(i) FROM Incident i WHERE i.citizen.id = :citizenId AND i.status IN ('RESOLVED', 'CLOSED')")
+    long countResolvedReportsByCitizen(@Param("citizenId") Long citizenId);
+
     Page<Incident> findByCitizenId(Long citizenId, Pageable pageable);
 
     @Query("SELECT DISTINCT i FROM Incident i " +

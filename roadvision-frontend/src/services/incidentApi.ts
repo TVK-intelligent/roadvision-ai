@@ -321,6 +321,21 @@ export const incidentApi = {
     return axiosClient.delete<{ message: string }>(`/admin/teams/${id}`);
   },
 
+  // Thêm nhân viên vào tổ đội
+  addMemberToTeam: (teamId: number | string, staffId: number | string) => {
+    return axiosClient.post<import('../types').Team>(`/admin/teams/${teamId}/members/${staffId}`);
+  },
+
+  // Đưa nhân viên ra khỏi tổ đội (trở về nhân viên tự do)
+  removeMemberFromTeam: (teamId: number | string, staffId: number | string) => {
+    return axiosClient.delete<import('../types').Team>(`/admin/teams/${teamId}/members/${staffId}`);
+  },
+
+  // Chỉ định một nhân viên làm tổ trưởng
+  setTeamLeader: (teamId: number | string, staffId: number | string) => {
+    return axiosClient.put<import('../types').Team>(`/admin/teams/${teamId}/leader/${staffId}`);
+  },
+
   // Lấy danh sách nhân viên chi tiết (hỗ trợ lọc theo tổ đội, loại đội, trạng thái)
   getStaffDetailedList: (params?: { teamId?: number; teamType?: string; isActive?: boolean }) => {
     return axiosClient.get<import('../types').Staff[]>('/admin/staff', { params });
@@ -366,6 +381,19 @@ export const incidentApi = {
 
   getEmergencyStatus: () => {
     return axiosClient.get<{ active: boolean; title?: string; message?: string; timestamp?: string }>('/notifications/emergency-status');
+  },
+
+  // Bảng xếp hạng công dân & Sổ cái uy tín
+  getCitizenLeaderboard: (period: string = 'month') => {
+    return axiosClient.get<any[]>(`/incidents/leaderboard/citizens?period=${period}`);
+  },
+
+  getMyReputationTransactions: () => {
+    return axiosClient.get<any[]>('/incidents/reputation/transactions');
+  },
+
+  reverseFraudIncident: (id: number, reason: string) => {
+    return axiosClient.post<Incident>(`/incidents/${id}/reverse-fraud`, { reason });
   },
 };
 

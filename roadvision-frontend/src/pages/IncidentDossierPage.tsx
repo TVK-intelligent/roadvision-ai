@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { incidentApi } from '../services/incidentApi';
 import { routingService, RouteResult } from '../services/routingService';
@@ -11,15 +11,21 @@ import { ImageCanvasWithBBox } from '../components/ImageCanvasWithBBox';
 import { LeafletMap } from '../components/LeafletMap';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, CheckCircle2, Star, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock, Compass, HardHat, Camera, FileCheck, X, Send, Ruler, Calendar, MapPin, Calculator, Globe, Navigation, Car, ChevronDown } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Star, Hammer, ThumbsUp, AlertCircle, ShieldCheck, Eye, EyeOff, RotateCcw, AlertTriangle, ShieldAlert, Info, Clock, Compass, HardHat, Camera, FileCheck, X, Send, Ruler, Calendar, MapPin, Calculator, Globe, Navigation, Car, ChevronDown, Zap } from 'lucide-react';
 
 const parseBoQFromEstimatedSize = (sizeStr?: string) => {
   if (!sizeStr) return null;
-  const match = sizeStr.match(/([\d.]+)\s*m\s*[xX*]\s*([\d.]+)\s*m\s*[xX*]\s*([\d.]+)\s*cm/);
+  const normalized = sizeStr.replace(/,/g, '.');
+  const match = normalized.match(/([\d.]+)\s*m?\s*[xX*×]\s*([\d.]+)\s*m?\s*[xX*×]\s*([\d.]+)\s*(cm|m)?/i);
   if (match) {
     const l = parseFloat(match[1]);
     const w = parseFloat(match[2]);
-    const d = parseFloat(match[3]);
+    let d = parseFloat(match[3]);
+    const unit = (match[4] || 'cm').toLowerCase();
+    if (unit === 'm' && d < 2) {
+      d = d * 100;
+    }
+    if (isNaN(l) || isNaN(w) || isNaN(d) || l <= 0 || w <= 0) return null;
     const area = l * w;
     const volume = area * (d / 100);
     const asphalt = volume * 2.4;
@@ -107,6 +113,15 @@ export const IncidentDossierPage: React.FC = () => {
   useEffect(() => {
     fetchDossier();
   }, [id]);
+
+  // Xác định xem quy trình có bỏ qua bước khảo sát thực địa hay không (Fast-Track)
+  const isInspectionSkipped = useMemo(() => {
+    if (!incident) return false;
+    const hasCompletedInspection = Boolean(incident.inspection && incident.inspection.confirmedCategory);
+    const isInInspectionPhase = ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(incident.status);
+    const hasMovedToConstruction = Boolean(incident.assignedTeamName) || ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'RESOLVED', 'CLOSED'].includes(incident.status);
+    return !hasCompletedInspection && !isInInspectionPhase && hasMovedToConstruction;
+  }, [incident]);
 
   const handleUpvote = async () => {
     if (!incident) return;
@@ -784,12 +799,13 @@ export const IncidentDossierPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stepper Tiến Độ 5 Pha Chuẩn */}
+      {/* Stepper Tiến Độ 7 Pha Chuẩn */}
       <Timeline
         status={incident.status}
         isRework={Boolean(incident.reworkReason || (incident.reworkCount && incident.reworkCount > 0))}
         reworkCount={incident.reworkCount}
         isDisputed={incident.flag === 'DISPUTED'}
+        isInspectionSkipped={isInspectionSkipped}
       />
 
       {/* Bố cục 2 Cột Đối Chiếu */}
@@ -870,8 +886,31 @@ export const IncidentDossierPage: React.FC = () => {
         </div>
       </div>
 
-      {/* GIAI ĐOẠN 4: BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG & ĐO ĐẠC THỰC ĐỊA */}
-      {(incident.inspection || ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'RESOLVED', 'CLOSED'].includes(incident.status)) && (
+      {/* BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG HOẶC BANNER BỎ QUA KHẢO SÁT (FAST-TRACK) */}
+      {isInspectionSkipped ? (
+        <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/40 to-white p-4.5 rounded-xl border border-amber-200 shadow-2xs flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Zap className="w-5 h-5 fill-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-sm text-amber-950">Quy trình Điều phối Nhanh (Fast-Track)</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                  Bỏ qua bước khảo sát thực địa
+                </span>
+              </div>
+              <p className="text-xs text-amber-800/90 mt-0.5">
+                Sự cố được Ban Điều phối phê duyệt thi công trực tiếp theo cơ chế phản ứng nhanh, bỏ qua công đoạn khảo sát đo đạc hiện trường để khẩn trương giải tỏa giao thông.
+              </p>
+            </div>
+          </div>
+          <div className="text-xs text-amber-900 font-semibold px-3 py-1.5 bg-white rounded-lg border border-amber-200 shrink-0 shadow-2xs flex items-center gap-1.5">
+            <HardHat className="w-4 h-4 text-emerald-600" />
+            <span>Chuyển thẳng sang Tổ thi công</span>
+          </div>
+        </div>
+      ) : (incident.inspection || ['INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED'].includes(incident.status)) ? (
         <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2.5">
@@ -881,7 +920,7 @@ export const IncidentDossierPage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm font-semibold text-slate-900">
-                    Giai đoạn 4: Biên bản Khảo sát hiện trường & Đo đạc thực tế
+                    Biên bản Khảo sát hiện trường & Đo đạc kỹ thuật
                   </h3>
                   {incident.inspection?.version && (
                     <span className="px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
@@ -1255,9 +1294,9 @@ export const IncidentDossierPage: React.FC = () => {
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
-      {/* GIAI ĐOẠN 5 & 6: KẾ HOẠCH & BIỆN PHÁP THI CÔNG SỬA CHỮA */}
+      {/* KẾ HOẠCH & BIỆN PHÁP THI CÔNG SỬA CHỮA */}
       {(incident.assignedTeamName || incident.workPlan || ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION', 'RESOLVED', 'CLOSED'].includes(incident.status)) && (
         <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
@@ -1267,7 +1306,7 @@ export const IncidentDossierPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <span>Giai đoạn 5: Kế hoạch & Biện pháp thi công sửa chữa</span>
+                  <span>Kế hoạch & Biện pháp thi công sửa chữa</span>
                   <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Đã duyệt phương án
                   </span>

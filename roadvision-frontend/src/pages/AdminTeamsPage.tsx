@@ -38,7 +38,20 @@ import {
   UserPlus,
   Eye,
   Clock,
+  LogOut,
 } from 'lucide-react';
+
+// Helper tách tên thực và tên đơn vị phụ trong ngoặc đơn
+export const parseStaffName = (rawName?: string) => {
+  if (!rawName) return { name: 'Chưa đặt tên', affiliation: null };
+  const match = rawName.match(/^([^(]+)(?:\((.*)\))?$/);
+  if (match) {
+    const name = match[1].trim();
+    const affiliation = match[2] ? match[2].trim() : null;
+    return { name, affiliation };
+  }
+  return { name: rawName.trim(), affiliation: null };
+};
 
 export const AdminTeamsPage: React.FC = () => {
   const toast = useToast();
@@ -69,7 +82,43 @@ export const AdminTeamsPage: React.FC = () => {
     zoneName: '',
     description: '',
     leaderId: undefined,
+    memberIds: [],
   });
+
+  // Quản lý thành viên tổ đội Modal
+  const [managingMembersTeam, setManagingMembersTeam] = useState<Team | null>(null);
+  const [selectedStaffToAdd, setSelectedStaffToAdd] = useState<string>('');
+  const [allowTransferFromOtherTeams, setAllowTransferFromOtherTeams] = useState<boolean>(false);
+  const [staffToAddInTeamForm, setStaffToAddInTeamForm] = useState<string>('');
+
+  // Danh sách nhân sự kỹ thuật tự do (chưa gán vào tổ đội nào)
+  const unassignedStaff = useMemo(() => {
+    return staffList.filter((s) => !s.teamId);
+  }, [staffList]);
+
+  // Danh sách nhân sự đủ điều kiện làm Tổ trưởng (Chỉ gồm thành viên của tổ đội này + nhân sự tự do, KHÔNG kéo nhân sự tổ khác)
+  const eligibleLeaders = useMemo(() => {
+    if (editingTeam) {
+      // 1. Các thành viên hiện tại của tổ đội
+      const currentTeamMembers = (editingTeam.members || []).map((m) => {
+        const parsed = parseStaffName(m.fullName);
+        return { id: m.id, name: parsed.name, email: m.email, isCurrentMember: true };
+      });
+      // 2. Các nhân sự tự do (chưa có tổ đội)
+      const freeStaff = unassignedStaff
+        .filter((s) => !currentTeamMembers.some((m) => m.id === s.id))
+        .map((s) => {
+          const parsed = parseStaffName(s.fullName);
+          return { id: s.id, name: '[Nhân sự tự do] ' + parsed.name, email: s.email, isCurrentMember: false };
+        });
+      return [...currentTeamMembers, ...freeStaff];
+    }
+    // Khi tạo mới tổ đội: Chỉ nhân sự tự do mới được chỉ định làm tổ trưởng
+    return unassignedStaff.map((s) => {
+      const parsed = parseStaffName(s.fullName);
+      return { id: s.id, name: parsed.name, email: s.email, isCurrentMember: false };
+    });
+  }, [editingTeam, unassignedStaff]);
 
   const [isStaffModalOpen, setIsStaffModalOpen] = useState<boolean>(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -170,6 +219,7 @@ export const AdminTeamsPage: React.FC = () => {
     const totalStaff = staffList.length;
     const activeStaff = staffList.filter((s) => s.isActive).length;
     const assignedStaff = staffList.filter((s) => s.teamId).length;
+    const unassignedCount = staffList.filter((s) => !s.teamId).length;
 
     // Năng lực & Trạng thái thời gian thực
     const readyTeams = teams.filter((t) => t.isActive && (!t.activeTaskCount || t.activeTaskCount === 0)).length;
@@ -186,6 +236,7 @@ export const AdminTeamsPage: React.FC = () => {
       totalStaff,
       activeStaff,
       assignedStaff,
+      unassignedCount,
       readyTeams,
       busyTeams,
       overloadedTeams,
@@ -237,6 +288,7 @@ export const AdminTeamsPage: React.FC = () => {
       zoneName: '',
       description: '',
       leaderId: undefined,
+      memberIds: [],
     });
     setIsTeamModalOpen(true);
   };
@@ -251,8 +303,100 @@ export const AdminTeamsPage: React.FC = () => {
       zoneName: team.zoneName || '',
       description: team.description || '',
       leaderId: team.leaderId,
+      memberIds: (team.members || []).map((m) => m.id),
     });
     setIsTeamModalOpen(true);
+  };
+
+  // Open Member Management Modal
+  const handleOpenManageMembers = (team: Team) => {
+    const currentTeam = teams.find((t) => t.id === team.id) || team;
+    setManagingMembersTeam(currentTeam);
+    setSelectedStaffToAdd('');
+    setAllowTransferFromOtherTeams(false);
+  };
+
+  // Thêm nhân viên vào tổ đội
+  const handleAddMemberToTeam = async (staffIdParam?: number) => {
+    if (!managingMembersTeam) return;
+    const targetStaffId = staffIdParam || (selectedStaffToAdd ? Number(selectedStaffToAdd) : undefined);
+    if (!targetStaffId) {
+      toast.warning('Vui lòng chọn nhân sự kỹ thuật cần thêm');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await incidentApi.addMemberToTeam(managingMembersTeam.id, targetStaffId);
+      const updated = res.data;
+      setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setManagingMembersTeam(updated);
+      setSelectedStaffToAdd('');
+      toast.success(`Đã bổ sung nhân sự vào tổ đội ${updated.name}`);
+      const staffRes = await incidentApi.getStaffDetailedList();
+      setStaffList(staffRes.data || []);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Không thể thêm nhân viên vào tổ đội');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Gỡ nhân viên ra khỏi tổ đội (trở thành nhân sự tự do)
+  const handleRemoveMemberFromTeam = async (staffId: number, staffName: string) => {
+    if (!managingMembersTeam) return;
+    if (
+      !window.confirm(
+        `Bạn có chắc chắn muốn đưa nhân viên "${staffName}" ra khỏi tổ đội "${managingMembersTeam.name}"?\nNhân viên sẽ chuyển về trạng thái Tự do (chưa phân đội) và sẵn sàng gán vào tổ khác.`
+      )
+    ) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await incidentApi.removeMemberFromTeam(managingMembersTeam.id, staffId);
+      const updated = res.data;
+      setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setManagingMembersTeam(updated);
+      toast.success(`Đã đưa "${staffName}" ra khỏi tổ đội`);
+      const staffRes = await incidentApi.getStaffDetailedList();
+      setStaffList(staffRes.data || []);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Không thể gỡ nhân viên khỏi tổ đội');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Chỉ định một thành viên làm Tổ trưởng
+  const handleSetTeamLeader = async (staffId: number, staffName: string) => {
+    if (!managingMembersTeam) return;
+    if (
+      !window.confirm(
+        `Xác nhận chỉ định nhân sự "${staffName}" làm Tổ trưởng của tổ đội "${managingMembersTeam.name}"?`
+      )
+    ) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await incidentApi.setTeamLeader(managingMembersTeam.id, staffId);
+      const updated = res.data;
+      setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setManagingMembersTeam(updated);
+      toast.success(`Đã chỉ định "${staffName}" làm Tổ trưởng`);
+      const staffRes = await incidentApi.getStaffDetailedList();
+      setStaffList(staffRes.data || []);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Không thể chỉ định tổ trưởng');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Submit Team Form
@@ -446,8 +590,13 @@ export const AdminTeamsPage: React.FC = () => {
           <div>
             <div className="text-[11px] font-medium text-slate-500">Tổng số tổ đội</div>
             <div className="text-xl font-bold text-slate-900 mt-0.5">{kpiStats.totalTeams} đội</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">
-              {kpiStats.assignedStaff}/{kpiStats.totalStaff} nhân sự đã vào đội
+            <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span>{kpiStats.assignedStaff}/{kpiStats.totalStaff} đã vào đội</span>
+              {kpiStats.unassignedCount > 0 && (
+                <span className="font-semibold text-amber-700 bg-amber-50 px-1 rounded border border-amber-200">
+                  {kpiStats.unassignedCount} tự do
+                </span>
+              )}
             </div>
           </div>
           <div className="w-9 h-9 rounded-md bg-slate-50 text-slate-600 border border-slate-200 flex items-center justify-center">
@@ -672,6 +821,24 @@ export const AdminTeamsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Dải mảnh thông báo nhân sự tự do */}
+          {unassignedStaff.length > 0 && (
+            <div className="py-2 px-3.5 bg-white border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                <span className="font-semibold text-slate-800 shrink-0">
+                  {unassignedStaff.length} nhân sự tự do:
+                </span>
+                <span className="text-slate-600 truncate">
+                  {unassignedStaff.map((s) => parseStaffName(s.fullName).name).join(', ')}
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-400 shrink-0 hidden sm:inline ml-3">
+                Bấm "Thành viên" trong thẻ để gán vào tổ
+              </span>
+            </div>
+          )}
+
           {/* Danh Sách Tổ Đội Gom Theo Mục Đích Chuyên Trách */}
           {filteredTeams.length === 0 ? (
             <div className="bg-white rounded-lg border border-slate-200 p-12 text-center shadow-xs">
@@ -748,35 +915,26 @@ export const AdminTeamsPage: React.FC = () => {
 
                   return (
                     <div key={cat.key} className="flex flex-col gap-3">
-                      {/* Tiêu đề nhóm mục đích chuyên trách */}
-                      <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${cat.theme.headerBg} ${cat.theme.border} shadow-2xs`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 ${cat.theme.iconBg}`}>
-                            <IconComp className="w-5 h-5" />
+                      {/* Tiêu đề nhóm phẳng, tinh gọn, không nền màu chói */}
+                      <div className="p-3.5 rounded-lg border border-slate-200/90 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                            <IconComp className="w-4 h-4" />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className={`text-sm font-bold ${cat.theme.titleColor}`}>
-                                {cat.title}
-                              </h3>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cat.theme.pill}`}>
-                                {cat.teams.length} tổ đội
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-                              {cat.desc}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-xs font-bold text-slate-900 tracking-wide uppercase">
+                              {cat.title}
+                            </h3>
+                            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                              {cat.teams.length} đội
+                            </span>
                           </div>
                         </div>
 
-                        {/* Thống kê năng lực nhóm */}
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto text-xs font-medium">
-                          <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-700 shadow-2xs">
-                            👥 <strong>{totalMembers}</strong> nhân sự
-                          </span>
-                          <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-blue-700 shadow-2xs">
-                            💼 <strong>{totalTasks}</strong> việc đang chạy
-                          </span>
+                        <div className="flex items-center gap-2.5 text-xs text-slate-500 font-medium self-end sm:self-auto">
+                          <span>👥 <strong>{totalMembers}</strong> nhân sự</span>
+                          <span>·</span>
+                          <span>💼 <strong>{totalTasks}</strong> việc đang chạy</span>
                         </div>
                       </div>
 
@@ -787,182 +945,142 @@ export const AdminTeamsPage: React.FC = () => {
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {cat.teams.map((team) => (
-                            <div
-                              key={team.id}
-                              className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs hover:border-slate-300 transition-colors flex flex-col justify-between"
-                            >
-                              <div>
-                                {/* Header thẻ: Loại đội + Trạng thái + Thao tác */}
-                                <div className="flex items-start justify-between gap-3 mb-3">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    {renderTeamTypeBadge(team.teamType)}
-                                    {!team.isActive ? (
-                                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                        Tạm ngừng
+                          {cat.teams.map((team) => {
+                            const leaderParsed = parseStaffName(team.leaderName);
+                            const regularMembers = (team.members || []).filter(
+                              (m) => !m.isTeamLeader && m.id !== team.leaderId
+                            );
+
+                            return (
+                              <div
+                                key={team.id}
+                                className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between gap-3"
+                              >
+                                <div>
+                                  {/* Header Card: Tên tổ đội & Trạng thái (trái) + Nút Thành viên & Thao tác (phải) */}
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-sm font-bold text-slate-900 leading-snug truncate" title={team.name}>
+                                          {team.name}
+                                        </h3>
+                                        {/* Trạng thái dùng chấm nhỏ thay vì cả pill cồng kềnh */}
+                                        {!team.isActive ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> Tạm ngừng
+                                          </span>
+                                        ) : team.availabilityStatus === 'OVERLOADED' || (team.activeTaskCount && team.activeTaskCount >= 3) ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" /> Quá tải ({team.activeTaskCount})
+                                          </span>
+                                        ) : team.availabilityStatus === 'BUSY' || (team.activeTaskCount && team.activeTaskCount > 0) ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Đang bận ({team.activeTaskCount})
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Sẵn sàng
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Tuyến đường / Khu vực: 1 dòng thanh thoát */}
+                                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1 truncate">
+                                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span className="truncate">{team.corridor || team.zoneName || 'Toàn tuyến'}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Phía phải header: Nút thành viên + nút sửa/xóa gọn gàng */}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenManageMembers(team)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors cursor-pointer"
+                                        title="Quản lý thành viên tổ đội"
+                                      >
+                                        <Users className="w-3.5 h-3.5 text-slate-500" />
+                                        <span>{team.members?.length || 0}</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenEditTeam(team)}
+                                        title="Sửa thông tin tổ đội"
+                                        className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteTeam(team)}
+                                        title="Giải thể tổ đội"
+                                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* 2. Tổ trưởng & Thành viên: phẳng, KHÔNG lồng viền hộp */}
+                                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-col gap-1.5 text-xs">
+                                    {/* Hàng tổ trưởng */}
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                          <Crown className="w-3 h-3 text-amber-600" />
+                                        </div>
+                                        <span className="font-semibold text-slate-900 truncate">
+                                          {leaderParsed.name || 'Chưa chỉ định'}
+                                        </span>
+                                        {team.leaderPhone && (
+                                          <span className="text-slate-400 text-[11px] truncate">· {team.leaderPhone}</span>
+                                        )}
+                                      </div>
+                                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 shrink-0">
+                                        Tổ trưởng
                                       </span>
-                                    ) : team.availabilityStatus === 'OVERLOADED' || (team.activeTaskCount && team.activeTaskCount >= 3) ? (
-                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                                        🔴 Quá tải ({team.activeTaskCount} việc)
-                                      </span>
-                                    ) : team.availabilityStatus === 'BUSY' || (team.activeTaskCount && team.activeTaskCount > 0) ? (
-                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                        🟡 Đang thi công ({team.activeTaskCount} việc)
-                                      </span>
+                                    </div>
+
+                                    {/* Dòng thành viên phối thuộc */}
+                                    {regularMembers.length === 0 ? (
+                                      <div className="text-[11px] text-slate-400 italic">
+                                        Chưa có thành viên nào khác ngoài tổ trưởng.
+                                      </div>
                                     ) : (
-                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                        🟢 Sẵn sàng nhận việc
-                                      </span>
+                                      <div className="text-[11px] text-slate-600 truncate flex items-center gap-1">
+                                        <span className="text-slate-400 shrink-0">Thành viên ({regularMembers.length}):</span>
+                                        <span className="truncate">
+                                          {regularMembers.map((m) => parseStaffName(m.fullName).name).join(', ')}
+                                        </span>
+                                      </div>
                                     )}
                                   </div>
-
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      onClick={() => handleOpenEditTeam(team)}
-                                      title="Sửa thông tin tổ đội"
-                                      className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors"
-                                    >
-                                      <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteTeam(team)}
-                                      title="Giải thể tổ đội"
-                                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
                                 </div>
 
-                                {/* Tên Tổ Đội */}
-                                <h3 className="text-base font-bold text-slate-900 leading-snug">
-                                  {team.name}
-                                </h3>
-
-                                {/* Khu vực & Tuyến đường */}
-                                <div className="mt-2.5 space-y-1 text-xs text-slate-600">
-                                  {team.zoneName && (
-                                    <div className="flex items-center gap-2">
-                                      <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                      <span className="truncate">{team.zoneName}</span>
-                                    </div>
-                                  )}
-                                  {team.corridor && (
-                                    <div className="flex items-center gap-2">
-                                      <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                      <span className="font-medium text-blue-800 truncate">{team.corridor}</span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Mô tả nhiệm vụ */}
-                                {team.description && (
-                                  <p className="mt-2.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100 leading-relaxed">
-                                    {team.description}
-                                  </p>
-                                )}
-
-                                {/* Khối Tổ Trưởng */}
-                                <div className="mt-3.5 p-3 rounded-md bg-amber-50/60 border border-amber-200/80 flex items-center justify-between">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className="w-7 h-7 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
-                                      <Crown className="w-3.5 h-3.5 text-amber-600" />
-                                    </div>
-                                    <div>
-                                      <div className="text-xs font-semibold text-slate-900">
-                                        {team.leaderName || 'Chưa chỉ định tổ trưởng'}
-                                      </div>
-                                      {team.leaderPhone && (
-                                        <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                                          <Phone className="w-3 h-3 text-slate-400" />
-                                          <span>{team.leaderPhone}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded uppercase tracking-wide">
-                                    Tổ trưởng
-                                  </span>
-                                </div>
-
-                                {/* Danh sách thành viên kèm theo (Không lặp lại tổ trưởng) */}
-                                <div className="mt-3.5">
-                                  {(() => {
-                                    const regularMembers = (team.members || []).filter(
-                                      (m) => !m.isTeamLeader && m.id !== team.leaderId
-                                    );
-                                    return (
-                                      <>
-                                        <div className="text-xs font-medium text-slate-500 mb-1.5 flex items-center justify-between">
-                                          <span>Tổ viên / Thành viên phối thuộc:</span>
-                                          <span className="font-semibold text-slate-700">{regularMembers.length} người</span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {regularMembers.length > 0 ? (
-                                            regularMembers.map((member) => (
-                                              <span
-                                                key={member.id}
-                                                className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs border border-slate-200"
-                                                title={`${member.fullName} (${member.email})`}
-                                              >
-                                                <UserCheck className="w-3 h-3 text-slate-400" />
-                                                <span>{member.fullName}</span>
-                                              </span>
-                                            ))
-                                          ) : (
-                                            <span className="text-xs text-slate-400 italic">Chưa có tổ viên nào khác ngoài tổ trưởng.</span>
-                                          )}
-                                        </div>
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-                              </div>
-
-                              {/* Footer thẻ: Nhiệm vụ đang thực hiện */}
-                              <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2 text-xs">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-slate-500 flex items-center gap-1.5">
+                                {/* 3. Footer: Nhiệm vụ đang chạy + nút xem */}
+                                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                                  <div className="flex items-center gap-1.5">
                                     <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                                    Nhiệm vụ đang thực hiện:
-                                  </span>
-                                  <span className={`font-semibold px-2 py-0.5 rounded-md border ${
-                                    (team.activeTaskCount || 0) === 0
-                                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                                      : (team.activeTaskCount || 0) >= 3
-                                      ? 'text-rose-700 bg-rose-50 border-rose-200'
-                                      : 'text-amber-700 bg-amber-50 border-amber-200'
-                                  }`}>
-                                    {team.activeTaskCount || 0} việc
-                                  </span>
-                                </div>
-                                {team.currentActiveIncidentTicket && (
-                                  <div className="p-2 rounded-md bg-amber-50/70 border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
-                                    <span className="truncate">
-                                      Xử lý: <strong className="font-mono text-amber-950 font-bold">{team.currentActiveIncidentTicket}</strong> - {team.currentActiveIncidentTitle || 'Hư hỏng mặt đường'}
-                                    </span>
-                                    <span className="text-[10px] text-amber-800 font-semibold px-1.5 py-0.5 bg-amber-100 rounded shrink-0 ml-1">
-                                      Hiện trường
-                                    </span>
+                                    <span>{team.activeTaskCount || 0} việc đang chạy</span>
                                   </div>
-                                )}
-                                {(team.activeTaskCount || 0) > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewingTasksTeam(team)}
-                                    className="w-full mt-1 py-1.5 px-2 bg-blue-50/80 hover:bg-blue-100 text-blue-700 rounded-md border border-blue-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                                  >
-                                    <Briefcase className="w-3.5 h-3.5 text-blue-600" />
-                                    <span>Xem chi tiết {team.activeTaskCount} nhiệm vụ đang gánh</span>
-                                  </button>
-                                )}
+
+                                  {(team.activeTaskCount || 0) > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingTasksTeam(team)}
+                                      className="text-[11px] text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                                    >
+                                      Xem chi tiết →
+                                    </button>
+                                  ) : (
+                                    <span className="text-[11px] text-slate-400">Trực ban rảnh việc</span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1172,138 +1290,522 @@ export const AdminTeamsPage: React.FC = () => {
       {/* MODAL: TẠO / SỬA TỔ ĐỘI (CHÂN NỀN TRẮNG CHUẨN ROADVISION) */}
       {/* ======================================================== */}
       {isTeamModalOpen && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-lg border border-slate-200 shadow-xl p-6 flex flex-col gap-4 animate-in fade-in">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[85vh] rounded-xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden animate-in fade-in">
+            {/* Header modal cố định */}
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
                   <Building2 className="w-4 h-4" />
                 </div>
-                <h3 className="font-semibold text-slate-900 text-sm">
-                  {editingTeam ? 'Cập Nhật Tổ Đội Chuyên Trách' : 'Thêm Tổ Đội Chuyên Trách Mới'}
-                </h3>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    {editingTeam ? 'Cập Nhật Tổ Đội Chuyên Trách' : 'Thêm Tổ Đội Chuyên Trách Mới'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {editingTeam ? ('Hiệu chỉnh thông tin & phân bổ nhân sự tổ: ' + editingTeam.name) : 'Thiết lập thông tin tổ đội và chỉ định nhân sự'}
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsTeamModalOpen(false)}
-                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitTeam} className="flex flex-col gap-3.5 text-xs">
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">
-                  Tên tổ đội <span className="text-rose-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="VD: Tổ Khảo Sát Hiện Trường Miền Bắc (Khu QLĐB I)"
-                  value={teamFormData.name}
-                  onChange={(e) => setTeamFormData({ ...teamFormData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Form nội dung cuộn linh hoạt */}
+            <form onSubmit={handleSubmitTeam} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3.5 text-xs">
+                {/* Tên tổ đội */}
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Loại tổ đội
+                    Tên tổ đội <span className="text-rose-600">*</span>
                   </label>
-                  <select
-                    value={teamFormData.teamType}
-                    onChange={(e) => setTeamFormData({ ...teamFormData, teamType: e.target.value as TeamType })}
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Tổ Khảo Sát Hiện Trường Miền Bắc (Khu QLĐB I)"
+                    value={teamFormData.name}
+                    onChange={(e) => setTeamFormData({ ...teamFormData, name: e.target.value })}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="PATROL">Tuần tra camera AI hành trình</option>
-                    <option value="INSPECTION">Khảo sát & đánh giá kỹ thuật</option>
-                    <option value="CONSTRUCTION">Thi công sửa chữa</option>
-                    <option value="EMERGENCY">Cơ động khẩn cấp 24/7</option>
-                  </select>
+                  />
                 </div>
 
+                {/* Hàng 2: Loại tổ đội & Chỉ định tổ trưởng */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">
+                      Loại tổ đội
+                    </label>
+                    <select
+                      value={teamFormData.teamType}
+                      onChange={(e) => setTeamFormData({ ...teamFormData, teamType: e.target.value as TeamType })}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="PATROL">Tuần tra camera AI hành trình</option>
+                      <option value="INSPECTION">Khảo sát & đánh giá kỹ thuật</option>
+                      <option value="CONSTRUCTION">Thi công sửa chữa</option>
+                      <option value="EMERGENCY">Cơ động khẩn cấp 24/7</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-medium text-slate-700">
+                        Chỉ định Tổ Trưởng
+                      </label>
+                      <span className="text-[10px] text-slate-500">
+                        {editingTeam ? ('Tổ có ' + (editingTeam.members?.length || 0) + ' thành viên') : 'Nhân sự tự do'}
+                      </span>
+                    </div>
+                    <select
+                      value={teamFormData.leaderId || ''}
+                      onChange={(e) =>
+                        setTeamFormData({
+                          ...teamFormData,
+                          leaderId: e.target.value ? Number(e.target.value) : undefined,
+                        })
+                      }
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500 text-xs font-medium"
+                    >
+                      <option value="">-- Chưa chỉ định tổ trưởng --</option>
+                      {eligibleLeaders.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Hàng 3: Tuyến đường phụ trách & Khu QLĐB phụ trách (Gọn 2 cột) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">
+                      Tuyến đường phụ trách (Corridor)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="VD: QL1A & Cao tốc Hà Nội - Hải Phòng"
+                      value={teamFormData.corridor}
+                      onChange={(e) => setTeamFormData({ ...teamFormData, corridor: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">
+                      Đơn vị hành chính / Khu QLĐB phụ trách
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="VD: Khu Quản lý Đường bộ I (Miền Bắc)"
+                      value={teamFormData.zoneName}
+                      onChange={(e) => setTeamFormData({ ...teamFormData, zoneName: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Hàng 4: Mô tả nhiệm vụ */}
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Chỉ định Tổ Trưởng
+                    Mô tả nhiệm vụ & phương tiện máy móc
                   </label>
-                  <select
-                    value={teamFormData.leaderId || ''}
-                    onChange={(e) =>
-                      setTeamFormData({
-                        ...teamFormData,
-                        leaderId: e.target.value ? Number(e.target.value) : undefined,
+                  <textarea
+                    rows={2}
+                    placeholder="Mô tả phạm vi ứng trực, trang thiết bị chuyên dùng..."
+                    value={teamFormData.description}
+                    onChange={(e) => setTeamFormData({ ...teamFormData, description: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Hàng 5: Thành viên tổ đội & Chức năng cho out tổ đội / Thêm nhân sự */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block font-medium text-slate-700">
+                      Thành viên tổ đội ({teamFormData.memberIds?.length || 0} người)
+                    </label>
+                    <span className="text-[11px] text-slate-500">
+                      {unassignedStaff.length > 0 ? ('Có ' + unassignedStaff.length + ' nhân sự tự do') : 'Chỉ thành viên thuộc tổ này'}
+                    </span>
+                  </div>
+
+                  {/* Danh sách thành viên hiện tại của tổ đội */}
+                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-40 overflow-y-auto bg-slate-50/50">
+                    {(teamFormData.memberIds || []).length === 0 ? (
+                      <div className="p-3 text-center text-xs text-slate-400 italic">
+                        Tổ đội chưa có thành viên nào. Hãy chọn nhân sự tự do bên dưới để thêm vào.
+                      </div>
+                    ) : (
+                      (teamFormData.memberIds || []).map((mId) => {
+                        const staff = staffList.find((s) => s.id === mId);
+                        if (!staff) return null;
+                        const parsed = parseStaffName(staff.fullName);
+                        const isLeader = teamFormData.leaderId === staff.id;
+
+                        return (
+                          <div
+                            key={staff.id}
+                            className="px-3 py-2 flex items-center justify-between gap-2 bg-white hover:bg-slate-50 transition-colors text-xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                {isLeader ? (
+                                  <Crown className="w-3.5 h-3.5 text-amber-600" />
+                                ) : (
+                                  parsed.name.slice(0, 2).toUpperCase()
+                                )}
+                              </div>
+                              <span className="font-semibold text-slate-900 truncate">{parsed.name}</span>
+                              <span className="text-slate-400 text-[11px] truncate hidden sm:inline">({staff.email})</span>
+                              {isLeader && (
+                                <span className="shrink-0 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                  Tổ trưởng
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Nút Cho out tổ đội trực tiếp */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newIds = (teamFormData.memberIds || []).filter((id) => id !== staff.id);
+                                const wasLeader = teamFormData.leaderId === staff.id;
+                                setTeamFormData({
+                                  ...teamFormData,
+                                  memberIds: newIds,
+                                  leaderId: wasLeader ? undefined : teamFormData.leaderId,
+                                });
+                                toast.info('Đã gỡ ' + parsed.name + ' khỏi tổ (bấm Lưu thay đổi để hoàn tất)');
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                              title="Cho thành viên này out tổ đội"
+                            >
+                              <LogOut className="w-3 h-3" />
+                              <span>Cho out tổ</span>
+                            </button>
+                          </div>
+                        );
                       })
-                    }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="">-- Chưa chỉ định --</option>
-                    {staffList.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.fullName} ({s.email})
-                      </option>
-                    ))}
-                  </select>
+                    )}
+                  </div>
+
+                  {/* Thanh thêm nhanh nhân sự tự do vào tổ đội */}
+                  <div className="mt-2 flex items-center gap-2">
+                    <select
+                      value={staffToAddInTeamForm}
+                      onChange={(e) => setStaffToAddInTeamForm(e.target.value)}
+                      className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">-- Chọn nhân sự tự do cần bổ sung --</option>
+                      {unassignedStaff
+                        .filter((s) => !(teamFormData.memberIds || []).includes(s.id))
+                        .map((s) => {
+                          const parsed = parseStaffName(s.fullName);
+                          return (
+                            <option key={s.id} value={s.id}>
+                              {parsed.name + ' (' + s.email + ')' + (s.specialization ? (' · ' + s.specialization) : '')}
+                            </option>
+                          );
+                        })}
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={!staffToAddInTeamForm}
+                      onClick={() => {
+                        if (!staffToAddInTeamForm) return;
+                        const sId = Number(staffToAddInTeamForm);
+                        const current = teamFormData.memberIds || [];
+                        if (!current.includes(sId)) {
+                          setTeamFormData({ ...teamFormData, memberIds: [...current, sId] });
+                        }
+                        setStaffToAddInTeamForm('');
+                      }}
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-medium rounded-md shadow-2xs transition-colors cursor-pointer shrink-0"
+                    >
+                      + Thêm vào tổ
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">
-                  Tuyến đường phụ trách (Corridor)
-                </label>
-                <input
-                  type="text"
-                  placeholder="VD: QL1A & Cao tốc Hà Nội - Hải Phòng"
-                  value={teamFormData.corridor}
-                  onChange={(e) => setTeamFormData({ ...teamFormData, corridor: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">
-                  Đơn vị hành chính / Khu QLĐB phụ trách
-                </label>
-                <input
-                  type="text"
-                  placeholder="VD: Khu Quản lý Đường bộ I (Miền Bắc)"
-                  value={teamFormData.zoneName}
-                  onChange={(e) => setTeamFormData({ ...teamFormData, zoneName: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">
-                  Mô tả nhiệm vụ & phương tiện máy móc
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Mô tả phạm vi ứng trực, trang thiết bị chuyên dùng..."
-                  value={teamFormData.description}
-                  onChange={(e) => setTeamFormData({ ...teamFormData, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+              {/* Footer cố định ở đáy, không bao giờ bị tràn/kịch màn hình */}
+              <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsTeamModalOpen(false)}
-                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                  className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-100 transition-colors text-xs cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs transition-colors flex items-center gap-1.5"
+                  className="px-4.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs transition-colors flex items-center gap-1.5 text-xs cursor-pointer disabled:opacity-50"
                 >
                   {submitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                   <span>{editingTeam ? 'Lưu thay đổi' : 'Tạo tổ đội'}</span>
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: QUẢN LÝ THÀNH VIÊN TỔ ĐỘI                         */}
+      {/* ======================================================== */}
+      {managingMembersTeam && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-xl border border-slate-200 shadow-2xl p-6 flex flex-col gap-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
+            {/* Header modal */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-base">
+                      Quản lý Thành viên: {managingMembersTeam.name}
+                    </h3>
+                    {renderTeamTypeBadge(managingMembersTeam.teamType)}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {managingMembersTeam.zoneName || 'Đơn vị phụ trách'} • {managingMembersTeam.corridor || 'Tuyến hành lang'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManagingMembersTeam(null)}
+                className="w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Khối 1: Bổ sung nhân sự vào tổ - Tinh gọn, thanh thoát */}
+            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col gap-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <UserPlus className="w-3.5 h-3.5 text-slate-500" />
+                  Thêm nhân sự vào tổ đội
+                </span>
+                <label className="flex items-center gap-1.5 text-[11px] text-slate-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allowTransferFromOtherTeams}
+                    onChange={(e) => setAllowTransferFromOtherTeams(e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Hiện cả nhân sự từ tổ khác</span>
+                </label>
+              </div>
+
+              {/* Dòng chọn nhân viên & nút thêm */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedStaffToAdd}
+                  onChange={(e) => setSelectedStaffToAdd(e.target.value)}
+                  className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">-- Chọn nhân sự cần thêm --</option>
+                  <optgroup label={`Nhân sự tự do (${unassignedStaff.length})`}>
+                    {unassignedStaff.map((s) => {
+                      const parsed = parseStaffName(s.fullName);
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {parsed.name} ({s.email}) {s.specialization ? `· ${s.specialization}` : ''}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                  {allowTransferFromOtherTeams && (
+                    <optgroup label="Điều chuyển từ tổ đội khác">
+                      {staffList
+                        .filter((s) => s.teamId && s.teamId !== managingMembersTeam.id)
+                        .map((s) => {
+                          const parsed = parseStaffName(s.fullName);
+                          return (
+                            <option key={s.id} value={s.id}>
+                              {parsed.name} ({s.email}) · Đang ở: {s.teamName}
+                            </option>
+                          );
+                        })}
+                    </optgroup>
+                  )}
+                </select>
+
+                <button
+                  type="button"
+                  disabled={submitting || !selectedStaffToAdd}
+                  onClick={() => handleAddMemberToTeam()}
+                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium rounded-md shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>{submitting ? 'Thêm...' : 'Thêm'}</span>
+                </button>
+              </div>
+
+              {/* Quick-add chips gọn nhẹ */}
+              {unassignedStaff.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 pt-0.5">
+                  <span className="text-slate-400">Gợi ý tự do:</span>
+                  {unassignedStaff.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => handleAddMemberToTeam(s.id)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                      title={`Bổ sung ngay ${s.fullName} vào tổ`}
+                    >
+                      <Plus className="w-3 h-3 text-slate-400" />
+                      <span>{parseStaffName(s.fullName).name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Khối 2: Danh sách thành viên hiện tại */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-slate-600" />
+                  <span>
+                    Danh sách thành viên hiện tại ({managingMembersTeam.members?.length || 0} người)
+                  </span>
+                </h4>
+                <span className="text-[11px] text-slate-500">
+                  Tổ trưởng: <strong className="text-slate-800">{managingMembersTeam.leaderName || 'Chưa có'}</strong>
+                </span>
+              </div>
+
+              {(!managingMembersTeam.members || managingMembersTeam.members.length === 0) ? (
+                <div className="p-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500">
+                  Tổ đội này hiện chưa có thành viên nào. Hãy chọn nhân sự ở trên để thêm vào tổ.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                  {managingMembersTeam.members.map((member) => {
+                    const isLeader = member.id === managingMembersTeam.leaderId || member.isTeamLeader;
+                    const { name: cleanName, affiliation } = parseStaffName(member.fullName);
+
+                    return (
+                      <div
+                        key={member.id}
+                        className={`min-h-[56px] py-2.5 px-4 flex items-center justify-between gap-3 transition-colors ${
+                          isLeader ? 'bg-amber-50/20' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        {/* Cột trái: Avatar + 2 dòng thông tin gọn gàng */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                              isLeader
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {isLeader ? (
+                              <Crown className="w-4 h-4 text-amber-600" />
+                            ) : (
+                              cleanName
+                                .split(' ')
+                                .map((n) => n[0])
+                                .slice(-2)
+                                .join('')
+                                .toUpperCase()
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            {/* Dòng 1: Tên đậm + badge vai trò + tag phụ thuộc nếu có */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className="font-semibold text-xs text-slate-900 truncate max-w-[180px] sm:max-w-[240px]"
+                                title={member.fullName}
+                              >
+                                {cleanName}
+                              </span>
+
+                              {isLeader && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                  <Crown className="w-2.5 h-2.5 text-amber-600" /> Tổ trưởng
+                                </span>
+                              )}
+
+                              {affiliation && (
+                                <span
+                                  className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded truncate max-w-[160px]"
+                                  title={affiliation}
+                                >
+                                  {affiliation}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Dòng 2 (phụ, xám nhỏ, không bullet thừa): SĐT · email · chuyên môn */}
+                            <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                              {[member.phone, member.email, member.specialization]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Cột phải: Thao tác (nhẹ nhàng, không nút khối dày đặc) */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {!isLeader && (
+                            <button
+                              type="button"
+                              disabled={submitting}
+                              onClick={() => handleSetTeamLeader(member.id, cleanName)}
+                              className="text-[11px] font-medium text-slate-600 hover:text-amber-800 hover:bg-amber-50 px-2 py-1 rounded transition-colors cursor-pointer"
+                              title="Chỉ định nhân sự này làm tổ trưởng"
+                            >
+                              Làm Tổ trưởng
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => handleRemoveMemberFromTeam(member.id, cleanName)}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Cho nhân sự này out tổ đội (trở về nhân sự tự do)"
+                          >
+                            <span>🚪 Cho out tổ</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+              <span>
+                💡 Khi nhân sự rời tổ, họ sẽ ở trạng thái <strong>Tự do</strong> và có thể gán vào bất kỳ tổ đội nào khác.
+              </span>
+              <button
+                type="button"
+                onClick={() => setManagingMembersTeam(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors cursor-pointer shrink-0"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -34,9 +34,13 @@ public class IncidentResponse {
     private IncidentStatus status;
     private Severity severity;
     private String flag;
+    private String aiStatus;
     private String rejectionReason;
     private String reworkReason;
     private Integer reworkCount;
+    private String fastTrackReason;
+    private Long fastTrackApprovedById;
+    private String fastTrackApprovedByName;
     private Integer upvoteCount;
     private Boolean hasUpvoted;
 

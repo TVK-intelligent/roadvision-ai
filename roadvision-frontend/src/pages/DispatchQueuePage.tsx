@@ -1041,37 +1041,14 @@ export const DispatchQueuePage: React.FC = () => {
                                 </div>
                               )}
 
-                              {/* Các trạng thái đang xử lý hoặc đã hoàn tất: Nút Xem chi tiết chuẩn mực */}
-                              {[
-                                'INSPECTION_ASSIGNED',
-                                'INSPECTING',
-                                'ASSIGNED',
-                                'IN_PROGRESS',
-                                'REWORK_REQUIRED',
-                                'RESOLVED',
-                                'CLOSED',
-                                'REJECTED',
-                              ].includes(incident.status) && (
-                                <Link
-                                  to={`/incidents/${incident.id}`}
-                                  className="h-7.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
-                                  title="Xem toàn bộ tiến độ và hồ sơ sự cố"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                  <span>Xem chi tiết</span>
-                                </Link>
-                              )}
-
-                              {/* Nút icon xem nhanh dành cho các dòng có nút hành động chính */}
-                              {['SUBMITTED', 'AI_ANALYZED', 'VERIFIED', 'INSPECTED', 'PENDING_ACCEPTANCE', 'PENDING_INSPECTION'].includes(incident.status) && (
-                                <Link
-                                  to={`/incidents/${incident.id}`}
-                                  title="Xem hồ sơ chi tiết sự cố"
-                                  className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Link>
-                              )}
+                              {/* Nút icon xem hồ sơ chi tiết sự cố thống nhất */}
+                              <Link
+                                to={`/incidents/${incident.id}`}
+                                title="Xem hồ sơ chi tiết sự cố"
+                                className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Link>
                             </>
                           )}
                         </div>

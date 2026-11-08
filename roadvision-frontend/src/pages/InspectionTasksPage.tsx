@@ -746,25 +746,16 @@ export const InspectionTasksPage: React.FC = () => {
                     {/* Hành động dành riêng cho ADMIN - CHỈ XEM (ACTION VIEW) */}
                     {isAdmin ? (
                       <div className="flex items-center gap-2">
-                        {(isInspectedDone || isTransferredToConstruction(task) || Boolean(task.inspection?.confirmedCategory)) ? (
+                        {(isInspectedDone || isTransferredToConstruction(task) || Boolean(task.inspection?.confirmedCategory)) && (
                           <button
                             onClick={() => {
                               setReviewTask(task);
                             }}
                             className="px-3 py-1.5 rounded-md bg-white hover:bg-slate-50 text-blue-700 font-medium text-xs flex items-center gap-1.5 transition-colors border border-blue-200 shadow-2xs cursor-pointer"
                           >
-                            <Eye className="w-3.5 h-3.5 text-blue-600" />
+                            <FileCheck className="w-3.5 h-3.5 text-blue-600" />
                             <span>Xem biên bản khảo sát</span>
                           </button>
-                        ) : (
-                          <Link
-                            to={`/incidents/${task.id}`}
-                            className="h-7.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-blue-600 font-medium text-xs inline-flex items-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap"
-                            title="Xem chi tiết hồ sơ"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                            <span>Xem chi tiết</span>
-                          </Link>
                         )}
                         {task.status === 'INSPECTING' && (
                           <span className="text-[11px] font-medium text-sky-700 bg-sky-50 px-2 py-1 rounded border border-sky-200 flex items-center gap-1">
@@ -812,16 +803,14 @@ export const InspectionTasksPage: React.FC = () => {
                       </>
                     )}
 
-                    {/* Nút icon xem chi tiết hồ sơ dành cho Staff hoặc khi Admin đã có nút Xem biên bản */}
-                    {(isInspectedDone || isTransferredToConstruction(task) || Boolean(task.inspection?.confirmedCategory) || !isAdmin) && (
-                      <Link
-                        to={`/incidents/${task.id}`}
-                        className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
-                        title="Xem chi tiết hồ sơ"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Link>
-                    )}
+                    {/* Nút icon xem chi tiết hồ sơ thống nhất cho mọi trạng thái */}
+                    <Link
+                      to={`/incidents/${task.id}`}
+                      className="w-7.5 h-7.5 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-blue-600 transition-colors shrink-0 shadow-2xs"
+                      title="Xem chi tiết hồ sơ sự cố"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Link>
                   </div>
                 </div>
               </div>

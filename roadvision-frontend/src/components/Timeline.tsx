@@ -1,12 +1,13 @@
 import React from 'react';
 import { IncidentStatus } from '../types';
-import { Check, Layers, UserCheck, Hammer, CheckCircle2, AlertTriangle, XCircle, ShieldCheck, FileCheck, Archive, Compass, RefreshCw } from 'lucide-react';
+import { Check, Layers, UserCheck, Hammer, CheckCircle2, AlertTriangle, XCircle, ShieldCheck, FileCheck, Archive, Compass, RefreshCw, Zap } from 'lucide-react';
 
 interface TimelineProps {
   status: IncidentStatus;
   isRework?: boolean;
   reworkCount?: number;
   isDisputed?: boolean;
+  isInspectionSkipped?: boolean;
 }
 
 interface StepDef {
@@ -83,7 +84,7 @@ const STEPS: StepDef[] = [
   },
 ];
 
-export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCount, isDisputed }) => {
+export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCount, isDisputed, isInspectionSkipped }) => {
   const getStageIndex = (s: IncidentStatus): number => {
     switch (s) {
       case 'SUBMITTED':
@@ -149,6 +150,11 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
               <AlertTriangle className="w-3 h-3" /> Đang khiếu nại
             </span>
           )}
+          {isInspectionSkipped && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-[11px] font-semibold border border-amber-200">
+              <Zap className="w-3 h-3 fill-amber-500 text-amber-600" /> Fast-Track: Bỏ qua khảo sát
+            </span>
+          )}
           {status === 'REWORK_REQUIRED' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-800 text-[11px] font-medium border border-rose-300">
               <RefreshCw className="w-3 h-3 animate-spin" /> Yêu cầu thi công lại {reworkCount ? `(Lần #${reworkCount})` : ''}
@@ -201,7 +207,9 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
                 {/* Node biểu tượng */}
                 <div
                   className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                    isAllDone
+                    isInspectionSkipped && step.key === 'INSPECTION'
+                      ? 'bg-amber-100 text-amber-700 border border-amber-300 ring-2 ring-amber-50'
+                      : isAllDone
                       ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-100'
                       : isCompleted
                       ? 'bg-blue-600 text-white'
@@ -210,13 +218,21 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
                       : 'bg-slate-100 text-slate-400 border border-slate-200'
                   }`}
                 >
-                  {isCompleted ? <Check className="w-4 h-4 text-white" /> : step.icon}
+                  {isInspectionSkipped && step.key === 'INSPECTION' ? (
+                    <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                  ) : isCompleted ? (
+                    <Check className="w-4 h-4 text-white" />
+                  ) : (
+                    step.icon
+                  )}
                 </div>
 
                 {/* Tên bước */}
                 <span
                   className={`text-[11px] sm:text-xs mt-2 font-medium line-clamp-1 transition-colors ${
-                    isAllDone
+                    isInspectionSkipped && step.key === 'INSPECTION'
+                      ? 'text-amber-800 font-semibold'
+                      : isAllDone
                       ? 'text-emerald-900 font-semibold'
                       : isCurrent
                       ? 'text-blue-700 font-semibold'
@@ -225,13 +241,15 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
                       : 'text-slate-400'
                   }`}
                 >
-                  {step.label}
+                  {isInspectionSkipped && step.key === 'INSPECTION' ? '4. Khảo sát (Bỏ qua)' : step.label}
                 </span>
 
                 {/* Trạng thái phụ */}
                 <span
                   className={`text-[10px] mt-0.5 line-clamp-1 ${
-                    isAllDone
+                    isInspectionSkipped && step.key === 'INSPECTION'
+                      ? 'text-amber-600 font-medium'
+                      : isAllDone
                       ? 'text-emerald-600 font-medium'
                       : isCurrent
                       ? 'text-blue-600 font-medium'
@@ -240,7 +258,9 @@ export const Timeline: React.FC<TimelineProps> = ({ status, isRework, reworkCoun
                       : 'text-slate-400'
                   }`}
                 >
-                  {isCurrent
+                  {isInspectionSkipped && step.key === 'INSPECTION'
+                    ? 'Bỏ qua (Fast-Track)'
+                    : isCurrent
                     ? step.subLabel(status, isRework, reworkCount)
                     : isCompleted
                     ? 'Hoàn tất'

@@ -30,4 +30,8 @@ public class ConstructionAssignRequest {
     private String safetyNotes; // Yêu cầu an toàn giao thông, biển báo, vật tư
 
     private String instructions; // Hướng dẫn chi tiết từ Admin
+
+    private Boolean isFastTrack; // Cờ Fast-Track bỏ qua bước khảo sát
+
+    private String fastTrackReason; // Lý do giải trình Fast-Track khẩn cấp
 }

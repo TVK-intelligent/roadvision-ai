@@ -1,6 +1,7 @@
 -- =============================================================================
 -- THIẾT KẾ CƠ SỞ DỮ LIỆU HỆ THỐNG ROADCARE (MYSQL 8.0+)
--- Hỗ trợ quy trình 5 pha: Ingestion -> AI Inference -> Triage -> Resolution -> Closure
+-- Chu trình 7 giai đoạn: Ingestion & AI -> Triage -> Inspection & Fast-Track -> 
+-- Planning & Assignment -> Execution -> QA Acceptance & Rework -> Closure & Gamification
 -- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS `roadcare_db` 
@@ -9,14 +10,36 @@ COLLATE utf8mb4_unicode_ci;
 
 USE `roadcare_db`;
 
--- 1. BẢNG NGƯỜI DÙNG & TÀI KHOẢN (USERS)
+-- 1. BẢNG TỔ ĐỘI CHUYÊN TRÁCH (TEAMS)
+DROP TABLE IF EXISTS `user_violations`;
+DROP TABLE IF EXISTS `user_reputation_transactions`;
 DROP TABLE IF EXISTS `feedbacks`;
 DROP TABLE IF EXISTS `resolutions`;
+DROP TABLE IF EXISTS `incident_evidences`;
+DROP TABLE IF EXISTS `incident_inspections`;
+DROP TABLE IF EXISTS `incident_upvotes`;
 DROP TABLE IF EXISTS `assignments`;
 DROP TABLE IF EXISTS `ai_detections`;
 DROP TABLE IF EXISTS `incidents`;
 DROP TABLE IF EXISTS `users`;
+DROP TABLE IF EXISTS `teams`;
 
+CREATE TABLE `teams` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `team_name` VARCHAR(150) NOT NULL UNIQUE,
+    `team_type` ENUM('INSPECTION', 'MAINTENANCE', 'PATROL', 'EMERGENCY') NOT NULL,
+    `leader_id` BIGINT NULL,
+    `zone_name` VARCHAR(150) NULL COMMENT 'Khu vực địa bàn phụ trách (Hạt quản lý đường bộ)',
+    `corridor_code` VARCHAR(50) NULL COMMENT 'Mã hành lang tuyến: QL1A, QL21, DOWNTOWN...',
+    `description` VARCHAR(500) NULL,
+    `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_teams_type` (`team_type`),
+    INDEX `idx_teams_zone` (`zone_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Danh mục tổ đội khảo sát, thi công và tuần tra cơ sở';
+
+-- 2. BẢNG NGƯỜI DÙNG & TÀI KHOẢN (USERS)
 CREATE TABLE `users` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `email` VARCHAR(150) NOT NULL UNIQUE,
@@ -26,142 +49,168 @@ CREATE TABLE `users` (
     `role` ENUM('ROLE_CITIZEN', 'ROLE_ADMIN', 'ROLE_STAFF') NOT NULL DEFAULT 'ROLE_CITIZEN',
     `avatar_url` VARCHAR(500) NULL,
     `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+    `reputation_score` INT NOT NULL DEFAULT 50 COMMENT 'Điểm uy tín tích lũy dài hạn: 0 - 1000',
+    `spam_strikes` INT NOT NULL DEFAULT 0 COMMENT 'Số lần bị cảnh cáo vi phạm',
+    `suspended_until` DATETIME NULL COMMENT 'Thời hạn tạm khóa quyền gửi tin',
+    `suspend_reason` VARCHAR(255) NULL,
+    `team_id` BIGINT NULL COMMENT 'Tổ đội trực thuộc nếu là kỹ thuật viên (Staff)',
+    `is_team_leader` BOOLEAN NOT NULL DEFAULT FALSE,
+    `specialization` VARCHAR(150) NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_users_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE SET NULL,
     INDEX `idx_users_role` (`role`),
-    INDEX `idx_users_email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Danh sách tài khoản công dân, quản trị viên và nhân viên kỹ thuật';
+    INDEX `idx_users_email` (`email`),
+    INDEX `idx_users_reputation` (`reputation_score`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Tài khoản công dân, quản trị viên điều phối và kỹ thuật viên';
 
--- 2. BẢNG SỰ CỐ MẶT ĐƯỜNG (INCIDENTS)
+-- Bổ sung Foreign Key leader cho bảng teams
+ALTER TABLE `teams` 
+    ADD CONSTRAINT `fk_teams_leader` FOREIGN KEY (`leader_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+-- 3. BẢNG SỰ CỐ MẶT ĐƯỜNG (INCIDENTS)
 CREATE TABLE `incidents` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `ticket_code` VARCHAR(30) NOT NULL UNIQUE COMMENT 'Mã định danh sự cố, vd: #RC-8942',
     `citizen_id` BIGINT NOT NULL COMMENT 'ID người dân tạo phản ánh',
     `title` VARCHAR(255) NOT NULL DEFAULT 'Sự cố mặt đường',
     `description` TEXT NULL COMMENT 'Mô tả chi tiết từ người dân',
-    `image_url` VARCHAR(500) NOT NULL COMMENT 'Đường dẫn ảnh chụp ban đầu tại hiện trường',
-    `latitude` DECIMAL(10, 8) NOT NULL COMMENT 'Vĩ độ GPS',
-    `longitude` DECIMAL(11, 8) NOT NULL COMMENT 'Kinh độ GPS',
+    `image_url` VARCHAR(500) NOT NULL COMMENT 'Đường dẫn ảnh chụp hiện trường ban đầu',
+    `image_sha256` VARCHAR(64) NULL COMMENT 'Mã băm SHA-256 chống tải ảnh trùng lặp',
+    `latitude` DECIMAL(10, 8) NOT NULL COMMENT 'Vĩ độ GPS hiện tại',
+    `longitude` DECIMAL(11, 8) NOT NULL COMMENT 'Kinh độ GPS hiện tại',
+    `original_latitude` DECIMAL(10, 8) NULL COMMENT 'Vĩ độ gốc trích xuất từ EXIF ảnh',
+    `original_longitude` DECIMAL(11, 8) NULL COMMENT 'Kinh độ gốc trích xuất từ EXIF ảnh',
+    `gps_accuracy` DOUBLE NULL COMMENT 'Sai số đo đạc GPS (mét)',
     `address` VARCHAR(255) NULL COMMENT 'Địa chỉ số nhà / tên đường',
-    `category` ENUM('POTHOLE', 'ROAD_CRACK', 'ROAD_OBSTACLE', 'ROAD_FLOODING', 'OTHER') NOT NULL DEFAULT 'POTHOLE',
-    `status` ENUM('SUBMITTED', 'AI_ANALYZED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED') NOT NULL DEFAULT 'SUBMITTED',
+    `route_corridor` VARCHAR(50) NULL COMMENT 'Hành lang tuyến quản lý: QL1A, QL21...',
+    `zone_name` VARCHAR(150) NULL COMMENT 'Hạt quản lý đường bộ phụ trách',
+    `category` ENUM('POTHOLE', 'ROAD_CRACK', 'ROAD_OBSTACLE', 'ROAD_FLOODING', 'COMPLEX_DAMAGE', 'OTHER') NOT NULL DEFAULT 'POTHOLE',
+    `status` ENUM('SUBMITTED', 'AI_ANALYZED', 'VERIFIED', 'INSPECTION_ASSIGNED', 'INSPECTING', 'INSPECTED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_ACCEPTANCE', 'REWORK_REQUIRED', 'RESOLVED', 'CLOSED', 'REJECTED') NOT NULL DEFAULT 'SUBMITTED',
     `severity` ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') NOT NULL DEFAULT 'MEDIUM',
-    `flag` VARCHAR(50) NULL DEFAULT NULL COMMENT 'Cờ cảnh báo vd: NEEDS_MANUAL_REVIEW',
+    `flag` VARCHAR(50) NULL DEFAULT NULL COMMENT 'Cờ nghiệp vụ: TRUSTED_REPORT, POTENTIAL_DUPLICATE, FAST_TRACK, MULTI_DEFECT, FRAUD_REVOKED...',
+    `ai_status` VARCHAR(50) NOT NULL DEFAULT 'AI_ANALYZED' COMMENT 'Trạng thái AI: AI_ANALYZED, AI_LOW_CONFIDENCE, AI_FAILED, MANUAL_FALLBACK',
+    `fast_track_reason` VARCHAR(500) NULL COMMENT 'Lý do giải trình khẩn cấp bỏ qua khảo sát',
+    `fast_track_approved_by` BIGINT NULL COMMENT 'Admin phê duyệt cơ chế Fast-Track',
     `rejection_reason` VARCHAR(500) NULL COMMENT 'Lý do từ chối nếu bị Admin bác bỏ',
+    `rework_reason` VARCHAR(500) NULL COMMENT 'Chỉ đạo làm lại khi nghiệm thu chưa đạt',
+    `rework_count` INT NOT NULL DEFAULT 0 COMMENT 'Số lần bị trả về thi công lại',
+    `upvote_count` INT NOT NULL DEFAULT 1,
+    `inspection_team_id` BIGINT NULL COMMENT 'Tổ phụ trách khảo sát',
+    `assigned_team_id` BIGINT NULL COMMENT 'Tổ phụ trách thi công',
+    `work_plan` VARCHAR(1000) NULL COMMENT 'Phương án thi công được duyệt',
+    `safety_notes` VARCHAR(1000) NULL COMMENT 'Yêu cầu biển báo, an toàn giao thông',
+    `planned_start_date` DATETIME NULL,
+    `planned_deadline` DATETIME NULL COMMENT 'Hạn cam kết xử lý SLA',
+    `delay_reason` VARCHAR(1000) NULL COMMENT 'Lý do giải trình chậm trễ nếu quá hạn',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `resolved_at` TIMESTAMP NULL DEFAULT NULL COMMENT 'Thời điểm hoàn thành sửa chữa',
-    `closed_at` TIMESTAMP NULL DEFAULT NULL COMMENT 'Thời điểm nghiệm thu & đóng phiếu',
+    `resolved_at` TIMESTAMP NULL DEFAULT NULL,
+    `closed_at` TIMESTAMP NULL DEFAULT NULL,
     
-    CONSTRAINT `fk_incidents_citizen` 
-        FOREIGN KEY (`citizen_id`) REFERENCES `users` (`id`) 
-        ON DELETE RESTRICT ON UPDATE CASCADE,
-        
+    CONSTRAINT `fk_incidents_citizen` FOREIGN KEY (`citizen_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
+    CONSTRAINT `fk_incidents_inspection_team` FOREIGN KEY (`inspection_team_id`) REFERENCES `teams` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_incidents_assigned_team` FOREIGN KEY (`assigned_team_id`) REFERENCES `teams` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_incidents_fast_track_approver` FOREIGN KEY (`fast_track_approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
     INDEX `idx_incidents_status` (`status`),
     INDEX `idx_incidents_category` (`category`),
-    INDEX `idx_incidents_created_at` (`created_at`),
+    INDEX `idx_incidents_corridor` (`route_corridor`),
     INDEX `idx_incidents_coordinates` (`latitude`, `longitude`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Lưu trữ toàn bộ thông tin vòng đời của các sự cố hạ tầng giao thông';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Hồ sơ sự cố hạ tầng giao thông qua 7 giai đoạn vận hành';
 
--- 3. BẢNG GHI NHẬN SUY LUẬN AI (AI_DETECTIONS)
+-- 4. BẢNG GHI NHẬN SUY LUẬN AI (AI_DETECTIONS)
 CREATE TABLE `ai_detections` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `incident_id` BIGINT NOT NULL UNIQUE COMMENT 'Quan hệ 1-1 với Incident ban đầu',
-    `class_name` VARCHAR(50) NOT NULL COMMENT 'Lớp nhận diện: POTHOLE, ROAD_CRACK...',
-    `confidence` DECIMAL(5, 4) NOT NULL COMMENT 'Độ tin cậy từ 0.0000 đến 1.0000',
-    `bbox_x` INT NOT NULL COMMENT 'Tọa độ X pixel góc trên trái của bounding box',
-    `bbox_y` INT NOT NULL COMMENT 'Tọa độ Y pixel góc trên trái của bounding box',
-    `bbox_width` INT NOT NULL COMMENT 'Chiều rộng hộp bao',
-    `bbox_height` INT NOT NULL COMMENT 'Chiều cao hộp bao',
-    `inference_ms` INT NOT NULL COMMENT 'Thời gian thực thi suy luận (ms)',
-    `raw_predictions_json` JSON NULL COMMENT 'Ma trận thô của toàn bộ các box phát hiện được',
+    `incident_id` BIGINT NOT NULL UNIQUE,
+    `class_name` VARCHAR(50) NOT NULL,
+    `confidence` DECIMAL(5, 4) NOT NULL,
+    `bbox_x` INT NOT NULL,
+    `bbox_y` INT NOT NULL,
+    `bbox_width` INT NOT NULL,
+    `bbox_height` INT NOT NULL,
+    `inference_ms` INT NOT NULL,
+    `raw_predictions_json` JSON NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT `fk_ai_detections_incident` 
-        FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) 
-        ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Lưu trữ chi tiết viễn trắc AI từ mô hình ONNX Runtime YOLOv8';
+    CONSTRAINT `fk_ai_detections_incident` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 4. BẢNG PHÂN CÔNG ĐIỀU PHỐI (ASSIGNMENTS)
-CREATE TABLE `assignments` (
-    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `incident_id` BIGINT NOT NULL,
-    `assigned_by_admin_id` BIGINT NOT NULL COMMENT 'Admin phê chuẩn và phân công',
-    `assigned_to_staff_id` BIGINT NOT NULL COMMENT 'Kỹ thuật viên hiện trường được giao',
-    `verified_category` VARCHAR(50) NOT NULL COMMENT 'Loại sự cố sau khi Admin thẩm định (có quyền ghi đè)',
-    `priority` ENUM('NORMAL', 'HIGH', 'CRITICAL') NOT NULL DEFAULT 'NORMAL',
-    `notes` TEXT NULL COMMENT 'Chỉ đạo thi công từ Admin',
-    `assigned_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT `fk_assignments_incident` 
-        FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) 
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `fk_assignments_admin` 
-        FOREIGN KEY (`assigned_by_admin_id`) REFERENCES `users` (`id`) 
-        ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT `fk_assignments_staff` 
-        FOREIGN KEY (`assigned_to_staff_id`) REFERENCES `users` (`id`) 
-        ON DELETE RESTRICT ON UPDATE CASCADE,
-        
-    INDEX `idx_assignments_staff` (`assigned_to_staff_id`),
-    INDEX `idx_assignments_incident` (`incident_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Lịch sử phân công điều phối nhiệm vụ';
-
--- 5. BẢNG NGHIỆM THU HIỆN TRƯỜNG (RESOLUTIONS / PROOF OF WORK)
-CREATE TABLE `resolutions` (
+-- 5. BẢNG KHẢO SÁT HIỆN TRƯỜNG (INCIDENT_INSPECTIONS)
+CREATE TABLE `incident_inspections` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `incident_id` BIGINT NOT NULL UNIQUE,
-    `staff_id` BIGINT NOT NULL COMMENT 'Kỹ thuật viên trực tiếp thực hiện',
-    `proof_image_url` VARCHAR(500) NOT NULL COMMENT 'Ảnh chụp mặt đường sau khi đã vá phẳng',
-    `notes` TEXT NULL COMMENT 'Ghi chú vật tư, kỹ thuật thi công',
-    `resolved_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT `fk_resolutions_incident` 
-        FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) 
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `fk_resolutions_staff` 
-        FOREIGN KEY (`staff_id`) REFERENCES `users` (`id`) 
-        ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Ảnh bằng chứng và chi tiết kết quả xử lý tại hiện trường';
+    `inspected_by_user_id` BIGINT NOT NULL,
+    `inspection_status` VARCHAR(50) NOT NULL DEFAULT 'COMPLETED',
+    `measured_length_m` DECIMAL(6, 2) NULL,
+    `measured_width_m` DECIMAL(6, 2) NULL,
+    `measured_depth_cm` DECIMAL(6, 2) NULL,
+    `estimated_area_sqm` DECIMAL(8, 2) NULL,
+    `recommended_treatment` VARCHAR(255) NULL,
+    `traffic_impact` VARCHAR(50) NULL,
+    `notes` TEXT NULL,
+    `inspected_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_inspections_incident` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_inspections_user` FOREIGN KEY (`inspected_by_user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 6. BẢNG ĐÁNH GIÁ & ĐÓNG PHIẾU (FEEDBACKS)
+-- 6. BẢNG BẰNG CHỨNG HÌNH ẢNH ĐA GIAI ĐOẠN (INCIDENT_EVIDENCES)
+CREATE TABLE `incident_evidences` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `incident_id` BIGINT NOT NULL,
+    `uploaded_by_user_id` BIGINT NOT NULL,
+    `stage` ENUM('REPORT', 'INSPECTION', 'CONSTRUCTION_BEFORE', 'CONSTRUCTION_DURING', 'CONSTRUCTION_AFTER', 'ACCEPTANCE') NOT NULL,
+    `file_url` VARCHAR(500) NOT NULL,
+    `notes` VARCHAR(500) NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_evidences_incident` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_evidences_user` FOREIGN KEY (`uploaded_by_user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
+    INDEX `idx_evidences_incident_stage` (`incident_id`, `stage`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 7. BẢNG SỔ CÁI BIẾN ĐỘNG ĐIỂM UY TÍN (USER_REPUTATION_TRANSACTIONS)
+CREATE TABLE `user_reputation_transactions` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL,
+    `incident_id` BIGINT NULL,
+    `points` INT NOT NULL COMMENT 'Biến động: +50, +100, -100, -50, -150',
+    `balance_after` INT NOT NULL COMMENT 'Số dư sau giao dịch: 0 - 1000',
+    `transaction_type` VARCHAR(50) NOT NULL COMMENT 'VERIFIED_BONUS, CLOSED_BONUS, PENALTY, REVERSAL, ADMIN_ADJUST',
+    `reason` VARCHAR(255) NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_reputation_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_reputation_incident` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE SET NULL,
+    UNIQUE KEY `uq_user_incident_type` (`user_id`, `incident_id`, `transaction_type`),
+    INDEX `idx_reputation_user_created` (`user_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Sổ cái Ledger lưu vết toàn bộ biến động điểm uy tín và thi đua';
+
+-- 8. BẢNG THEO DÕI VI PHẠM & CẢNH CÁO (USER_VIOLATIONS)
+CREATE TABLE `user_violations` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL,
+    `incident_id` BIGINT NULL,
+    `violation_type` VARCHAR(50) NOT NULL COMMENT 'FAKE_REPORT, MALICIOUS_CONTENT, INTERNET_IMAGE, SPAM, OTHER',
+    `strike_count` INT NOT NULL DEFAULT 1 COMMENT 'Lần vi phạm tích lũy: 1 đến 5',
+    `action_taken` VARCHAR(100) NOT NULL COMMENT 'WARNING, RESTRICTED, SUSPENDED_7_DAYS',
+    `description` VARCHAR(500) NULL,
+    `is_revoked` BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Khiếu nại thành công, Admin hủy cảnh cáo',
+    `revoked_by` BIGINT NULL,
+    `revoked_reason` VARCHAR(500) NULL,
+    `revoked_at` DATETIME NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_violation_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_violation_incident` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_violation_revoker` FOREIGN KEY (`revoked_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+    INDEX `idx_violation_user_active` (`user_id`, `is_revoked`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Nhật ký ghi nhận và quản lý chế tài vi phạm 3 mức độ của người dùng';
+
+-- 9. BẢNG ĐÁNH GIÁ CỦA CÔNG DÂN (FEEDBACKS)
 CREATE TABLE `feedbacks` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `incident_id` BIGINT NOT NULL UNIQUE,
-    `citizen_id` BIGINT NOT NULL COMMENT 'Người dân chấm điểm chất lượng',
-    `rating` TINYINT NOT NULL COMMENT 'Thang điểm từ 1 đến 5 sao',
-    `comments` TEXT NULL COMMENT 'Ý kiến nhận xét của công dân',
+    `citizen_id` BIGINT NOT NULL,
+    `rating` TINYINT NOT NULL COMMENT '1 đến 5 sao',
+    `comments` TEXT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT `fk_feedbacks_incident` 
-        FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) 
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `fk_feedbacks_citizen` 
-        FOREIGN KEY (`citizen_id`) REFERENCES `users` (`id`) 
-        ON DELETE RESTRICT ON UPDATE CASCADE,
-        
+    CONSTRAINT `fk_feedbacks_incident` FOREIGN KEY (`incident_id`) REFERENCES `incidents` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_feedbacks_citizen` FOREIGN KEY (`citizen_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
     CONSTRAINT `chk_rating_range` CHECK (`rating` >= 1 AND `rating` <= 5)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Đánh giá mức độ hài lòng của công dân sau khi nghiệm thu';
-
--- =============================================================================
--- DỮ LIỆU MẪU BAN ĐẦU (SEED DATA)
--- =============================================================================
-
--- Mật khẩu mặc định là: 'password123' (bcrypt hash mẫu)
-INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `phone`, `role`) VALUES
-(1, 'admin@roadcare.gov.vn', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.fS06l78rT3vV9yFfBmsF8R9l8k8qye', 'Eng. Elena Rostova', '0909000001', 'ROLE_ADMIN'),
-(2, 'staff.nguyen@roadcare.gov.vn', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.fS06l78rT3vV9yFfBmsF8R9l8k8qye', 'Nguyễn Văn Kỹ Thuật (Đội 4)', '0909000002', 'ROLE_STAFF'),
-(3, 'staff.tran@roadcare.gov.vn', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.fS06l78rT3vV9yFfBmsF8R9l8k8qye', 'Trần Văn Hiện Trường (Đội 1)', '0909000003', 'ROLE_STAFF'),
-(4, 'citizen.an@gmail.com', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.fS06l78rT3vV9yFfBmsF8R9l8k8qye', 'Lê Hoàng An', '0912345678', 'ROLE_CITIZEN');
-
--- Sự cố mẫu #RC-8942 khớp hoàn toàn với bản thiết kế Stitch UI
-INSERT INTO `incidents` (`id`, `ticket_code`, `citizen_id`, `title`, `description`, `image_url`, `latitude`, `longitude`, `address`, `category`, `status`, `severity`, `created_at`) VALUES
-(8942, '#RC-8942', 4, 'Severe Road Pothole with Subsurface Base Erosion', 'Ổ gà lớn giữa đường gây nguy hiểm cho xe máy qua lại ban đêm', 'https://storage.roadcare.gov.vn/incidents/rc-8942-origin.jpg', 10.776889, 106.700806, '120 Nguyễn Trãi, Phường Bến Thành, Quận 1, TP.HCM', 'POTHOLE', 'ASSIGNED', 'HIGH', '2026-09-07 08:30:00');
-
--- Kết quả suy luận AI mẫu cho #RC-8942
-INSERT INTO `ai_detections` (`incident_id`, `class_name`, `confidence`, `bbox_x`, `bbox_y`, `bbox_width`, `bbox_height`, `inference_ms`) VALUES
-(8942, 'POTHOLE', 0.9472, 128, 140, 371, 345, 42);
-
--- Phân công mẫu cho #RC-8942
-INSERT INTO `assignments` (`incident_id`, `assigned_by_admin_id`, `assigned_to_staff_id`, `verified_category`, `priority`, `notes`, `assigned_at`) VALUES
-(8942, 1, 2, 'POTHOLE', 'HIGH', 'Khắc phục ngay trong ngày hôm nay bằng thảm nhựa nguội Carboncor', '2026-09-07 09:15:00');
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

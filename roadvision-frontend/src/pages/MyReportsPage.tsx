@@ -20,31 +20,40 @@ import {
 } from 'lucide-react';
 
 const getReputationTier = (score: number) => {
-  if (score >= 80) {
+  if (score >= 800) {
     return {
       tier: 'Hạng Vàng',
-      title: 'Công dân gương mẫu',
+      title: 'Hiệp sĩ giao thông',
       badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
       barClass: 'bg-gradient-to-r from-amber-400 to-amber-500',
       description: 'Phản ánh của bạn có độ tin cậy rất cao và luôn được ưu tiên tiếp nhận xử lý nhanh nhất.',
     };
   }
-  if (score >= 60) {
+  if (score >= 600) {
     return {
       tier: 'Hạng Bạc',
-      title: 'Công dân tích cực',
+      title: 'Đôi mắt đô thị',
       badgeClass: 'bg-sky-100 text-sky-800 border-sky-300',
       barClass: 'bg-gradient-to-r from-sky-400 to-blue-500',
       description: 'Đóng góp tích cực và đáng tin cậy trong việc giám sát chất lượng hạ tầng giao thông đô thị.',
     };
   }
-  if (score >= 40) {
+  if (score >= 400) {
     return {
       tier: 'Hạng Đồng',
-      title: 'Thành viên tiêu chuẩn',
+      title: 'Công dân tích cực',
       badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
       barClass: 'bg-gradient-to-r from-slate-400 to-slate-500',
       description: 'Tài khoản hoạt động tiêu chuẩn. Tiếp tục gửi các phản ánh chính xác để nâng hạng uy tín.',
+    };
+  }
+  if (score >= 100) {
+    return {
+      tier: 'Tiêu chuẩn',
+      title: 'Thành viên tiêu chuẩn',
+      badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      barClass: 'bg-gradient-to-r from-emerald-400 to-emerald-500',
+      description: 'Tài khoản tiêu chuẩn đã xác thực. Bạn được cấp quyền gửi phản ánh mọi tuyến đường.',
     };
   }
   return {
@@ -136,7 +145,7 @@ export const MyReportsPage: React.FC = () => {
               </div>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-3xl font-black text-slate-900 font-mono">{reputationScore}</span>
-                <span className="text-sm font-semibold text-slate-400">/ 100 điểm</span>
+                <span className="text-sm font-semibold text-slate-400">/ 1.000 điểm</span>
               </div>
               <p className="text-xs text-slate-600 mt-1 max-w-xl">
                 {tierInfo.description}
@@ -148,18 +157,18 @@ export const MyReportsPage: React.FC = () => {
           <div className="lg:w-72 flex flex-col gap-1.5 justify-center">
             <div className="flex justify-between items-center text-xs font-medium text-slate-600">
               <span>Mức độ tín nhiệm</span>
-              <span className="font-bold text-amber-700">{reputationScore}%</span>
+              <span className="font-bold text-amber-700">{Math.round(Math.min(100, (reputationScore / 1000) * 100))}%</span>
             </div>
             <div className="w-full h-2.5 bg-slate-200/80 rounded-full overflow-hidden p-0.5">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${tierInfo.barClass}`}
-                style={{ width: `${Math.min(100, Math.max(5, reputationScore))}%` }}
+                style={{ width: `${Math.min(100, Math.max(3, (reputationScore / 1000) * 100))}%` }}
               />
             </div>
             <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-              <span>0 (Thấp)</span>
-              <span>50 (Tiêu chuẩn)</span>
-              <span>100 (Xuất sắc)</span>
+              <span>0 (Hạn chế)</span>
+              <span>500 (Tích cực)</span>
+              <span>1.000 (Hiệp sĩ)</span>
             </div>
           </div>
 
@@ -168,17 +177,17 @@ export const MyReportsPage: React.FC = () => {
             <div className="flex items-center gap-2 text-slate-700">
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
               <span>Sự cố nghiệm thu hoàn tất:</span>
-              <span className="font-bold text-emerald-600 ml-auto">+10đ ⭐</span>
+              <span className="font-bold text-emerald-600 ml-auto">+100đ ⭐</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
               <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-              <span>Khảo sát hiện trường duyệt:</span>
-              <span className="font-bold text-blue-600 ml-auto">+5đ 🔍</span>
+              <span>Thẩm định hợp lệ:</span>
+              <span className="font-bold text-blue-600 ml-auto">+50đ 🔍</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
               <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-              <span>Phản ánh sai / spam bị từ chối:</span>
-              <span className="font-bold text-rose-600 ml-auto">-10đ ⚠️</span>
+              <span>Vi phạm tin giả / spam:</span>
+              <span className="font-bold text-rose-600 ml-auto">-100đ ⚠️</span>
             </div>
           </div>
         </div>

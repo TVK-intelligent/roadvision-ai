@@ -394,6 +394,8 @@ export interface TeamRequest {
   baseLongitude?: number;
   baseAddress?: string;
   leaderId?: number;
+  memberIds?: number[];
+  isActive?: boolean;
 }
 
 export interface Staff {

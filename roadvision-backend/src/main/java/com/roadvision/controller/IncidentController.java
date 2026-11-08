@@ -2,6 +2,7 @@ package com.roadvision.controller;
 
 import com.roadvision.dto.*;
 import com.roadvision.entity.User;
+import com.roadvision.entity.UserReputationTransaction;
 import com.roadvision.enums.Category;
 import com.roadvision.enums.IncidentStatus;
 import com.roadvision.enums.Role;
@@ -672,6 +673,32 @@ public class IncidentController {
             @Valid @RequestBody AcceptanceReviewRequest request) {
         Long adminId = getUserIdFromHeader(authHeader);
         return ResponseEntity.ok(incidentService.reviewAcceptance(id, request, adminId));
+    }
+
+    @GetMapping("/leaderboard/citizens")
+    @Operation(summary = "Bảng xếp hạng thi đua công dân theo tháng và điểm uy tín tích lũy dài hạn")
+    public ResponseEntity<List<CitizenLeaderboardResponse>> getCitizenLeaderboard(
+            @RequestParam(name = "period", defaultValue = "month") String period) {
+        return ResponseEntity.ok(incidentService.getCitizenLeaderboard(period));
+    }
+
+    @GetMapping("/reputation/transactions")
+    @Operation(summary = "Lấy lịch sử biến động sổ cái điểm uy tín của người dùng đang đăng nhập")
+    public ResponseEntity<List<UserReputationTransaction>> getMyReputationTransactions(
+            @RequestHeader("Authorization") String authHeader) {
+        Long userId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.getUserReputationTransactions(userId));
+    }
+
+    @PostMapping("/{id}/reverse-fraud")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin thu hồi điểm thưởng và áp dụng phạt vi phạm khi phát hiện gian lận sau duyệt")
+    public ResponseEntity<IncidentResponse> reverseFraud(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable("id") Long id,
+            @Valid @RequestBody FraudReversalRequest request) {
+        Long adminId = getUserIdFromHeader(authHeader);
+        return ResponseEntity.ok(incidentService.reverseFraudIncident(id, request, adminId));
     }
 
     private Long getUserIdFromHeader(String authHeader) {

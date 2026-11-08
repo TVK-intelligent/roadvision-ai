@@ -77,6 +77,18 @@ public class TeamService {
             userRepository.save(leader);
         }
 
+        // Gán các thành viên được chọn vào tổ đội
+        if (request.getMemberIds() != null && !request.getMemberIds().isEmpty()) {
+            for (Long mId : request.getMemberIds()) {
+                if (leader != null && leader.getId().equals(mId)) continue;
+                userRepository.findById(mId).ifPresent(u -> {
+                    u.setTeam(saved);
+                    u.setIsTeamLeader(false);
+                    userRepository.save(u);
+                });
+            }
+        }
+
         log.info("Tạo mới tổ đội thành công: {} (ID: {})", saved.getName(), saved.getId());
         return mapToTeamResponse(saved);
     }
@@ -120,6 +132,28 @@ public class TeamService {
             team.setLeader(null);
         }
 
+        // Đồng bộ danh sách thành viên nếu request có truyền memberIds
+        if (request.getMemberIds() != null) {
+            List<User> curMembers = userRepository.findByTeamId(id);
+            for (User cur : curMembers) {
+                // Không gỡ tổ trưởng
+                if (team.getLeader() != null && team.getLeader().getId().equals(cur.getId())) continue;
+                if (!request.getMemberIds().contains(cur.getId())) {
+                    cur.setTeam(null);
+                    cur.setIsTeamLeader(false);
+                    userRepository.save(cur);
+                }
+            }
+            for (Long mId : request.getMemberIds()) {
+                if (team.getLeader() != null && team.getLeader().getId().equals(mId)) continue;
+                userRepository.findById(mId).ifPresent(u -> {
+                    u.setTeam(team);
+                    u.setIsTeamLeader(false);
+                    userRepository.save(u);
+                });
+            }
+        }
+
         Team updated = teamRepository.save(team);
         return mapToTeamResponse(updated);
     }
@@ -129,7 +163,7 @@ public class TeamService {
         Team team = teamRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tổ đội có ID: " + id));
 
-        // Rời các thành viên ra khỏi team trước khi xóa
+        // Rời toàn bộ thành viên ra khỏi team trước khi giải thể (trở thành nhân sự tự do)
         List<User> members = userRepository.findByTeamId(id);
         for (User u : members) {
             u.setTeam(null);
@@ -137,8 +171,99 @@ public class TeamService {
             userRepository.save(u);
         }
 
-        teamRepository.delete(team);
-        log.info("Đã xóa tổ đội ID: {}", id);
+        team.setLeader(null);
+        team.setIsActive(false);
+
+        try {
+            teamRepository.delete(team);
+            log.info("Đã xóa vĩnh viễn tổ đội ID: {}", id);
+        } catch (Exception ex) {
+            // Trường hợp có hồ sơ sự cố lịch sử trỏ tới team này bằng khóa ngoại, chuyển sang giải thể an toàn (Soft Delete)
+            teamRepository.save(team);
+            log.warn("Tổ đội ID: {} có dữ liệu nhiệm vụ liên kết, đã giải thể và ngưng hoạt động an toàn", id);
+        }
+    }
+
+    @Transactional
+    public TeamResponse addMemberToTeam(Long teamId, Long staffId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tổ đội có ID: " + teamId));
+        User staff = userRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên có ID: " + staffId));
+
+        if (staff.getRole() != Role.ROLE_STAFF) {
+            throw new BadRequestException("Chỉ tài khoản Cán bộ kỹ thuật (ROLE_STAFF) mới có thể gán vào tổ đội");
+        }
+
+        // Nếu nhân viên đang là tổ trưởng của tổ đội khác, gỡ chức vụ tổ trưởng ở đội cũ
+        if (staff.getTeam() != null && !staff.getTeam().getId().equals(teamId)) {
+            Team oldTeam = staff.getTeam();
+            if (oldTeam.getLeader() != null && oldTeam.getLeader().getId().equals(staff.getId())) {
+                oldTeam.setLeader(null);
+                teamRepository.save(oldTeam);
+            }
+        }
+
+        staff.setTeam(team);
+        staff.setIsTeamLeader(false);
+        userRepository.save(staff);
+
+        log.info("Đã thêm nhân viên {} vào tổ đội {}", staff.getFullName(), team.getName());
+        return mapToTeamResponse(team);
+    }
+
+    @Transactional
+    public TeamResponse removeMemberFromTeam(Long teamId, Long staffId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tổ đội có ID: " + teamId));
+        User staff = userRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên có ID: " + staffId));
+
+        if (staff.getTeam() == null || !staff.getTeam().getId().equals(teamId)) {
+            throw new BadRequestException("Nhân viên này không thuộc tổ đội " + team.getName());
+        }
+
+        if (team.getLeader() != null && team.getLeader().getId().equals(staff.getId())) {
+            team.setLeader(null);
+            teamRepository.save(team);
+        }
+
+        staff.setTeam(null);
+        staff.setIsTeamLeader(false);
+        userRepository.save(staff);
+
+        log.info("Đã đưa nhân viên {} ra khỏi tổ đội {}", staff.getFullName(), team.getName());
+        return mapToTeamResponse(team);
+    }
+
+    @Transactional
+    public TeamResponse setTeamLeader(Long teamId, Long staffId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tổ đội có ID: " + teamId));
+        User staff = userRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên có ID: " + staffId));
+
+        if (staff.getRole() != Role.ROLE_STAFF) {
+            throw new BadRequestException("Chỉ tài khoản Cán bộ kỹ thuật (ROLE_STAFF) mới có thể làm tổ trưởng");
+        }
+
+        // Đảm bảo nhân viên thuộc tổ đội này
+        staff.setTeam(team);
+        staff.setIsTeamLeader(true);
+
+        // Hạ cờ tổ trưởng cũ nếu có
+        if (team.getLeader() != null && !team.getLeader().getId().equals(staff.getId())) {
+            User oldLeader = team.getLeader();
+            oldLeader.setIsTeamLeader(false);
+            userRepository.save(oldLeader);
+        }
+
+        team.setLeader(staff);
+        userRepository.save(staff);
+        Team updated = teamRepository.save(team);
+
+        log.info("Đã chỉ định {} làm tổ trưởng cho {}", staff.getFullName(), team.getName());
+        return mapToTeamResponse(updated);
     }
 
     // ==================== QUẢN LÝ NHÂN VIÊN (STAFF) ====================
