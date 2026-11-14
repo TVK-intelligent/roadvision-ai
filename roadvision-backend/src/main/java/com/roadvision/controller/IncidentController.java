@@ -264,6 +264,13 @@ public class IncidentController {
         return ResponseEntity.ok(res);
     }
 
+    @PostMapping("/reset-patrol-tracker")
+    @Operation(summary = "Đặt lại trạng thái bộ bám vết đối tượng ByteTracker khi bắt đầu video tuần tra mới")
+    public ResponseEntity<Map<String, Object>> resetPatrolTracker() {
+        patrolVideoAiService.resetTracker();
+        return ResponseEntity.ok(Map.of("success", true, "message", "Đã đặt lại bộ bám vết ByteTracker thành công"));
+    }
+
     /**
      * PHA 3: Quản trị viên lấy danh sách hàng đợi điều phối (Dispatch Queue)
      */

@@ -161,6 +161,21 @@ public class AiPipelineEvaluationTest {
                             g.setStroke(new java.awt.BasicStroke(Math.max(2, img.getWidth() / 300)));
                             g.drawRect(b.getX(), b.getY(), b.getWidth(), b.getHeight());
 
+                            // Vẽ đa giác contour (Segmentation Polygon Mask) ôm sát thân/tán cây hoặc vật cản
+                            if (b.getPolygon() != null && b.getPolygon().size() >= 3) {
+                                int n = b.getPolygon().size();
+                                int[] xPoints = new int[n];
+                                int[] yPoints = new int[n];
+                                for (int pi = 0; pi < n; pi++) {
+                                    xPoints[pi] = b.getPolygon().get(pi)[0];
+                                    yPoints[pi] = b.getPolygon().get(pi)[1];
+                                }
+                                g.setColor(new java.awt.Color(col.getRed(), col.getGreen(), col.getBlue(), 65));
+                                g.fillPolygon(xPoints, yPoints, n);
+                                g.setColor(col);
+                                g.drawPolygon(xPoints, yPoints, n);
+                            }
+
                             String label = String.format("%s %.0f%%", b.getClassName(), b.getConfidence() * 100);
                             java.awt.FontMetrics fm = g.getFontMetrics();
                             int tw = fm.stringWidth(label);

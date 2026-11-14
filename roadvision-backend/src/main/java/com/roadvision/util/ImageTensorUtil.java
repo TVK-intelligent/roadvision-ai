@@ -28,6 +28,8 @@ public class ImageTensorUtil {
         private int height;
         private float confidence;
         private String className;
+        private List<int[]> polygon; // Tọa độ đa giác [x, y] phân đoạn ôm sát viền đối tượng (Segmentation Contour)
+        private Integer trackId;     // Định danh vết theo dõi liên khung hình cho video tuần tra (ByteTrack ID)
     }
 
     @Data

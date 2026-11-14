@@ -467,6 +467,8 @@ public class AiInferenceService {
                     .y(b.getY())
                     .width(b.getWidth())
                     .height(b.getHeight())
+                    .polygon(b.getPolygon())
+                    .trackId(b.getTrackId())
                     .build());
         }
         return calibrated;
@@ -1691,9 +1693,9 @@ public class AiInferenceService {
             return null;
         }
 
-        // Với vật cản có độ tin cậy tốt (>= 35%) trên lòng đường, tin tưởng mô hình AI
-        if (b.getConfidence() >= 0.35f) {
-            return b;
+        // Với vật cản trên lòng đường, nếu là cây đổ hoặc vật cản lớn chiếm diện rộng, tiến hành siết viền ôm sát & trích xuất đa giác
+        if (bw >= 150 || bh >= 120) {
+            return tightenFallenTreeAndExtractPolygon(img, b);
         }
 
         // Lọc đối tượng nằm hoàn toàn ở vỉa hè xa / lề cỏ ngoại vi ngoài hành lang làn xe chạy
@@ -1754,6 +1756,99 @@ public class AiInferenceService {
         }
 
         return b;
+    }
+
+    /**
+     * Tinh chỉnh thu gọn Bounding Box và trích xuất đường viền đa giác ôm sát thân/tán cây đổ
+     * Cắt bỏ phần vỉa hè lát đá trống ở mép đáy và nền trời/nhà cửa ở mép trên.
+     */
+    private ImageTensorUtil.BoundingBox tightenFallenTreeAndExtractPolygon(BufferedImage img, ImageTensorUtil.BoundingBox b) {
+        int bx = Math.max(0, b.getX());
+        int by = Math.max(0, b.getY());
+        int bw = Math.min(img.getWidth() - bx, b.getWidth());
+        int bh = Math.min(img.getHeight() - by, b.getHeight());
+        if (bw < 180 || bh < 140) return b;
+
+        int minX = bx + bw, maxX = bx, minY = by + bh, maxY = by;
+        List<int[]> contourPoints = new ArrayList<>();
+        int step = Math.max(2, Math.min(bw, bh) / 40);
+        int treePixelCount = 0;
+
+        for (int y = by; y < by + bh; y += step) {
+            int rowFirstX = -1, rowLastX = -1;
+            for (int x = bx; x < bx + bw; x += step) {
+                int rgb = img.getRGB(x, y);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int bVal = rgb & 0xFF;
+                int luma = (int) (0.299 * r + 0.587 * g + 0.114 * bVal);
+
+                // Nhận diện thân gỗ, rễ cây đứt gãy, tán lá cành xanh
+                boolean isFoliage = (g > r + 8 && g > bVal + 5 && luma > 35 && luma < 200);
+                boolean isWoodOrRoot = (r > bVal + 12 && g > bVal && luma >= 30 && luma <= 150);
+                boolean isDarkTrunk = (luma < 50 && Math.abs(r - bVal) < 18);
+
+                // Loại bỏ gạch vỉa hè lục giác xám hoặc nền đường ướt phẳng không có chướng ngại
+                boolean isSidewalkTile = (Math.abs(r - g) <= 14 && Math.abs(g - bVal) <= 14 && luma >= 80 && luma <= 190 && !isFoliage);
+                boolean isPlainWetAsphalt = (Math.abs(r - g) <= 8 && Math.abs(g - bVal) <= 8 && luma < 80 && !isFoliage);
+
+                if ((isFoliage || isWoodOrRoot || isDarkTrunk) && !isSidewalkTile && !isPlainWetAsphalt) {
+                    treePixelCount++;
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    if (rowFirstX == -1) rowFirstX = x;
+                    rowLastX = x;
+                }
+            }
+            if (rowFirstX != -1 && rowLastX != -1) {
+                contourPoints.add(new int[]{rowFirstX, y});
+                if (rowLastX > rowFirstX) {
+                    contourPoints.add(new int[]{rowLastX, y});
+                }
+            }
+        }
+
+        log.info("tightenFallenTree: treePixelCount={}, minX={}, maxX={}, minY={}, maxY={}, orig=[{},{},{},{}]",
+                treePixelCount, minX, maxX, minY, maxY, bx, by, bw, bh);
+        if (treePixelCount >= 18 && minX < maxX && minY < maxY) {
+            int padX = Math.max(6, (int) ((maxX - minX) * 0.04));
+            int padY = Math.max(6, (int) ((maxY - minY) * 0.04));
+
+            int tightX = Math.max(bx, minX - padX);
+            int tightY = Math.max(by, minY - padY);
+            int tightRight = Math.min(bx + bw, maxX + padX);
+            int tightBottom = Math.min(by + bh, maxY + padY);
+            int tightW = Math.max(20, tightRight - tightX);
+            int tightH = Math.max(20, tightBottom - tightY);
+
+            List<int[]> polygon = simplifyContourToPolygon(contourPoints, 12);
+
+            return ImageTensorUtil.BoundingBox.builder()
+                    .className("ROAD_OBSTACLE")
+                    .confidence(b.getConfidence())
+                    .x(tightX)
+                    .y(tightY)
+                    .width(tightW)
+                    .height(tightH)
+                    .polygon(polygon)
+                    .trackId(b.getTrackId())
+                    .build();
+        }
+        return b;
+    }
+
+    private List<int[]> simplifyContourToPolygon(List<int[]> pts, int maxPoints) {
+        if (pts == null || pts.isEmpty()) return Collections.emptyList();
+        if (pts.size() <= maxPoints) return pts;
+        List<int[]> simplified = new ArrayList<>();
+        int step = Math.max(1, pts.size() / maxPoints);
+        for (int i = 0; i < pts.size(); i += step) {
+            simplified.add(pts.get(i));
+            if (simplified.size() >= maxPoints) break;
+        }
+        return simplified;
     }
 
     private List<ImageTensorUtil.BoundingBox> decomposeClusteredObstacle(

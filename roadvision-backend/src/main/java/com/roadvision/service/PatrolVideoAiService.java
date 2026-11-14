@@ -48,13 +48,19 @@ public class PatrolVideoAiService {
     };
 
     private final ResourceLoader resourceLoader;
+    private final com.roadvision.util.ByteTracker byteTracker;
     private OrtEnvironment env;
     private OrtSession session;
     private boolean isModelLoaded = false;
     private int cachedInputSize = 800;
 
     public PatrolVideoAiService(ResourceLoader resourceLoader) {
+        this(resourceLoader, new com.roadvision.util.ByteTracker());
+    }
+
+    public PatrolVideoAiService(ResourceLoader resourceLoader, com.roadvision.util.ByteTracker byteTracker) {
         this.resourceLoader = resourceLoader;
+        this.byteTracker = byteTracker;
     }
 
     @PostConstruct
@@ -352,8 +358,18 @@ public class PatrolVideoAiService {
             List<ImageTensorUtil.BoundingBox> visibleBoxes = new ArrayList<>();
             for (ImageTensorUtil.BoundingBox b : finalVideoBoxes) {
                 if (b.getConfidence() >= effectiveThreshold) {
-                    visibleBoxes.add(b);
+                    if ("ROAD_OBSTACLE".equals(b.getClassName()) && (b.getWidth() >= 160 || b.getHeight() >= 120)) {
+                        visibleBoxes.add(tightenObstacleBoxAndExtractPolygon(image, b));
+                    } else {
+                        visibleBoxes.add(b);
+                    }
                 }
+            }
+
+            // BƯỚC 6: BÁM VẾT ĐA MỤC TIÊU THỜI GIAN THỰC (BYTETRACKING)
+            // Gán Track ID liên tục, triệt tiêu đếm trùng và hiện tượng nhấp nháy box
+            if (byteTracker != null) {
+                return byteTracker.update(visibleBoxes);
             }
 
             return visibleBoxes;
@@ -914,5 +930,104 @@ public class PatrolVideoAiService {
         }
 
         return b;
+    }
+
+    /**
+     * Tinh chỉnh thu gọn Bounding Box và trích xuất Polygon cho cây đổ / vật cản lớn trong Video
+     */
+    private ImageTensorUtil.BoundingBox tightenObstacleBoxAndExtractPolygon(BufferedImage img, ImageTensorUtil.BoundingBox b) {
+        if (img == null || b == null) return b;
+        int imgW = img.getWidth();
+        int imgH = img.getHeight();
+
+        int rx = Math.max(0, Math.min(b.getX(), imgW - 1));
+        int ry = Math.max(0, Math.min(b.getY(), imgH - 1));
+        int rw = Math.min(b.getWidth(), imgW - rx);
+        int rh = Math.min(b.getHeight(), imgH - ry);
+        if (rw <= 30 || rh <= 30) return b;
+
+        int minX = rx + rw, maxX = rx, minY = ry + rh, maxY = ry;
+        List<int[]> contourPoints = new ArrayList<>();
+        int step = Math.max(2, Math.min(rw, rh) / 35);
+        int obstaclePixelCount = 0;
+
+        for (int py = ry; py < ry + rh; py += step) {
+            int rowFirstX = -1, rowLastX = -1;
+            for (int px = rx; px < rx + rw; px += step) {
+                int rgb = img.getRGB(px, py);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int bVal = rgb & 0xFF;
+                int luma = (int) (0.299 * r + 0.587 * g + 0.114 * bVal);
+
+                boolean isFoliage = (g > r + 8 && g > bVal + 5 && luma > 35 && luma < 200);
+                boolean isWoodOrRoot = (r > bVal + 12 && g > bVal && luma >= 30 && luma <= 150);
+                boolean isDarkObject = (luma < 52 && Math.abs(r - bVal) < 18);
+                boolean isBrightObstacle = (r > 175 && r > g + 35 && r > bVal + 50);
+
+                boolean isPlainSidewalk = (Math.abs(r - g) <= 14 && Math.abs(g - bVal) <= 14 && luma >= 80 && luma <= 190 && !isFoliage);
+                boolean isPlainWetAsphalt = (Math.abs(r - g) <= 8 && Math.abs(g - bVal) <= 8 && luma < 80 && !isFoliage);
+
+                if ((isFoliage || isWoodOrRoot || isDarkObject || isBrightObstacle) && !isPlainSidewalk && !isPlainWetAsphalt) {
+                    obstaclePixelCount++;
+                    if (px < minX) minX = px;
+                    if (px > maxX) maxX = px;
+                    if (py < minY) minY = py;
+                    if (py > maxY) maxY = py;
+                    if (rowFirstX == -1) rowFirstX = px;
+                    rowLastX = px;
+                }
+            }
+            if (rowFirstX != -1 && rowLastX != -1) {
+                contourPoints.add(new int[]{rowFirstX, py});
+                if (rowLastX > rowFirstX) {
+                    contourPoints.add(new int[]{rowLastX, py});
+                }
+            }
+        }
+
+        if (obstaclePixelCount >= 16 && minX < maxX && minY < maxY) {
+            int padX = Math.max(6, (int) ((maxX - minX) * 0.05));
+            int padY = Math.max(6, (int) ((maxY - minY) * 0.05));
+
+            int tightX = Math.max(rx, minX - padX);
+            int tightY = Math.max(ry, minY - padY);
+            int tightW = Math.min(imgW - tightX, (maxX - minX) + padX * 2);
+            int tightH = Math.min(imgH - tightY, (maxY - minY) + padY * 2);
+
+            List<int[]> polygon = simplifyContourToPolygon(contourPoints, 12);
+
+            if (tightW <= rw && tightH <= rh && (tightW * tightH) < (rw * rh)) {
+                return ImageTensorUtil.BoundingBox.builder()
+                        .className("ROAD_OBSTACLE")
+                        .confidence(b.getConfidence())
+                        .x(tightX)
+                        .y(tightY)
+                        .width(tightW)
+                        .height(tightH)
+                        .polygon(polygon)
+                        .build();
+            }
+        }
+
+        return b;
+    }
+
+    private List<int[]> simplifyContourToPolygon(List<int[]> pts, int maxPoints) {
+        if (pts == null || pts.isEmpty()) return Collections.emptyList();
+        if (pts.size() <= maxPoints) return pts;
+        List<int[]> simplified = new ArrayList<>();
+        int step = Math.max(1, pts.size() / maxPoints);
+        for (int i = 0; i < pts.size(); i += step) {
+            simplified.add(pts.get(i));
+            if (simplified.size() >= maxPoints) break;
+        }
+        return simplified;
+    }
+
+    public void resetTracker() {
+        if (byteTracker != null) {
+            byteTracker.reset();
+        }
     }
 }
